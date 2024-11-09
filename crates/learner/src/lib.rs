@@ -36,6 +36,7 @@ pub mod clients;
 pub mod database;
 pub mod errors;
 pub mod format;
+pub mod llm;
 pub mod paper;
 pub mod pdf;
 
