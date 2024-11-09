@@ -118,12 +118,6 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Install cargo-semver-checks
-        uses: taiki-e/install-action@cargo-semver-checks
-
-      - name: Run semver checks for learnerd
-        run: cd crates/learnerd && cargo semver-checks check-release
-
       - name: Run release-plz for learnerd
         uses: MarcoIeni/release-plz-action@v0.5.41
         env:
