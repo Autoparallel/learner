@@ -32,7 +32,7 @@ jobs:
         run: cargo semver-checks check-release --workspace
 
       - name: Update Cargo.lock
-        uses: stefanzweifel/git-auto-commit-action@v5  # Better commit action
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: update Cargo.lock"
           file_pattern: "Cargo.lock"
@@ -42,3 +42,52 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # New steps with better error handling and correct version matching
+      - name: Get latest version
+        id: get_version
+        run: |
+          VERSION=$(cargo metadata --format-version=1 | jq -r '.packages[] | select(.name == "learner") | .version')
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not determine learner crate version"
+            exit 1
+          fi
+          echo "Found learner version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update workspace manifest
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+          if [ -z "$VERSION" ]; then
+            echo "Error: Version was not set properly"
+            exit 1
+          fi
+          
+          # Create backup
+          cp Cargo.toml Cargo.toml.bak
+          
+          # Update version using perl for better regex support
+          if ! perl -i -pe "s/(learner = \{ path = \"crates\/learner\", version = \")[\d\.]+(\"\})/\${1}$VERSION\${2}/" Cargo.toml; then
+            echo "Error: Failed to update version in Cargo.toml"
+            mv Cargo.toml.bak Cargo.toml
+            exit 1
+          fi
+          
+          # Verify the change
+          if ! grep -q "learner.*version = \"$VERSION\"" Cargo.toml; then
+            echo "Error: Version update verification failed"
+            mv Cargo.toml.bak Cargo.toml
+            exit 1
+          fi
+          
+          # Remove backup if everything succeeded
+          rm Cargo.toml.bak
+          
+          echo "Successfully updated workspace manifest to version $VERSION"
+
+      - name: Commit workspace changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update workspace manifest learner version to ${{ steps.get_version.outputs.version }}"
+          file_pattern: "Cargo.toml"
+          commit_options: "--no-verify"
