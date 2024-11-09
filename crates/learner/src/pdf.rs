@@ -2,6 +2,7 @@
 use std::path::Path;
 
 use lopdf::{Document, Object};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use super::*;
@@ -74,30 +75,34 @@ impl PDFAnalyzer {
 
   fn extract_pages(&self, doc: &Document) -> Result<Vec<PageContent>, LearnerError> {
     let mut pages = Vec::new();
+    let re = Regex::new(r"\(([^)]+)\)").unwrap(); // TODO (autoparallel): use lazy static
 
     for (page_num, page_id) in doc.page_iter().enumerate() {
-      println!("Processing page {}, id: {:?}", page_num + 1, page_id);
+      debug!("Processing page {}, id: {:?}", page_num + 1, page_id);
 
       let page = doc.get_object(page_id)?;
-      println!("Page object: {:?}", page);
-
       let page_dict = page.as_dict()?;
-      println!("Page dict: {:?}", page_dict);
 
-      // Get Contents object(s)
       match page_dict.get(b"Contents") {
         Ok(contents) => {
+          let mut text = String::new();
           println!("Contents: {:?}", contents);
           let text_ref = contents.as_reference()?;
           dbg!(text_ref);
 
-          let text = doc.get_object(text_ref)?;
-          dbg!(text);
-          let text_stream = text.as_stream()?;
+          let text_object = doc.get_object(text_ref)?;
+          dbg!(text_object);
+          let text_stream = text_object.as_stream()?;
           let plain_content = text_stream.get_plain_content()?;
-          dbg!(String::from_utf8_lossy(&plain_content));
+          let plain_content_string = String::from_utf8_lossy(&plain_content);
+          dbg!(&plain_content_string);
+          for cap in re.captures_iter(&plain_content_string) {
+            text.push_str(&cap[1]);
+            text.push(' '); // Add space between text segments
+          }
+          dbg!(&text);
           //   println!("Extracted text length: {}", text.len());
-          //   pages.push(PageContent { page_number: page_num as u32 + 1, text });
+          pages.push(PageContent { page_number: page_num as u32 + 1, text });
         },
         Err(e) => println!("Failed to get Contents: {:?}", e),
       }
@@ -138,24 +143,18 @@ mod tests {
     let analyzer = PDFAnalyzer::new();
     let content = analyzer.analyze(test_pdf).unwrap();
 
-    // // Test page content
-    // assert!(!content.pages.is_empty(), "Should have at least one page");
+    // Test page content
+    assert!(!content.pages.is_empty(), "Should have at least one page");
 
-    // // First page should contain title and abstract
-    // let first_page = &content.pages[0];
-    // assert!(
-    //   first_page.text.contains("Analysis of PDF Extraction Methods"),
-    //   "First page should contain title"
-    // );
-    // assert!(
-    //   first_page.text.contains("This is a sample paper"),
-    //   "First page should contain abstract"
-    // );
-
-    // Print first 200 chars of each page for inspection
-    for page in &content.pages {
-      println!("\nPage {}:", page.page_number);
-      println!("First 200 chars: {:?}", page.text.chars().take(200).collect::<String>());
-    }
+    // First page should contain title and abstract
+    let first_page = &content.pages[0];
+    assert!(
+      first_page.text.contains("Analysis of PDF Extraction Methods"),
+      "First page should contain title"
+    );
+    assert!(
+      first_page.text.contains("This is a sample paper"),
+      "First page should contain abstract"
+    );
   }
 }
