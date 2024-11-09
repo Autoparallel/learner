@@ -30,6 +30,7 @@ pub mod database;
 pub mod errors;
 pub mod format;
 pub mod paper;
+pub mod pdf;
 
 use clients::{ArxivClient, DOIClient, IACRClient};
 use database::Database;

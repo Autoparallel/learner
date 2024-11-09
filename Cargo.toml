@@ -30,6 +30,7 @@ tracing = { version = "0.1", default-features = false }
 # learner only
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
 lazy_static = { version = "1.5", default-features = false }
+lopdf = { version = "0.34" }
 quick-xml = { version = "0.37", default-features = false, features = [
   "serialize",
 ] }
@@ -46,7 +47,6 @@ rusqlite = { version = "0.32", default-features = false, features = [
 serde_json = { version = "1.0", default-features = false }
 tokio-rusqlite = { version = "0.6", default-features = false }
 url = { version = "2.5", default-features = false }
-lopdf = { version = "0.34", default-features = false }
 
 # learnerd only
 clap = { version = "4.0", default-features = false, features = [

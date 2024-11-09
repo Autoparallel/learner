@@ -130,6 +130,10 @@ pub enum LearnerError {
   /// usually when dealing with database column indices or sizes.
   #[error(transparent)]
   ColumnOverflow(#[from] std::num::TryFromIntError),
+
+  /// An error occured parsing a pdf.
+  #[error("{0}")]
+  PDFError(String),
 }
 
 impl LearnerError {
