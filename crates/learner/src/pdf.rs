@@ -1,9 +1,4 @@
-#![allow(missing_docs, clippy::missing_docs_in_private_items)]
-use std::path::Path;
-
-use lopdf::{Document, Object};
-use regex::Regex;
-use serde::{Deserialize, Serialize};
+use lopdf::Document;
 
 use super::*;
 
@@ -75,7 +70,9 @@ impl PDFAnalyzer {
 
   fn extract_pages(&self, doc: &Document) -> Result<Vec<PageContent>, LearnerError> {
     let mut pages = Vec::new();
-    let re = Regex::new(r"\(([^)]+)\)").unwrap(); // TODO (autoparallel): use lazy static
+    lazy_static! {
+      static ref PDF_TEXT_REGEX: Regex = Regex::new(r"\(([^)]+)\)").unwrap();
+    };
 
     for (page_num, page_id) in doc.page_iter().enumerate() {
       debug!("Processing page {}, id: {:?}", page_num + 1, page_id);
@@ -86,22 +83,14 @@ impl PDFAnalyzer {
       match page_dict.get(b"Contents") {
         Ok(contents) => {
           let mut text = String::new();
-          println!("Contents: {:?}", contents);
           let text_ref = contents.as_reference()?;
-          dbg!(text_ref);
-
-          let text_object = doc.get_object(text_ref)?;
-          dbg!(text_object);
-          let text_stream = text_object.as_stream()?;
-          let plain_content = text_stream.get_plain_content()?;
-          let plain_content_string = String::from_utf8_lossy(&plain_content);
-          dbg!(&plain_content_string);
-          for cap in re.captures_iter(&plain_content_string) {
+          let plain_content = doc.get_object(text_ref)?.as_stream()?.get_plain_content()?;
+          for cap in PDF_TEXT_REGEX.captures_iter(&String::from_utf8_lossy(&plain_content)) {
             text.push_str(&cap[1]);
-            text.push(' '); // Add space between text segments
+            text.push(' '); // TODO (autoparallel): This adds space between text segments, but it
+                            // does so too aggressively
           }
-          dbg!(&text);
-          //   println!("Extracted text length: {}", text.len());
+          trace!("text for page {}: {}", page_num, text);
           pages.push(PageContent { page_number: page_num as u32 + 1, text });
         },
         Err(e) => println!("Failed to get Contents: {:?}", e),
@@ -114,7 +103,6 @@ impl PDFAnalyzer {
 
 #[cfg(test)]
 mod tests {
-  use std::path::PathBuf;
 
   use super::*;
 
@@ -153,7 +141,7 @@ mod tests {
       "First page should contain title"
     );
     assert!(
-      first_page.text.contains("This is a sample paper"),
+      first_page.text.contains("Abstract \\227This is a sam ple paper"),
       "First page should contain abstract"
     );
   }

@@ -30,8 +30,6 @@
 //! # }
 //! ```
 
-use std::path::Path;
-
 use rusqlite::params;
 use tokio_rusqlite::Connection;
 

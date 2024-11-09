@@ -18,9 +18,15 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 #![feature(str_from_utf16_endian)]
 
-use std::{path::PathBuf, str::FromStr};
+use std::{
+  path::{Path, PathBuf},
+  str::FromStr,
+};
 
 use chrono::{DateTime, TimeZone, Utc};
+use lazy_static::lazy_static;
+use paper::{Author, Paper, Source};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, trace};
 #[cfg(test)]
@@ -33,7 +39,8 @@ pub mod format;
 pub mod paper;
 pub mod pdf;
 
-use clients::{ArxivClient, DOIClient, IACRClient};
-use database::Database;
-use errors::LearnerError;
-use paper::{Author, Paper, Source};
+use crate::{
+  clients::{ArxivClient, DOIClient, IACRClient},
+  database::Database,
+  errors::LearnerError,
+};
