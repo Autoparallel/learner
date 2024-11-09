@@ -8,12 +8,13 @@ license.workspace    = true
 name                 = "learner"
 readme.workspace     = true
 repository.workspace = true
-version              = "0.2.3"
+version              = "0.3.0"
 
 [dependencies]
 chrono         = { workspace = true }
-dirs           = { workspace = true }
+dirs           = { workspace = true } # TODO (autoparallel): move into workspace
 lazy_static    = { workspace = true }
+lopdf          = { workspace = true }
 quick-xml      = { workspace = true }
 regex          = { workspace = true }
 reqwest        = { workspace = true }

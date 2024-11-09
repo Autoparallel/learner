@@ -12,60 +12,50 @@ repository = "https://github.com/autoparallel/learner"
 
 [workspace.dependencies]
 # local
-learner = { path = "crates/learner", version = "0.2.3" }
+learner = { path = "crates/learner", version = "0.3.0" }
 
 # shared
-dirs = { version = "5.0", default-features = false }
-serde = { version = "1.0", default-features = false, features = ["derive"] }
-thiserror = { version = "2.0", default-features = false }
-tokio = { version = "1.41", default-features = false, features = [
+dirs = { version = "5.0" }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = { version = "2.0" }
+tokio = { version = "1.41", features = [
   "rt",
   "rt-multi-thread",
   "macros",
   "fs",
   "io-util",
 ] }
-tracing = { version = "0.1", default-features = false }
+tracing = { version = "0.1" }
 
 # learner only
-chrono = { version = "0.4", default-features = false, features = ["serde"] }
-lazy_static = { version = "1.5", default-features = false }
-quick-xml = { version = "0.37", default-features = false, features = [
-  "serialize",
-] }
-regex = { version = "1.11", default-features = false }
-reqwest = { version = "0.12", default-features = false, features = [
+chrono = { version = "0.4", features = ["serde"] }
+lazy_static = { version = "1.5" }
+lopdf = { version = "0.34" }
+quick-xml = { version = "0.37", features = ["serialize"] }
+regex = { version = "1.11" }
+reqwest = { version = "0.12", features = [
   "json",
   "rustls-tls",
-] }
-rusqlite = { version = "0.32", default-features = false, features = [
-  "bundled",
-  "functions",
-  "chrono",
-] }
-serde_json = { version = "1.0", default-features = false }
-tokio-rusqlite = { version = "0.6", default-features = false }
-url = { version = "2.5", default-features = false }
+], default-features = false }
+rusqlite = { version = "0.32", features = ["bundled", "functions", "chrono"] }
+serde_json = { version = "1.0" }
+tokio-rusqlite = { version = "0.6" }
+url = { version = "2.5" }
 
 # learnerd only
-clap = { version = "4.0", default-features = false, features = [
-  "derive",
-  "std",
-] }
-console = { version = "0.15", default-features = false }
-dialoguer = { version = "0.11", default-features = false }
-glob = { version = "0.3", default-features = false }
-nix = { version = "0.29.0", default-features = false, features = ["signal"] }
-tracing-appender = { version = "0.2", default-features = false }
-tracing-subscriber = { version = "0.3", default-features = false, features = [
-  "env-filter",
-] }
+clap               = { version = "4.0", features = ["derive", "std"] }
+console            = { version = "0.15" }
+dialoguer          = { version = "0.11" }
+glob               = { version = "0.3" }
+nix                = { version = "0.29.0", features = ["signal"] }
+tracing-appender   = { version = "0.2" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # dev only
-anyhow       = { version = "1.0", default-features = false }
-assert_cmd   = { version = "2.0", default-features = false }
-predicates   = { version = "3.1", default-features = false }
-serial_test  = { version = "3.1", default-features = false }
-tempfile     = { version = "3.13", default-features = false }
+anyhow       = { version = "1.0" }
+assert_cmd   = { version = "2.0" }
+predicates   = { version = "3.1" }
+serial_test  = { version = "3.1" }
+tempfile     = { version = "3.13" }
 tokio-test   = { version = "0.4" }
-tracing-test = { version = "0.2", default-features = false }
+tracing-test = { version = "0.2" }

@@ -117,19 +117,29 @@ pub enum LearnerError {
   #[error(transparent)]
   Path(#[from] std::io::Error),
 
-  /// The database hasn't been properly initialized.
-  ///
-  /// This occurs when attempting to use the database before it
-  /// has been initialized with the required schema.
-  #[error("Database not initialized")]
-  DatabaseNotInitialized,
-
   /// A numeric conversion failed, typically in database operations.
   ///
   /// This occurs when converting between different numeric types,
   /// usually when dealing with database column indices or sizes.
   #[error(transparent)]
   ColumnOverflow(#[from] std::num::TryFromIntError),
+
+  /// PDF parsing and processing errors from the lopdf library.
+  ///
+  /// This variant wraps errors from the lopdf library, which can occur during:
+  /// - Initial PDF file parsing
+  /// - Object access within the PDF structure
+  /// - Stream decompression and content extraction
+  /// - Dictionary access and type conversion
+  ///
+  /// Common error cases include:
+  /// - Malformed or corrupted PDF files
+  /// - Missing required PDF objects or references
+  /// - Invalid stream encoding
+  /// - Type mismatches when accessing PDF objects
+  /// - Encrypted PDF files that require passwords
+  #[error(transparent)]
+  Lopdf(#[from] lopdf::Error),
 }
 
 impl LearnerError {

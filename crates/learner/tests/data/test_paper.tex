@@ -1,0 +1,92 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{amsmath,graphicx,lipsum}
+
+% Enhanced metadata configuration
+\usepackage[pdftex,
+    pdftitle={Analysis of PDF Extraction Methods},
+    pdfauthor={Alice Researcher and Bob Scholar},
+    pdfsubject={PDF Content Analysis},
+    pdfkeywords={PDF analysis, text extraction, metadata, academic papers},
+    pdfproducer={pdfTeX},
+    pdfcreator={LaTeX with hyperref}
+]{hyperref}
+
+\title{Analysis of PDF Extraction Methods\\
+\large{With Multiple Features for Testing}}
+
+\author{
+    \IEEEauthorblockN{Alice Researcher\textsuperscript{1}, Bob Scholar\textsuperscript{2}}
+    \IEEEauthorblockA{\textsuperscript{1}Department of Computer Science, Example University\\
+    Email: alice@example.edu}
+    \IEEEauthorblockA{\textsuperscript{2}Institute of Technology, Another University\\
+    Email: bob@example.edu}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This is a sample paper designed for testing PDF analysis features. It includes various elements like \textbf{bold text}, \textit{italics}, citations \cite{smith2023}, equations, tables, and figures. The paper has been carefully constructed to test extraction of metadata, structure, and content.
+\end{abstract}
+
+\section{Introduction}
+\lipsum[1]
+
+Here's a link to \href{https://example.com}{Example Website} and a footnote\footnote{This is a sample footnote.}.
+
+\section{Methods}
+\subsection{Experimental Setup}
+This section includes an equation:
+\begin{equation}
+    E = mc^2 \label{eq:einstein}
+\end{equation}
+
+And a table:
+\begin{table}[ht]
+    \caption{Sample Results}
+    \centering
+    \begin{tabular}{|c|c|c|}
+        \hline
+        Method & Accuracy & Time (ms) \\
+        \hline
+        A & 95\% & 100 \\
+        B & 92\% & 80 \\
+        \hline
+    \end{tabular}
+    \label{tab:results}
+\end{table}
+
+\subsection{Implementation}
+\lipsum[2]
+
+\section{Results}
+Here's a simple figure:
+\begin{figure}[ht]
+    \centering
+    \rule{3cm}{2cm} % This creates a simple black rectangle
+    \caption{A Sample Figure}
+    \label{fig:sample}
+\end{figure}
+
+As shown in Figure \ref{fig:sample}, we can see that...
+
+\section{Discussion}
+Here's a list of key points:
+\begin{itemize}
+    \item Point A with citation \cite{jones2022}
+    \item Point B with equation reference (\ref{eq:einstein})
+    \item Point C with figure reference (Fig. \ref{fig:sample})
+\end{itemize}
+
+\section{Conclusion}
+This test paper demonstrates various PDF features including metadata, structure, cross-references, and different content types.
+
+% Bibliography
+\begin{thebibliography}{2}
+\bibitem{smith2023} J. Smith, ``Sample Paper Title,'' Journal of Examples, vol. 1, no. 1, pp. 1-10, 2023. DOI: 10.1234/example.2023.001
+
+\bibitem{jones2022} R. Jones, ``Another Sample Paper,'' Proc. Int. Conf. Examples, pp. 100-110, 2022. DOI: 10.5678/conf.2022.123
+\end{thebibliography}
+
+\end{document}
