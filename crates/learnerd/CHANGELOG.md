@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/Autoparallel/learner/compare/learnerd-v0.1.2...learnerd-v0.1.3) - 2024-11-09
+
+### Added
+- pdf extraction ([#56](https://github.com/Autoparallel/learner/pull/56))
+
 ## [0.1.2](https://github.com/Autoparallel/learner/compare/learnerd-v0.1.1...learnerd-v0.1.2) - 2024-11-09
 
 ### Added
