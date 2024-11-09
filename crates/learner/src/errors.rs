@@ -140,6 +140,9 @@ pub enum LearnerError {
   /// - Encrypted PDF files that require passwords
   #[error(transparent)]
   Lopdf(#[from] lopdf::Error),
+
+  #[error("Content sent to LLM contained too many tokens.")]
+  LLMContentTooLong,
 }
 
 impl LearnerError {
