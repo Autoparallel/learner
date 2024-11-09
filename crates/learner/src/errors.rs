@@ -131,9 +131,11 @@ pub enum LearnerError {
   #[error(transparent)]
   ColumnOverflow(#[from] std::num::TryFromIntError),
 
-  /// An error occured parsing a pdf.
-  #[error("{0}")]
-  PDFError(String),
+  #[error(transparent)]
+  Lopdf(#[from] lopdf::Error),
+
+  #[error(transparent)]
+  UTF8(#[from] std::string::FromUtf8Error),
 }
 
 impl LearnerError {

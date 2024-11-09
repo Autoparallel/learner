@@ -1,2 +1,10 @@
 /target
 .env
+
+# PDFLaTeX stuff
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
