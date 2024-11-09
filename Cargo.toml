@@ -38,7 +38,6 @@ rusqlite       = { version = "0.32", features = ["bundled", "functions", "chrono
 serde_json     = { version = "1.0" }
 tokio-rusqlite = { version = "0.6" }
 url            = { version = "2.5" }
-encoding_rs    = { version = "0.8" }
 
 # learnerd only
 clap               = { version = "4.0", features = ["derive", "std"] }

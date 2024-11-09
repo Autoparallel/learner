@@ -1057,7 +1057,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "dirs",
- "encoding_rs",
+ "flate2",
  "lazy_static",
  "lopdf",
  "quick-xml",

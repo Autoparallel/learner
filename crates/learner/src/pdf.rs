@@ -64,11 +64,10 @@ impl PDFAnalyzer {
       // Check if the string starts with the UTF-16BE BOM (0xFE 0xFF)
       if bytes.starts_with(&[0xFE, 0xFF]) {
         // Skip the BOM and decode as UTF-16BE
-        let (cow, ..) = encoding_rs::UTF_16BE.decode(&bytes[2..]);
-        cow.into_owned()
+        String::from_utf16be_lossy(&bytes[2..])
       } else {
         // Regular string decoding
-        String::from_utf8_lossy(bytes).into_owned()
+        String::from_utf8_lossy(bytes).to_string()
       }
     })
   }
@@ -89,107 +88,22 @@ impl PDFAnalyzer {
       match page_dict.get(b"Contents") {
         Ok(contents) => {
           println!("Contents: {:?}", contents);
-          let text = self.extract_text_from_contents(doc, contents)?;
-          println!("Extracted text length: {}", text.len());
-          pages.push(PageContent { page_number: page_num as u32 + 1, text });
+          let text_ref = contents.as_reference()?;
+          dbg!(text_ref);
+
+          let text = doc.get_object(text_ref)?;
+          dbg!(text);
+          let text_stream = text.as_stream()?;
+          let plain_content = text_stream.get_plain_content()?;
+          dbg!(String::from_utf8_lossy(&plain_content));
+          //   println!("Extracted text length: {}", text.len());
+          //   pages.push(PageContent { page_number: page_num as u32 + 1, text });
         },
         Err(e) => println!("Failed to get Contents: {:?}", e),
       }
     }
 
     Ok(pages)
-  }
-
-  fn extract_text_from_contents(
-    &self,
-    doc: &Document,
-    contents: &Object,
-  ) -> Result<String, LearnerError> {
-    println!("Extracting text from contents: {:?}", contents);
-    let mut text = String::new();
-
-    match contents {
-      Object::Array(array) => {
-        println!("Processing array of {} content streams", array.len());
-        for content_ref in array {
-          println!("Processing content ref: {:?}", content_ref);
-          if let Ok(content_obj) = doc.get_object(content_ref.as_reference()?) {
-            println!("Content object: {:?}", content_obj);
-            if let Ok(stream) = content_obj.as_stream() {
-              println!("Got stream, decoding content...");
-              let content = stream.decode_content()?;
-              println!("Decoded {} operations", content.operations.len());
-
-              for operation in content.operations {
-                println!(
-                  "Operation: {} with {} operands",
-                  operation.operator,
-                  operation.operands.len()
-                );
-                self.process_text_operation(&operation, &mut text)?;
-              }
-            } else {
-              println!("Failed to get stream from content object");
-            }
-          }
-        }
-      },
-      Object::Reference(r) => {
-        println!("Processing single reference: {:?}", r);
-        // ... similar debug prints for single reference case ...
-      },
-      _ => println!("Unexpected contents type: {:?}", contents),
-    }
-
-    println!("Final text length: {}", text.len());
-    Ok(text)
-  }
-
-  fn process_text_operation(
-    &self,
-    operation: &lopdf::content::Operation,
-    text: &mut String,
-  ) -> Result<(), LearnerError> {
-    match operation.operator.as_str() {
-      // Text showing operators
-      "Tj" | "TJ" => {
-        if let Some(first) = operation.operands.first() {
-          if let Ok(text_bytes) = first.as_str() {
-            // Handle UTF-16BE encoded text
-            if text_bytes.starts_with(&[0xFE, 0xFF]) {
-              let (decoded, ..) = encoding_rs::UTF_16BE.decode(&text_bytes[2..]);
-              text.push_str(&decoded);
-            } else {
-              text.push_str(&String::from_utf8_lossy(text_bytes));
-            }
-            text.push(' '); // Add space between text chunks
-          }
-        }
-      },
-      // Single quote operator (move to next line and show text)
-      "'" => {
-        text.push('\n');
-        if let Some(first) = operation.operands.first() {
-          if let Ok(text_bytes) = first.as_str() {
-            text.push_str(&String::from_utf8_lossy(text_bytes));
-            text.push(' ');
-          }
-        }
-      },
-      // Double quote operator (move to next line and show text with spacing)
-      "\"" => {
-        text.push('\n');
-        if let Some(text_op) = operation.operands.get(2) {
-          if let Ok(text_bytes) = text_op.as_str() {
-            text.push_str(&String::from_utf8_lossy(text_bytes));
-            text.push(' ');
-          }
-        }
-      },
-      _ => {}, // Ignore other operators
-    }
-
-    Ok(())
   }
 }
 
