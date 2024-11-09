@@ -10,8 +10,41 @@ on:
       - main
 
 jobs:
-  release:
-    name: Release
+  check-learner:
+    name: Check Learner Release
+    runs-on: ubuntu-latest
+    outputs:
+      has_release: ${{ steps.check_release.outputs.has_release }}
+      new_version: ${{ steps.check_release.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check for learner release
+        id: check_release
+        run: |
+          # Use release-plz to check if learner has changes requiring release
+          cd crates/learner
+          if release-plz check; then
+            echo "has_release=true" >> $GITHUB_OUTPUT
+            # Get the next version that would be released
+            VERSION=$(cargo metadata --format-version=1 | jq -r '.packages[] | select(.name == "learner") | .version')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "Learner has changes for release, next version: $VERSION"
+          else
+            echo "has_release=false" >> $GITHUB_OUTPUT
+            echo "No release needed for learner"
+          fi
+
+  release-learner:
+    name: Release Learner
+    needs: check-learner
+    if: needs.check-learner.outputs.has_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -28,66 +61,72 @@ jobs:
       - name: Install cargo-semver-checks
         uses: taiki-e/install-action@cargo-semver-checks
 
-      - name: Run semver checks
-        run: cargo semver-checks check-release --workspace
+      - name: Run semver checks for learner
+        run: cd crates/learner && cargo semver-checks check-release
 
-      - name: Update Cargo.lock
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: update Cargo.lock"
-          file_pattern: "Cargo.lock"
-
-      - name: Run release-plz
+      - name: Run release-plz for learner
         uses: MarcoIeni/release-plz-action@v0.5.41
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          RELEASE_PLZ_PATH: crates/learner
 
-      # New steps with better error handling and correct version matching
-      - name: Get latest version
-        id: get_version
+      - name: Create PR for workspace update
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(cargo metadata --format-version=1 | jq -r '.packages[] | select(.name == "learner") | .version')
-          if [ -z "$VERSION" ]; then
-            echo "Error: Could not determine learner crate version"
-            exit 1
-          fi
-          echo "Found learner version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          VERSION=${{ needs.check-learner.outputs.new_version }}
+          BRANCH="chore/update-learner-version-$VERSION"
+          
+          # Create new branch
+          git checkout -b $BRANCH
+          
+          # Update version using perl
+          perl -i -pe "s/(learner = \{ path = \"crates\/learner\", version = \")[\d\.]+(\"\})/\${1}$VERSION\${2}/" Cargo.toml
+          
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml
+          git commit -m "chore: update workspace manifest learner version to $VERSION"
+          git push origin $BRANCH
+          
+          # Create PR
+          gh pr create \
+            --title "chore: update workspace manifest learner version to $VERSION" \
+            --body "This PR updates the workspace manifest to use learner version $VERSION following its release." \
+            --base main \
+            --head $BRANCH
 
-      - name: Update workspace manifest
-        run: |
-          VERSION=${{ steps.get_version.outputs.version }}
-          if [ -z "$VERSION" ]; then
-            echo "Error: Version was not set properly"
-            exit 1
-          fi
-          
-          # Create backup
-          cp Cargo.toml Cargo.toml.bak
-          
-          # Update version using perl for better regex support
-          if ! perl -i -pe "s/(learner = \{ path = \"crates\/learner\", version = \")[\d\.]+(\"\})/\${1}$VERSION\${2}/" Cargo.toml; then
-            echo "Error: Failed to update version in Cargo.toml"
-            mv Cargo.toml.bak Cargo.toml
-            exit 1
-          fi
-          
-          # Verify the change
-          if ! grep -q "learner.*version = \"$VERSION\"" Cargo.toml; then
-            echo "Error: Version update verification failed"
-            mv Cargo.toml.bak Cargo.toml
-            exit 1
-          fi
-          
-          # Remove backup if everything succeeded
-          rm Cargo.toml.bak
-          
-          echo "Successfully updated workspace manifest to version $VERSION"
-
-      - name: Commit workspace changes
-        uses: stefanzweifel/git-auto-commit-action@v5
+  release-learnerd:
+    name: Release Learnerd
+    needs: [check-learner, release-learner]
+    if: |
+      always() &&
+      (needs.check-learner.outputs.has_release == 'false' ||
+       (needs.check-learner.outputs.has_release == 'true' && needs.release-learner.result == 'success'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          commit_message: "chore: update workspace manifest learner version to ${{ steps.get_version.outputs.version }}"
-          file_pattern: "Cargo.toml"
-          commit_options: "--no-verify"
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-semver-checks
+        uses: taiki-e/install-action@cargo-semver-checks
+
+      - name: Run semver checks for learnerd
+        run: cd crates/learnerd && cargo semver-checks check-release
+
+      - name: Run release-plz for learnerd
+        uses: MarcoIeni/release-plz-action@v0.5.41
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          RELEASE_PLZ_PATH: crates/learnerd
