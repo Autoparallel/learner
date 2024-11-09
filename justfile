@@ -37,12 +37,16 @@ install-cargo-tools:
     ensure_installed "cargo-semver-checks" "cargo install cargo-semver-checks"
     ensure_installed "taplo" "cargo install taplo-cli"
 
+# Install nightly rust
+install-rust-nightly:
+    rustup install nightly
+
 # Install required Rust targets
 install-targets:
     rustup target add x86_64-unknown-linux-musl aarch64-apple-darwin
 
 # Setup complete development environment
-setup: install-deps install-targets install-cargo-tools
+setup: install-deps install-targets install-cargo-tools install-rust-nightly
     @echo "Development environment setup complete!"
 
 # Build native target (lib, tests, examples, etc)

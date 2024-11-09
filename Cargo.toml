@@ -12,7 +12,7 @@ repository = "https://github.com/autoparallel/learner"
 
 [workspace.dependencies]
 # local
-learner = { path = "crates/learner", version = "0.2.3" }
+learner = { path = "crates/learner", version = "0.3.0" }
 
 # shared
 dirs = { version = "5.0" }
@@ -28,16 +28,19 @@ tokio = { version = "1.41", features = [
 tracing = { version = "0.1" }
 
 # learner only
-chrono         = { version = "0.4", features = ["serde"] }
-lazy_static    = { version = "1.5" }
-lopdf          = { version = "0.34" }
-quick-xml      = { version = "0.37", features = ["serialize"] }
-regex          = { version = "1.11" }
-reqwest        = { version = "0.12", features = ["json", "rustls-tls"] }
-rusqlite       = { version = "0.32", features = ["bundled", "functions", "chrono"] }
-serde_json     = { version = "1.0" }
+chrono = { version = "0.4", features = ["serde"] }
+lazy_static = { version = "1.5" }
+lopdf = { version = "0.34" }
+quick-xml = { version = "0.37", features = ["serialize"] }
+regex = { version = "1.11" }
+reqwest = { version = "0.12", features = [
+  "json",
+  "rustls-tls",
+], default-features = false }
+rusqlite = { version = "0.32", features = ["bundled", "functions", "chrono"] }
+serde_json = { version = "1.0" }
 tokio-rusqlite = { version = "0.6" }
-url            = { version = "2.5" }
+url = { version = "2.5" }
 
 # learnerd only
 clap               = { version = "4.0", features = ["derive", "std"] }
