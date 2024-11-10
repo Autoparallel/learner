@@ -320,7 +320,7 @@ mod tests {
   #[test]
   fn test_pdf_metadata_extraction() {
     let content =
-      PDFContentBuilder::new().path(PathBuf::from("tests/data/test_paper.pdf")).analyze().unwrap();
+      PDFContentBuilder::new().path(PathBuf::from("tests/.data/test_paper.pdf")).analyze().unwrap();
 
     // Test metadata
     let metadata = content.metadata;
@@ -336,7 +336,7 @@ mod tests {
   #[test]
   fn test_pdf_page_extraction() {
     let content =
-      PDFContentBuilder::new().path(PathBuf::from("tests/data/test_paper.pdf")).analyze().unwrap();
+      PDFContentBuilder::new().path(PathBuf::from("tests/.data/test_paper.pdf")).analyze().unwrap();
 
     // Test page content
     assert!(!content.pages.is_empty(), "Should have at least one page");
