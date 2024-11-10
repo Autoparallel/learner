@@ -944,8 +944,6 @@ async fn main() -> Result<(), LearnerdErrors> {
       Ok(())
     },
     #[cfg(feature = "tui")]
-    Commands::Tui => {
-      todo!()
-    },
+    Commands::Tui => tui::run().await,
   }
 }
