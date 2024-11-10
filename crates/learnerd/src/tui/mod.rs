@@ -1,10 +1,28 @@
 //! Terminal User Interface for learnerd.
 //!
-//! This module provides an interactive TUI for managing papers in the learner database.
-//! It is enabled through the "tui" feature flag and provides a keyboard-driven interface
-//! for viewing, searching, and managing papers.
-
-#![allow(missing_docs, clippy::missing_docs_in_private_items)]
+//! This module provides an interactive terminal interface for managing and viewing academic papers.
+//! It uses the `ratatui` library for rendering and `crossterm` for terminal manipulation and
+//! event handling. The TUI offers features including:
+//!
+//! - Paper list navigation and viewing
+//! - Detailed paper information display
+//! - PDF status tracking
+//! - Keyboard-driven interface
+//!
+//! The interface is split into two main panes:
+//! - Left: List of papers with title and count
+//! - Right: Detailed view of the selected paper
+//!
+//! # Navigation
+//!
+//! The TUI supports both arrow keys and vim-style navigation:
+//! - Up/k: Move selection up
+//! - Down/j: Move selection down
+//! - q: Quit application
+//!
+//! # Notes
+//! The TUI is enabled through the "tui" feature flag. When enabled, it becomes
+//! the default interface when no command is specified.
 
 use std::io;
 
@@ -25,20 +43,51 @@ use ratatui::{
 
 use crate::errors::LearnerdErrors;
 
-const TITLE_STYLE: Style = Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD); // TODO: bold?
+/// Style for section titles and headers
+const TITLE_STYLE: Style = Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+/// Style for the currently selected item
 const HIGHLIGHT_STYLE: Style =
   Style::new().bg(Color::DarkGray).fg(Color::LightCyan).add_modifier(Modifier::BOLD);
-const LABEL_STYLE: Style = Style::new().fg(Color::LightBlue); // TODO: bold?
+/// Style for field labels in paper details
+const LABEL_STYLE: Style = Style::new().fg(Color::LightBlue);
+/// Style for regular text content
 const NORMAL_TEXT: Style = Style::new().fg(Color::Gray);
+/// Style for help text and secondary information
 const HELP_STYLE: Style = Style::new().fg(Color::DarkGray);
-const HIGHLIGHT_KEY: Style = Style::new().fg(Color::Yellow); // TODO: bold?
+/// Style for keyboard shortcuts in help text
+const HIGHLIGHT_KEY: Style = Style::new().fg(Color::Yellow);
 
+/// Represents the current dialog state of the application.
+///
+/// Used to track whether a dialog is currently being displayed
+/// and what type of dialog it is.
 enum DialogState {
+  /// No dialog is currently active
   None,
+  /// Exit confirmation dialog is being shown
   ExitConfirm,
 }
 
 /// Runs the Terminal User Interface.
+///
+/// This function initializes the terminal, sets up the display,
+/// and manages the main event loop. It handles:
+/// - Terminal setup and cleanup
+/// - Event processing
+/// - User input
+/// - Screen rendering
+/// - Dialog management
+///
+/// The interface is restored to its original state when the
+/// function returns, regardless of how it exits.
+///
+/// # Errors
+///
+/// Returns a `LearnerdErrors` if:
+/// - Terminal initialization fails
+/// - Database operations fail
+/// - Event handling fails
+/// - Screen drawing fails
 pub async fn run() -> Result<(), LearnerdErrors> {
   // Create app state
   let db = Database::open(Database::default_path()).await?;
@@ -249,6 +298,20 @@ pub async fn run() -> Result<(), LearnerdErrors> {
   Ok(())
 }
 
+/// Creates a centered dialog box with the given dimensions.
+///
+/// This helper function calculates the appropriate layout for a centered
+/// dialog box based on the given title, message, and available screen space.
+///
+/// # Arguments
+///
+/// * `title` - The title to display at the top of the dialog
+/// * `message` - The message to display in the dialog body
+/// * `r` - The available screen area to center within
+///
+/// # Returns
+///
+/// Returns a `Rect` defining the position and size of the dialog box
 fn create_dialog_box(title: &str, message: &str, r: Rect) -> Rect {
   let width = title.len().max(message.len()).max(40) as u16 + 4;
   let height = 3;

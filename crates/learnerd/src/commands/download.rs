@@ -1,5 +1,8 @@
+//! Module for abstracting the "download" functionality to the [`learner`] database.
+
 use super::*;
 
+/// Function for the [`Commands::Download`] in the CLI.
 pub async fn download(cli: Cli, source: Source, identifier: String) -> Result<()> {
   let path = cli.path.unwrap_or_else(|| {
     let default_path = Database::default_path();

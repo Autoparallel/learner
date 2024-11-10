@@ -1,5 +1,8 @@
+//! Module for abstracting the "init" functionality to the [`learner`] database.
+
 use super::*;
 
+/// Function for the [`Commands::Init`] in the CLI.
 pub async fn init(cli: Cli) -> Result<()> {
   let db_path = cli.path.unwrap_or_else(|| {
     let default_path = Database::default_path();

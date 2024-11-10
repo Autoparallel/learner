@@ -1,5 +1,8 @@
+//! Module for abstracting the "search" functionality to the [`learner`] database.
+
 use super::*;
 
+/// Function for the [`Commands::Search`] in the CLI.
 pub async fn search(cli: Cli, query: String) -> Result<()> {
   let path = cli.path.unwrap_or_else(|| {
     let default_path = Database::default_path();

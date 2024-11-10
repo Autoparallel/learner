@@ -158,6 +158,9 @@ pub enum LearnerError {
   #[error("No messages were supplied to send to the LLM.")]
   LLMMissingMessage,
 
+  // TODO (autoparallel): This can be gotten rid of if we use an enum to handle the ways to sort
+  // data in the database instead of a string.
+  /// An error working with the database.
   #[error("{0}")]
   Database(String),
 }

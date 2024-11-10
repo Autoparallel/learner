@@ -1,5 +1,8 @@
+//! Module for abstracting the "get" functionality to the [`learner`] database.
+
 use super::*;
 
+/// Function for the [`Commands::Get`] in the CLI.
 pub async fn get(cli: Cli, source: Source, identifier: String) -> Result<()> {
   let path = cli.path.unwrap_or_else(|| {
     let default_path = Database::default_path();

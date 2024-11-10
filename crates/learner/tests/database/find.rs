@@ -75,7 +75,6 @@ async fn test_pdf_status_update() {
 #[tokio::test]
 async fn test_pdf_list_papers() -> Result<(), Box<dyn Error>> {
   let (db, _dir) = setup_test_db().await;
-  let paper = create_test_paper();
 
   // Save a few papers
   let mut paper1 = create_test_paper();

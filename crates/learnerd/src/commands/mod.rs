@@ -1,3 +1,56 @@
+//! Command implementations for the learner CLI and TUI.
+//!
+//! This module organizes all available commands for managing academic papers and the
+//! learner system. It provides functionality for:
+//!
+//! - Paper Management
+//!   - Adding papers from various sources (arXiv, DOI, IACR)
+//!   - Retrieving paper details
+//!   - Searching across papers
+//!   - Removing papers
+//!
+//! - PDF Management
+//!   - Downloading PDFs
+//!   - Managing PDF storage
+//!
+//! - System Management
+//!   - Database initialization
+//!   - Database cleanup
+//!   - Daemon control
+//!
+//! # Usage
+//!
+//! Commands can be used both from the CLI and the TUI (when enabled):
+//!
+//! ```bash
+//! # Initialize database
+//! learner init
+//!
+//! # Add a paper
+//! learner add 2301.07041
+//!
+//! # Search papers
+//! learner search "quantum computing"
+//!
+//! # Get paper details
+//! learner get arxiv 2301.07041
+//! ```
+//!
+//! When the TUI feature is enabled, running `learner` with no commands launches
+//! the interactive terminal interface.
+//!
+//! # Command Organization
+//!
+//! Each command is implemented in its own module, with the main command enum
+//! [`Commands`] providing the interface between the CLI parser and the individual
+//! implementations. Commands are designed to be usable both from the CLI and
+//! the TUI contexts.
+//!
+//! # Feature Flags
+//!
+//! - `tui`: Enables the Terminal User Interface and makes it the default when no command is
+//!   specified.
+
 use super::*;
 
 pub mod add;

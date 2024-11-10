@@ -13,6 +13,7 @@
 
 use thiserror::Error;
 
+/// Error type alias used for the [`learnerd`] crate.
 pub type Result<T> = core::result::Result<T, LearnerdErrors>;
 
 /// Errors that can occur during CLI operations.

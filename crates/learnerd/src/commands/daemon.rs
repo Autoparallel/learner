@@ -1,6 +1,9 @@
+//! Module for abstracting the "daemon" functionality to the [`learner`] database.
+
 use super::*;
 
-pub async fn daemon(cli: Cli, cmd: DaemonCommands) -> Result<()> {
+/// Function for the [`Commands::Daemon`] in the CLI.
+pub async fn daemon(cmd: DaemonCommands) -> Result<()> {
   let daemon = daemon::Daemon::new();
 
   match cmd {

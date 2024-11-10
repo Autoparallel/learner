@@ -71,7 +71,7 @@ static SUCCESS: Emoji<'_, '_> = Emoji("✨ ", "");
 /// Command line interface configuration and argument parsing
 #[derive(Parser)]
 #[command(author, version, about = "Daemon and CLI for the learner paper management system")]
-struct Cli {
+pub struct Cli {
   /// Verbose mode (-v, -vv, -vvv) for different levels of logging detail
   #[arg(
         short,
@@ -168,7 +168,7 @@ async fn main() -> Result<()> {
     Commands::Search { query } => search(cli, query).await,
     Commands::Clean => clean(cli).await,
     Commands::Download { source, identifier } => download(cli, source, identifier).await,
-    Commands::Daemon { cmd } => daemon(cli, cmd).await,
+    Commands::Daemon { cmd } => daemon(cmd).await,
     #[cfg(feature = "tui")]
     Commands::Tui => tui::run().await,
   }
