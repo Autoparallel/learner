@@ -4,6 +4,8 @@
 //! It is enabled through the "tui" feature flag and provides a keyboard-driven interface
 //! for viewing, searching, and managing papers.
 
+#![allow(missing_docs, clippy::missing_docs_in_private_items)]
+
 use std::io;
 
 use crossterm::{
@@ -15,7 +17,7 @@ use learner::{database::Database, format::format_title};
 use ratatui::{
   backend::CrosstermBackend,
   layout::{Constraint, Direction, Layout, Margin, Rect},
-  style::{Color, Modifier, Style},
+  style::{Color, Modifier, Style, Stylize},
   text::{Line, Span},
   widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
   Terminal,
@@ -23,10 +25,17 @@ use ratatui::{
 
 use crate::errors::LearnerdErrors;
 
+const TITLE_STYLE: Style = Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD); // TODO: bold?
+const HIGHLIGHT_STYLE: Style =
+  Style::new().bg(Color::DarkGray).fg(Color::LightCyan).add_modifier(Modifier::BOLD);
+const LABEL_STYLE: Style = Style::new().fg(Color::LightBlue); // TODO: bold?
+const NORMAL_TEXT: Style = Style::new().fg(Color::Gray);
+const HELP_STYLE: Style = Style::new().fg(Color::DarkGray);
+const HIGHLIGHT_KEY: Style = Style::new().fg(Color::Yellow); // TODO: bold?
+
 enum DialogState {
   None,
   ExitConfirm,
-  PaperDetails(usize),
 }
 
 /// Runs the Terminal User Interface.
@@ -52,110 +61,153 @@ pub async fn run() -> Result<(), LearnerdErrors> {
   while running {
     // Draw UI
     terminal.draw(|f| {
-      let chunks = Layout::default()
+      // Create main horizontal split
+      let main_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+          Constraint::Percentage(30), // List of papers
+          Constraint::Percentage(70), // Paper details
+        ])
+        .split(f.area());
+
+      // Create vertical layout for left pane (list + help)
+      let left_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(1)])
-        .split(f.size());
+        .split(main_chunks[0]);
 
-      let items: Vec<ListItem> = papers
-        .iter()
-        .map(|p| {
-          ListItem::new(format!(
-            "{} ({}, {})",
-            p.title,
-            p.source.to_string(),
-            p.authors.first().map_or("No author", |a| &a.name)
-          ))
-        })
-        .collect();
+      // Paper list
+      let items: Vec<ListItem> = papers.iter().map(|p| ListItem::new(p.title.clone())).collect();
 
       let list = List::new(items)
-        .block(Block::default().title("Papers").borders(Borders::ALL))
-        .highlight_style(Style::default().bg(Color::DarkGray));
+        .block(
+          Block::default()
+            .title(Line::from(vec![
+              Span::styled("📚 ", Style::default().fg(Color::LightBlue)),
+              Span::styled("Papers", TITLE_STYLE),
+              Span::styled(format!(" ({})", papers.len()), NORMAL_TEXT),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Blue)),
+        )
+        .highlight_style(HIGHLIGHT_STYLE)
+        .highlight_symbol("▶ ");
+      f.render_stateful_widget(list, left_chunks[0], &mut selected);
 
-      f.render_stateful_widget(list, chunks[0], &mut selected);
+      // Help text
+      let help = Paragraph::new(Line::from(vec![
+        Span::styled("↑/k", HIGHLIGHT_KEY),
+        Span::styled(": up", HELP_STYLE),
+        Span::raw(" • "),
+        Span::styled("↓/j", HIGHLIGHT_KEY),
+        Span::styled(": down", HELP_STYLE),
+        Span::raw(" • "),
+        Span::styled("q", HIGHLIGHT_KEY),
+        Span::styled(": quit", HELP_STYLE),
+      ]));
+      f.render_widget(help, left_chunks[1]);
 
-      let help =
-        ratatui::widgets::Paragraph::new("↑/k: up  |  ↓/j: down  |  Enter: details  |  q: quit");
-      f.render_widget(help, chunks[1]);
+      // Paper details (right pane)
+      if let Some(i) = selected.selected() {
+        let paper = &papers[i];
+        let pdf_path = format!(
+          "{}/{}.pdf",
+          Database::default_pdf_path().display(),
+          format_title(&paper.title, Some(50))
+        );
 
-      // Render dialogs if active
-      match dialog {
-        DialogState::ExitConfirm => {
-          let dialog_box = create_dialog_box(
-            "Exit Confirmation",
-            "Are you sure you want to quit? (y/n)",
-            f.size(),
-          );
-          f.render_widget(Clear, dialog_box); // Clear the background
-          f.render_widget(
+        let pdf_exists = std::path::Path::new(&pdf_path).exists();
+        let content = vec![
+          Line::from(vec![
+            Span::styled("Title: ", LABEL_STYLE),
+            Span::styled(&paper.title, Style::default().fg(Color::White)),
+          ]),
+          Line::from(""),
+          Line::from(vec![
+            Span::styled("Authors: ", LABEL_STYLE),
+            Span::styled(
+              paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "),
+              NORMAL_TEXT,
+            ),
+          ]),
+          Line::from(""),
+          Line::from(vec![
+            Span::styled("Source: ", LABEL_STYLE),
+            Span::styled(paper.source.to_string(), Style::default().fg(Color::LightYellow)),
+            Span::raw(" ("),
+            Span::styled(&paper.source_identifier, Style::default().fg(Color::LightYellow)),
+            Span::raw(")"),
+          ]),
+          Line::from(""),
+          Line::from(vec![Span::styled("Abstract:", LABEL_STYLE)]),
+          Line::from(""),
+          Line::from(Span::styled(&paper.abstract_text, NORMAL_TEXT)),
+          Line::from(""),
+          Line::from(vec![
+            Span::styled("PDF Status: ", LABEL_STYLE),
+            Span::styled(
+              if pdf_exists {
+                format!("✓ Available: {}", pdf_path)
+              } else {
+                "✗ Not downloaded".to_string()
+              },
+              if pdf_exists {
+                Style::default().fg(Color::Green)
+              } else {
+                Style::default().fg(Color::Red)
+              },
+            ),
+          ]),
+        ];
+
+        let details = Paragraph::new(content)
+          .block(
             Block::default()
+              .title(Line::from(vec![
+                Span::styled("📄 ", Style::default().fg(Color::LightBlue)),
+                Span::styled("Paper Details", TITLE_STYLE),
+              ]))
               .borders(Borders::ALL)
-              .style(Style::default().bg(Color::Black))
-              .title("Exit Confirmation"),
-            dialog_box,
-          );
-          f.render_widget(
-            Paragraph::new("Are you sure you want to quit? (y/n)").style(Style::default()),
-            dialog_box.inner(Margin { vertical: 1, horizontal: 2 }),
-          );
-        },
-        DialogState::PaperDetails(index) => {
-          let paper = &papers[index];
-          let pdf_path = format!(
-            "{}/{}.pdf",
-            Database::default_pdf_path().display(),
-            format_title(&paper.title, Some(50))
-          );
-          let pdf_status = if std::path::Path::new(&pdf_path).exists() {
-            format!("PDF available at: {}", pdf_path)
-          } else {
-            "PDF not downloaded".to_string()
-          };
+              .border_style(Style::default().fg(Color::Blue)),
+          )
+          .wrap(ratatui::widgets::Wrap { trim: true });
+        f.render_widget(details, main_chunks[1]);
+      }
 
-          let content = vec![
-            Line::from(vec![
-              Span::styled("Title: ", Style::default().add_modifier(Modifier::BOLD)),
-              Span::raw(&paper.title),
-            ]),
-            Line::from(vec![
-              Span::styled("Authors: ", Style::default().add_modifier(Modifier::BOLD)),
-              Span::raw(
-                paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "),
-              ),
-            ]),
-            Line::from(vec![
-              Span::styled("Source: ", Style::default().add_modifier(Modifier::BOLD)),
-              Span::raw(format!("{} ({})", paper.source, paper.source_identifier)),
-            ]),
-            Line::from(""),
-            Line::from(vec![Span::styled(
-              "Abstract:",
-              Style::default().add_modifier(Modifier::BOLD),
-            )]),
-            Line::from(paper.abstract_text.clone()),
+      // Render exit confirmation if active
+      if let DialogState::ExitConfirm = dialog {
+        let dialog_box =
+          create_dialog_box("Exit Confirmation", "Are you sure you want to quit? (y/n)", f.area());
+        f.render_widget(Clear, dialog_box);
+        f.render_widget(
+          Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Red))
+            .title(Span::styled("Exit Confirmation", Style::default().fg(Color::Red).bold())),
+          dialog_box,
+        );
+        f.render_widget(
+          Paragraph::new(vec![
+            Line::from(Span::styled(
+              "Are you sure you want to quit?",
+              Style::default().fg(Color::White),
+            )),
             Line::from(""),
             Line::from(vec![
-              Span::styled("PDF Status: ", Style::default().add_modifier(Modifier::BOLD)),
-              Span::raw(pdf_status),
+              Span::styled("y", HIGHLIGHT_KEY),
+              Span::styled(": yes", HELP_STYLE),
+              Span::raw(" • "),
+              Span::styled("n", HIGHLIGHT_KEY),
+              Span::styled(": no", HELP_STYLE),
             ]),
-          ];
-
-          let dialog_box = create_dialog_box("Paper Details", "", f.size());
-          f.render_widget(Clear, dialog_box);
-          f.render_widget(
-            Block::default()
-              .borders(Borders::ALL)
-              .style(Style::default().bg(Color::Black))
-              .title("Paper Details (Esc to close)"),
-            dialog_box,
-          );
-          f.render_widget(
-            Paragraph::new(content).wrap(ratatui::widgets::Wrap { trim: true }),
-            dialog_box.inner(Margin { vertical: 1, horizontal: 2 }),
-          );
-        },
-        DialogState::None => {},
+          ])
+          .alignment(ratatui::layout::Alignment::Center),
+          dialog_box.inner(Margin { vertical: 1, horizontal: 2 }),
+        );
+        f.render_widget(
+          Paragraph::new("Are you sure you want to quit? (y/n)").style(Style::default()),
+          dialog_box.inner(Margin { vertical: 1, horizontal: 2 }),
+        );
       }
     })?;
 
@@ -168,10 +220,6 @@ pub async fn run() -> Result<(), LearnerdErrors> {
             KeyCode::Char('n') | KeyCode::Esc => dialog = DialogState::None,
             _ => {},
           },
-          DialogState::PaperDetails(_) =>
-            if key.code == KeyCode::Esc {
-              dialog = DialogState::None;
-            },
           DialogState::None => match key.code {
             KeyCode::Char('q') => dialog = DialogState::ExitConfirm,
             KeyCode::Up | KeyCode::Char('k') => {
@@ -186,10 +234,6 @@ pub async fn run() -> Result<(), LearnerdErrors> {
                 selected.select(Some(i + 1));
               }
             },
-            KeyCode::Enter =>
-              if let Some(i) = selected.selected() {
-                dialog = DialogState::PaperDetails(i);
-              },
             _ => {},
           },
         }
@@ -207,7 +251,7 @@ pub async fn run() -> Result<(), LearnerdErrors> {
 
 fn create_dialog_box(title: &str, message: &str, r: Rect) -> Rect {
   let width = title.len().max(message.len()).max(40) as u16 + 4;
-  let height = if message.is_empty() { 20 } else { 3 };
+  let height = 3;
   let popup_layout = Layout::default()
     .direction(Direction::Vertical)
     .constraints([
@@ -217,14 +261,12 @@ fn create_dialog_box(title: &str, message: &str, r: Rect) -> Rect {
     ])
     .split(r);
 
-  let popup_layout = Layout::default()
+  Layout::default()
     .direction(Direction::Horizontal)
     .constraints([
       Constraint::Length((r.width - width) / 2),
       Constraint::Length(width),
       Constraint::Length((r.width - width) / 2),
     ])
-    .split(popup_layout[1])[1];
-
-  popup_layout
+    .split(popup_layout[1])[1]
 }
