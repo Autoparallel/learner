@@ -70,3 +70,28 @@ async fn test_pdf_status_update() {
   let (_, _, stored_status, _) = status.unwrap();
   assert_eq!(stored_status, "success");
 }
+
+#[traced_test]
+#[tokio::test]
+async fn test_pdf_list_papers() -> Result<(), Box<dyn Error>> {
+  let (db, _dir) = setup_test_db().await;
+  let paper = create_test_paper();
+
+  // Save a few papers
+  let mut paper1 = create_test_paper();
+  paper1.title = "Neural Networks in Machine Learning".to_string();
+  paper1.abstract_text = "This paper discusses deep learning".to_string();
+  paper1.source_identifier = "2401.00001".to_string();
+
+  let mut paper2 = create_test_paper();
+  paper2.title = "Advanced Algorithms".to_string();
+  paper2.abstract_text = "Classical computer science topics".to_string();
+  paper2.source_identifier = "2401.00002".to_string();
+
+  db.save_paper(&paper1).await.unwrap();
+  db.save_paper(&paper2).await.unwrap();
+
+  let papers = db.list_papers("title", true).await?;
+  assert_eq!(papers.len(), 2);
+  Ok(())
+}

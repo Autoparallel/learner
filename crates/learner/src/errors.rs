@@ -157,6 +157,9 @@ pub enum LearnerError {
   /// would result in API errors or meaningless responses.
   #[error("No messages were supplied to send to the LLM.")]
   LLMMissingMessage,
+
+  #[error("{0}")]
+  Database(String),
 }
 
 impl LearnerError {

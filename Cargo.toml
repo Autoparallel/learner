@@ -23,6 +23,7 @@ tokio = { version = "1.41", features = [
   "macros",
   "fs",
   "io-util",
+  "signal",
 ] }
 tracing = { version = "0.1" }
 

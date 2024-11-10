@@ -45,7 +45,7 @@ use super::*;
 /// If the database file doesn't exist, it will be created.
 pub struct Database {
   /// Async SQLite connection handle
-  conn: Connection,
+  pub conn: Connection,
 }
 
 impl Database {
@@ -561,6 +561,111 @@ impl Database {
           Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
           Err(e) => Err(e.into()),
         }
+      })
+      .await
+      .map_err(LearnerError::from)
+  }
+
+  // TODO (autoparallel): Things like this should have some kind of enum to select, not `&str`
+  /// Lists all papers with optional ordering.
+  ///
+  /// Retrieves all papers from the database with configurable sorting.
+  /// The papers are returned with their complete metadata including authors.
+  ///
+  /// # Arguments
+  ///
+  /// * `order_by` - Field to order by ("title", "date", "source")
+  /// * `desc` - Whether to sort in descending order
+  ///
+  /// # Returns
+  ///
+  /// Returns a Result containing a vector of papers ordered as specified.
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::Database;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let db = Database::open("papers.db").await?;
+  ///
+  /// // Get papers ordered by title
+  /// let papers = db.list_papers("title", false).await?;
+  ///
+  /// // Get papers ordered by date, newest first
+  /// let papers = db.list_papers("date", true).await?;
+  /// # Ok(())
+  /// # }
+  /// ```
+  pub async fn list_papers(&self, order_by: &str, desc: bool) -> Result<Vec<Paper>, LearnerError> {
+    // Validate order_by field
+    let order_clause = match order_by.to_lowercase().as_str() {
+      "title" => "p.title",
+      "date" => "p.publication_date",
+      "source" => "p.source, p.source_identifier",
+      _ => return Err(LearnerError::Database("Invalid order_by field".into())),
+    };
+
+    let direction = if desc { "DESC" } else { "ASC" };
+    let query = format!(
+      "SELECT p.id, p.title, p.abstract_text, p.publication_date, 
+                    p.source, p.source_identifier, p.pdf_url, p.doi
+             FROM papers p
+             ORDER BY {} {}",
+      order_clause, direction
+    );
+
+    self
+      .conn
+      .call(move |conn| {
+        let mut papers = Vec::new();
+        let mut paper_stmt = conn.prepare(&query)?;
+        let mut author_stmt = conn.prepare_cached(
+          "SELECT name, affiliation, email
+                     FROM authors
+                     WHERE paper_id = ?",
+        )?;
+
+        let paper_rows = paper_stmt.query_map([], |row| {
+          Ok((
+            row.get::<_, i64>(0)?, // Get paper_id
+            Paper {
+              title:             row.get(1)?,
+              abstract_text:     row.get(2)?,
+              publication_date:  row.get(3)?,
+              source:            Source::from_str(&row.get::<_, String>(4)?).map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                  4,
+                  rusqlite::types::Type::Text,
+                  Box::new(e),
+                )
+              })?,
+              source_identifier: row.get(5)?,
+              pdf_url:           row.get(6)?,
+              doi:               row.get(7)?,
+              authors:           Vec::new(),
+            },
+          ))
+        })?;
+
+        for paper_result in paper_rows {
+          let (paper_id, mut paper) = paper_result?;
+
+          // Get authors for this paper
+          let authors = author_stmt
+            .query_map([paper_id], |row| {
+              Ok(Author {
+                name:        row.get(0)?,
+                affiliation: row.get(1)?,
+                email:       row.get(2)?,
+              })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+          paper.authors = authors;
+          papers.push(paper);
+        }
+
+        Ok(papers)
       })
       .await
       .map_err(LearnerError::from)
