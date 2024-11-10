@@ -43,6 +43,7 @@ pub async fn run() -> Result<(), LearnerdErrors> {
   let papers = db.list_papers("title", true).await?;
 
   // Setup terminal
+  enable_raw_mode()?;
   let mut stdout = io::stdout();
   execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
