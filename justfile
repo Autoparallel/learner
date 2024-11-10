@@ -1,228 +1,195 @@
-# List available commands
 default:
     @just --list
 
+[private]
+warn := "\\033[33m"
+error := "\\033[31m"
+info := "\\033[34m"
+success := "\\033[32m"
+reset := "\\033[0m"
+bold := "\\033[1m"
+
+# Print formatted headers without shell scripts
+[private]
+header msg:
+    @printf "{{info}}{{bold}}==> {{msg}}{{reset}}\n"
+
 # Install required system dependencies
 install-deps:
-    #!/usr/bin/env bash
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        brew install filosottile/musl-cross/musl-cross
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        if command -v apt-get &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y musl-tools
-        elif command -v dnf &> /dev/null; then
-            sudo dnf install -y musl-gcc
-        elif command -v pacman &> /dev/null; then
-            sudo pacman -Sy musl
-        fi
+    @just header "Installing system dependencies"
+    # macOS
+    if command -v brew > /dev/null; then \
+        brew install filosottile/musl-cross/musl-cross; \
+    fi
+    # Linux
+    if command -v apt-get > /dev/null; then \
+        sudo apt-get update && sudo apt-get install -y musl-tools; \
+    elif command -v dnf > /dev/null; then \
+        sudo dnf install -y musl-gcc; \
+    elif command -v pacman > /dev/null; then \
+        sudo pacman -Sy musl; \
     fi
 
+# Install cargo tools
 install-cargo-tools:
-    #!/usr/bin/env bash
-    
-    # Helper function to check and install cargo tools
-    function ensure_installed() {
-        local tool=$1
-        local install_cmd=$2
-        if ! command -v "$tool" &> /dev/null; then
-            echo "Installing $tool..."
-            eval "$install_cmd"
-        else
-            echo "✓ $tool already installed"
-        fi
-    }
-    
-    ensure_installed "cargo-udeps" "cargo install cargo-udeps --locked"
-    ensure_installed "cargo-semver-checks" "cargo install cargo-semver-checks"
-    ensure_installed "taplo" "cargo install taplo-cli"
+    @just header "Installing Cargo tools"
+    # cargo-udeps
+    if ! command -v cargo-udeps > /dev/null; then \
+        printf "{{info}}Installing cargo-udeps...{{reset}}\n" && \
+        cargo install cargo-udeps --locked; \
+    else \
+        printf "{{success}}✓ cargo-udeps already installed{{reset}}\n"; \
+    fi
+    # cargo-semver-checks
+    if ! command -v cargo-semver-checks > /dev/null; then \
+        printf "{{info}}Installing cargo-semver-checks...{{reset}}\n" && \
+        cargo install cargo-semver-checks; \
+    else \
+        printf "{{success}}✓ cargo-semver-checks already installed{{reset}}\n"; \
+    fi
+    # taplo
+    if ! command -v taplo > /dev/null; then \
+        printf "{{info}}Installing taplo...{{reset}}\n" && \
+        cargo install taplo-cli; \
+    else \
+        printf "{{success}}✓ taplo already installed{{reset}}\n"; \
+    fi
 
 # Install nightly rust
 install-rust-nightly:
+    @just header "Installing Rust nightly"
     rustup install nightly
 
 # Install required Rust targets
 install-targets:
+    @just header "Installing Rust targets"
     rustup target add x86_64-unknown-linux-musl aarch64-apple-darwin
 
 # Setup complete development environment
 setup: install-deps install-targets install-cargo-tools install-rust-nightly
-    @echo "Development environment setup complete!"
+    @printf "{{success}}{{bold}}Development environment setup complete!{{reset}}\n"
 
-# Build native target (lib, tests, examples, etc)
+# Build with local OS target
 build:
+    @just header "Building workspace"
     cargo build --workspace --all-targets
 
-# Build all platforms
+# Build with MacOS and Linux targets
 build-all: build-mac build-linux
-    @echo "All arch builds completed!"
+    @printf "{{success}}{{bold}}All arch builds completed!{{reset}}\n"
 
-# Build macOS ARM64
+# Build just the target
 build-mac:
-    @echo "Building macOS ARM64..."
+    @just header "Building macOS ARM64"
     cargo build --workspace --target aarch64-apple-darwin
 
-# Build Linux x86_64
+# Build the Linux target
 build-linux:
-    @echo "Building Linux x86_64..."
+    @just header "Building Linux x86_64"
     cargo build --workspace --target x86_64-unknown-linux-musl
 
-# Test local target arch code
+# Run the tests on your local OS
 test:
+    @just header "Running tests"
     cargo test --workspace --all-targets
 
-# Lint local target arch code
+# Run clippy for the workspace on your local OS
 lint:
+    @just header "Running clippy"
     cargo clippy --workspace --all-targets --all-features
 
-# Lint all target arches
+# Run clippy for the workspace on MacOS and Linux targets
 lint-all: lint-mac lint-linux
-    @echo "All arch lint completed!"
+    @printf "{{success}}{{bold}}All arch lint completed!{{reset}}\n"
 
-# Lint macOS ARM64
+# Run clippy for the MacOS target
 lint-mac:
-    @echo "Checking lint on macOS ARM64..."
+    @just header "Checking lint on macOS ARM64"
     cargo clippy --workspace --all-targets --target aarch64-apple-darwin
 
-# Lint Linux x86_64
+# Run clippy for the Linux target
 lint-linux:
-    @echo "Checking lint on Linux x86_64..."
+    @just header "Checking lint on Linux x86_64"
     cargo clippy --workspace --all-targets --target x86_64-unknown-linux-musl
 
-# Format code
+# Check for semantic versioning for workspace crates
+semver:
+    @just header "Checking semver compatibility"
+    cargo semver-checks check-release --workspace
+
+# Run format for the workspace
 fmt:
+    @just header "Formatting code"
     cargo fmt --all
     taplo fmt
 
-# Check unused dependencies
+# Check for unused dependencies in the workspace
 udeps:
+    @just header "Checking unused dependencies"
     cargo +nightly udeps --workspace
 
-# Clean build artifacts
+# Run cargo clean to remove build artifacts
 clean:
+    @just header "Cleaning build artifacts"
     cargo clean
 
-# Show environment info
+# Show your relevant environment information
 info:
-    @echo "OS: $OSTYPE"
-    @rustc --version
-    @cargo --version
-    @echo "Installed targets:"
-    @rustup target list --installed
+    @just header "Environment Information"
+    @printf "{{info}}OS:{{reset}} %s\n" "$(uname -s)"
+    @printf "{{info}}Rust:{{reset}} %s\n" "$(rustc --version)"
+    @printf "{{info}}Cargo:{{reset}} %s\n" "$(cargo --version)"
+    @printf "{{info}}Installed targets:{{reset}}\n"
+    @rustup target list --installed | sed 's/^/  /'
 
-# Run all CI checks
-# ci:
-#     #!/usr/bin/env bash
-#     set -euo pipefail
-    
-#     echo "Running CI checks..."
-    
-#     # Format check
-#     echo "\nChecking formatting..."
-#     if ! cargo fmt --all -- --check; then
-#         echo "❌ Formatting check failed"
-#         exit 1
-#     fi
-#     if ! taplo fmt --check; then
-#         echo "❌ TOML formatting check failed"
-#         exit 1
-#     fi
-    
-#     # Clippy with denied warnings
-#     echo "\nRunning clippy checks..."
-#     if ! cargo clippy --target x86_64-unknown-linux-musl --all-targets --all-features -- --deny warnings; then
-#         echo "❌ Linux clippy check failed"
-#         exit 1
-#     fi
-#     if ! cargo clippy --target aarch64-apple-darwin --all-targets --all-features -- --deny warnings; then
-#         echo "❌ macOS clippy check failed"
-#         exit 1
-#     fi
-    
-#     # Tests
-#     echo "\nRunning tests..."
-#     if ! cargo test --verbose --workspace; then
-#         echo "❌ Tests failed"
-#         exit 1
-#     fi
-    
-#     # Build checks
-#     echo "\nChecking builds..."
-#     if ! cargo build --target x86_64-unknown-linux-musl --workspace; then
-#         echo "❌ Linux build failed"
-#         exit 1
-#     fi
-#     if ! cargo build --target aarch64-apple-darwin --workspace; then
-#         echo "❌ macOS build failed"
-#         exit 1
-#     fi
-    
-#     # Dependency checks
-#     echo "\nChecking for unused dependencies..."
-#     if ! cargo +nightly udeps --workspace; then
-#         echo "❌ Unused dependency check failed"
-#         exit 1
-#     fi
-    
-#     # Semver checks
-#     echo "\nChecking semver compatibility..."
-#     if ! cargo semver-checks check-release --workspace; then
-#         echo "❌ Semver check failed"
-#         exit 1
-#     fi
-    
-#     echo "✅ All CI checks passed!"
-
-# Run all CI checks
+# Run all possible CI checks (cannot test a non-local OS target!)
 ci:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    
-    # Array to store failures
-    declare -a failures=()
-    
-    # Helper function for progress indicator
-    function progress() {
-        echo "⏳ ${1}..."
-    }
-    
-    # Helper function to capture failures
-    function run_check() {
-        local name=$1
-        shift
-        progress "$name"
-        if ! "$@" > /tmp/check-output 2>&1; then
-            failures+=("$name")
-            echo "  ❌ Failed"
-            echo "----------------------------------------"
-            cat /tmp/check-output
-            echo "----------------------------------------"
-        else
-            echo "  ✅ Passed"
-        fi
-    }
-    
-    echo "🚀 Starting CI checks\n"
-    
-    # Run all checks
-    run_check "Rust formatting" cargo fmt --all -- --check
-    run_check "TOML formatting" taplo fmt --check
-    run_check "Linux clippy" cargo clippy --target x86_64-unknown-linux-musl --all-targets --all-features -- --deny warnings
-    run_check "macOS clippy" cargo clippy --target aarch64-apple-darwin --all-targets --all-features -- --deny warnings
-    run_check "Linux build" cargo build --target x86_64-unknown-linux-musl --workspace
-    run_check "macOS build" cargo build --target aarch64-apple-darwin --workspace
-    run_check "Test suite" cargo test --verbose --workspace
-    run_check "Unused dependencies" cargo +nightly udeps --workspace
-    run_check "Semver compatibility" cargo semver-checks check-release --workspace
-    
-    echo "\n📊 CI Summary:"
-    if [ ${#failures[@]} -eq 0 ]; then
-        echo "✨ All checks passed successfully!"
+    @printf "{{bold}}Starting CI checks{{reset}}\n\n"
+    @ERROR=0; \
+    just run-single-check "Rust formatting" "cargo fmt --all -- --check" || ERROR=1; \
+    just run-single-check "TOML formatting" "taplo fmt --check" || ERROR=1; \
+    just run-single-check "Linux clippy" "cargo clippy --target x86_64-unknown-linux-musl --all-targets --all-features -- --deny warnings" || ERROR=1; \
+    just run-single-check "macOS clippy" "cargo clippy --target aarch64-apple-darwin --all-targets --all-features -- --deny warnings" || ERROR=1; \
+    just run-single-check "Linux build" "cargo build --target x86_64-unknown-linux-musl --workspace" || ERROR=1; \
+    just run-single-check "macOS build" "cargo build --target aarch64-apple-darwin --workspace" || ERROR=1; \
+    just run-single-check "Test suite" "cargo test --verbose --workspace" || ERROR=1; \
+    just run-single-check "Unused dependencies" "cargo +nightly udeps --workspace" || ERROR=1; \
+    just run-single-check "Semver compatibility" "cargo semver-checks check-release --workspace" || ERROR=1; \
+    printf "\n{{bold}}CI Summary:{{reset}}\n"; \
+    if [ $ERROR -eq 0 ]; then \
+        printf "{{success}}{{bold}}All checks passed successfully!{{reset}}\n"; \
+    else \
+        printf "{{error}}{{bold}}Some checks failed. See output above for details.{{reset}}\n"; \
+        exit 1; \
+    fi
+
+# Run a single check and return status (0 = pass, 1 = fail)
+[private]
+run-single-check name command:
+    #!/usr/bin/env sh
+    printf "{{info}}{{bold}}Running{{reset}} {{info}}%s{{reset}}...\n" "{{name}}"
+    if {{command}} > /tmp/check-output 2>&1; then
+        printf "  {{success}}{{bold}}PASSED{{reset}}\n"
         exit 0
     else
-        echo "❌ The following checks failed:"
-        for failure in "${failures[@]}"; do
-            echo "  • $failure"
-        done
+        printf "  {{error}}{{bold}}FAILED{{reset}}\n"
+        printf "{{error}}----------------------------------------\n"
+        while IFS= read -r line; do
+            printf "{{error}}%s{{reset}}\n" "$line"
+        done < /tmp/check-output
+        printf "{{error}}----------------------------------------{{reset}}\n"
         exit 1
     fi
+
+# Success summary (called if all checks pass)
+[private]
+_ci-summary-success:
+    @printf "\n{{bold}}CI Summary:{{reset}}\n"
+    @printf "{{success}}{{bold}}All checks passed successfully!{{reset}}\n"
+
+# Failure summary (called if any check fails)
+[private]
+_ci-summary-failure:
+    @printf "\n{{bold}}CI Summary:{{reset}}\n"
+    @printf "{{error}}{{bold}}Some checks failed. See output above for details.{{reset}}\n"
+    @exit 1

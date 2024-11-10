@@ -84,13 +84,6 @@ pub enum LearnerError {
   #[error("API error: {0}")]
   ApiError(String),
 
-  /// Failed to parse a URL.
-  ///
-  /// This occurs when attempting to parse paper URLs from various
-  /// sources and the URL format is invalid.
-  #[error(transparent)]
-  InvalidUrl(#[from] url::ParseError),
-
   /// A SQLite operation failed.
   ///
   /// This wraps errors from the `rusqlite` crate, covering:
@@ -164,6 +157,12 @@ pub enum LearnerError {
   /// would result in API errors or meaningless responses.
   #[error("No messages were supplied to send to the LLM.")]
   LLMMissingMessage,
+
+  // TODO (autoparallel): This can be gotten rid of if we use an enum to handle the ways to sort
+  // data in the database instead of a string.
+  /// An error working with the database.
+  #[error("{0}")]
+  Database(String),
 }
 
 impl LearnerError {

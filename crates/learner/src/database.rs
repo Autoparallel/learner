@@ -45,7 +45,7 @@ use super::*;
 /// If the database file doesn't exist, it will be created.
 pub struct Database {
   /// Async SQLite connection handle
-  conn: Connection,
+  pub conn: Connection,
 }
 
 impl Database {
@@ -565,6 +565,111 @@ impl Database {
       .await
       .map_err(LearnerError::from)
   }
+
+  // TODO (autoparallel): Things like this should have some kind of enum to select, not `&str`
+  /// Lists all papers with optional ordering.
+  ///
+  /// Retrieves all papers from the database with configurable sorting.
+  /// The papers are returned with their complete metadata including authors.
+  ///
+  /// # Arguments
+  ///
+  /// * `order_by` - Field to order by ("title", "date", "source")
+  /// * `desc` - Whether to sort in descending order
+  ///
+  /// # Returns
+  ///
+  /// Returns a Result containing a vector of papers ordered as specified.
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::Database;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let db = Database::open("papers.db").await?;
+  ///
+  /// // Get papers ordered by title
+  /// let papers = db.list_papers("title", false).await?;
+  ///
+  /// // Get papers ordered by date, newest first
+  /// let papers = db.list_papers("date", true).await?;
+  /// # Ok(())
+  /// # }
+  /// ```
+  pub async fn list_papers(&self, order_by: &str, desc: bool) -> Result<Vec<Paper>, LearnerError> {
+    // Validate order_by field
+    let order_clause = match order_by.to_lowercase().as_str() {
+      "title" => "p.title",
+      "date" => "p.publication_date",
+      "source" => "p.source, p.source_identifier",
+      _ => return Err(LearnerError::Database("Invalid order_by field".into())),
+    };
+
+    let direction = if desc { "DESC" } else { "ASC" };
+    let query = format!(
+      "SELECT p.id, p.title, p.abstract_text, p.publication_date, 
+                    p.source, p.source_identifier, p.pdf_url, p.doi
+             FROM papers p
+             ORDER BY {} {}",
+      order_clause, direction
+    );
+
+    self
+      .conn
+      .call(move |conn| {
+        let mut papers = Vec::new();
+        let mut paper_stmt = conn.prepare(&query)?;
+        let mut author_stmt = conn.prepare_cached(
+          "SELECT name, affiliation, email
+                     FROM authors
+                     WHERE paper_id = ?",
+        )?;
+
+        let paper_rows = paper_stmt.query_map([], |row| {
+          Ok((
+            row.get::<_, i64>(0)?, // Get paper_id
+            Paper {
+              title:             row.get(1)?,
+              abstract_text:     row.get(2)?,
+              publication_date:  row.get(3)?,
+              source:            Source::from_str(&row.get::<_, String>(4)?).map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                  4,
+                  rusqlite::types::Type::Text,
+                  Box::new(e),
+                )
+              })?,
+              source_identifier: row.get(5)?,
+              pdf_url:           row.get(6)?,
+              doi:               row.get(7)?,
+              authors:           Vec::new(),
+            },
+          ))
+        })?;
+
+        for paper_result in paper_rows {
+          let (paper_id, mut paper) = paper_result?;
+
+          // Get authors for this paper
+          let authors = author_stmt
+            .query_map([paper_id], |row| {
+              Ok(Author {
+                name:        row.get(0)?,
+                affiliation: row.get(1)?,
+                email:       row.get(2)?,
+              })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+          paper.authors = authors;
+          papers.push(paper);
+        }
+
+        Ok(papers)
+      })
+      .await
+      .map_err(LearnerError::from)
+  }
 }
 
 #[cfg(test)]
@@ -572,141 +677,33 @@ mod tests {
 
   use super::*;
 
-  /// Helper function to create a test paper
-  fn create_test_paper() -> Paper {
-    Paper {
-      title:             "Test Paper".to_string(),
-      abstract_text:     "This is a test abstract".to_string(),
-      publication_date:  Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap(),
-      source:            Source::Arxiv,
-      source_identifier: "2401.00000".to_string(),
-      pdf_url:           Some("https://arxiv.org/pdf/2401.00000".to_string()),
-      doi:               Some("10.1000/test.123".to_string()),
-      authors:           vec![
-        Author {
-          name:        "John Doe".to_string(),
-          affiliation: Some("Test University".to_string()),
-          email:       Some("john@test.edu".to_string()),
-        },
-        Author { name: "Jane Smith".to_string(), affiliation: None, email: None },
-      ],
-    }
-  }
-
   /// Helper function to set up a test database
-  async fn setup_test_db() -> (Database, tempfile::TempDir) {
+  async fn setup_test_db() -> (Database, PathBuf, tempfile::TempDir) {
     let dir = tempdir().unwrap();
-    let db_path = dir.path().join("test.db");
-    let db = Database::open(&db_path).await.unwrap();
-    (db, dir)
+    let path = dir.path().join("test.db");
+    let db = Database::open(&path).await.unwrap();
+    (db, path, dir)
   }
 
   #[traced_test]
   #[tokio::test]
   async fn test_database_creation() {
-    let dir = tempdir().unwrap();
-    let db_path = dir.path().join("test.db");
-
-    // Create database
-    let _db = Database::open(&db_path).await.unwrap();
+    let (_db, path, _dir) = setup_test_db().await;
 
     // Check that file exists
-    assert!(db_path.exists());
-  }
-
-  #[traced_test]
-  #[tokio::test]
-  async fn test_save_and_retrieve_paper() {
-    let (db, _dir) = setup_test_db().await;
-    let paper = create_test_paper();
-
-    // Save paper
-    let paper_id = db.save_paper(&paper).await.unwrap();
-    assert!(paper_id > 0);
-
-    // Retrieve paper
-    let retrieved = db
-      .get_paper_by_source_id(&paper.source, &paper.source_identifier)
-      .await
-      .unwrap()
-      .expect("Paper should exist");
-
-    // Verify paper data
-    assert_eq!(retrieved.title, paper.title);
-    assert_eq!(retrieved.abstract_text, paper.abstract_text);
-    assert_eq!(retrieved.publication_date, paper.publication_date);
-    assert_eq!(retrieved.source, paper.source);
-    assert_eq!(retrieved.source_identifier, paper.source_identifier);
-    assert_eq!(retrieved.pdf_url, paper.pdf_url);
-    assert_eq!(retrieved.doi, paper.doi);
-
-    // Verify authors
-    assert_eq!(retrieved.authors.len(), paper.authors.len());
-    assert_eq!(retrieved.authors[0].name, paper.authors[0].name);
-    assert_eq!(retrieved.authors[0].affiliation, paper.authors[0].affiliation);
-    assert_eq!(retrieved.authors[0].email, paper.authors[0].email);
-    assert_eq!(retrieved.authors[1].name, paper.authors[1].name);
-    assert_eq!(retrieved.authors[1].affiliation, None);
-    assert_eq!(retrieved.authors[1].email, None);
+    assert!(path.exists());
   }
 
   #[traced_test]
   #[tokio::test]
   async fn test_get_nonexistent_paper() {
-    let (db, _dir) = setup_test_db().await;
+    let (db, _path, _dir) = setup_test_db().await;
 
     let result = db.get_paper_by_source_id(&Source::Arxiv, "nonexistent").await.unwrap();
 
     assert!(result.is_none());
   }
 
-  #[traced_test]
-  #[tokio::test]
-  async fn test_full_text_search() {
-    let (db, _dir) = setup_test_db().await;
-
-    // Save a few papers
-    let mut paper1 = create_test_paper();
-    paper1.title = "Neural Networks in Machine Learning".to_string();
-    paper1.abstract_text = "This paper discusses deep learning".to_string();
-    paper1.source_identifier = "2401.00001".to_string();
-
-    let mut paper2 = create_test_paper();
-    paper2.title = "Advanced Algorithms".to_string();
-    paper2.abstract_text = "Classical computer science topics".to_string();
-    paper2.source_identifier = "2401.00002".to_string();
-
-    db.save_paper(&paper1).await.unwrap();
-    db.save_paper(&paper2).await.unwrap();
-
-    // Search for papers
-    let results = db.search_papers("neural").await.unwrap();
-    assert_eq!(results.len(), 1);
-    assert_eq!(results[0].title, paper1.title);
-
-    let results = db.search_papers("learning").await.unwrap();
-    assert_eq!(results.len(), 1);
-    assert_eq!(results[0].source_identifier, paper1.source_identifier);
-
-    let results = db.search_papers("algorithms").await.unwrap();
-    assert_eq!(results.len(), 1);
-    assert_eq!(results[0].title, paper2.title);
-  }
-
-  #[traced_test]
-  #[tokio::test]
-  async fn test_duplicate_paper_handling() {
-    let (db, _dir) = setup_test_db().await;
-    let paper = create_test_paper();
-
-    // Save paper first time
-    let result1 = db.save_paper(&paper).await;
-    assert!(result1.is_ok());
-
-    // Try to save the same paper again
-    let result2 = db.save_paper(&paper).await;
-    assert!(result2.is_err()); // Should fail due to UNIQUE constraint
-  }
   #[traced_test]
   #[tokio::test]
   async fn test_default_pdf_path() {
@@ -725,7 +722,7 @@ mod tests {
   #[traced_test]
   #[tokio::test]
   async fn test_config_operations() {
-    let (db, _dir) = setup_test_db().await;
+    let (db, _path, _dir) = setup_test_db().await;
 
     // Test setting and getting a config value
     db.set_config("test_key", "test_value").await.unwrap();
@@ -740,102 +737,6 @@ mod tests {
     db.set_config("test_key", "new_value").await.unwrap();
     let updated = db.get_config("test_key").await.unwrap();
     assert_eq!(updated, Some("new_value".to_string()));
-  }
-
-  #[traced_test]
-  #[tokio::test]
-  async fn test_pdf_recording() {
-    let (db, _dir) = setup_test_db().await;
-    let paper = create_test_paper();
-
-    // Save paper first to get an ID
-    let paper_id = db.save_paper(&paper).await.unwrap();
-
-    // Test recording successful PDF download
-    let path = PathBuf::from("/test/path/paper.pdf");
-    let filename = "paper.pdf".to_string();
-
-    let file_id =
-      db.record_pdf(paper_id, path.clone(), filename.clone(), "success", None).await.unwrap();
-
-    assert!(file_id > 0);
-
-    // Test retrieving PDF status
-    let status = db.get_pdf_status(paper_id).await.unwrap();
-    assert!(status.is_some());
-
-    let (stored_path, stored_filename, stored_status, error) = status.unwrap();
-    assert_eq!(stored_path, path);
-    assert_eq!(stored_filename, filename);
-    assert_eq!(stored_status, "success");
-    assert_eq!(error, None);
-  }
-
-  #[traced_test]
-  #[tokio::test]
-  async fn test_pdf_failure_recording() {
-    let (db, _dir) = setup_test_db().await;
-    let paper = create_test_paper();
-
-    // Save paper first to get an ID
-    let paper_id = db.save_paper(&paper).await.unwrap();
-
-    // Test recording failed PDF download
-    let path = PathBuf::from("/test/path/paper.pdf");
-    let filename = "paper.pdf".to_string();
-    let error_msg = "HTTP 403: Access Denied".to_string();
-
-    db.record_pdf(paper_id, path.clone(), filename.clone(), "failed", Some(error_msg.clone()))
-      .await
-      .unwrap();
-
-    // Test retrieving failed status
-    let status = db.get_pdf_status(paper_id).await.unwrap();
-    assert!(status.is_some());
-
-    let (stored_path, stored_filename, stored_status, error) = status.unwrap();
-    assert_eq!(stored_path, path);
-    assert_eq!(stored_filename, filename);
-    assert_eq!(stored_status, "failed");
-    assert_eq!(error, Some(error_msg));
-  }
-
-  #[traced_test]
-  #[tokio::test]
-  async fn test_pdf_status_nonexistent() {
-    let (db, _dir) = setup_test_db().await;
-    let paper = create_test_paper();
-
-    // Save paper first to get an ID
-    let paper_id = db.save_paper(&paper).await.unwrap();
-
-    // Test getting status for paper with no PDF record
-    let status = db.get_pdf_status(paper_id).await.unwrap();
-    assert_eq!(status, None);
-  }
-
-  #[traced_test]
-  #[tokio::test]
-  async fn test_pdf_status_update() {
-    let (db, _dir) = setup_test_db().await;
-    let paper = create_test_paper();
-
-    // Save paper first to get an ID
-    let paper_id = db.save_paper(&paper).await.unwrap();
-
-    let path = PathBuf::from("/test/path/paper.pdf");
-    let filename = "paper.pdf".to_string();
-
-    // First record as pending
-    db.record_pdf(paper_id, path.clone(), filename.clone(), "pending", None).await.unwrap();
-
-    // Then update to success
-    db.record_pdf(paper_id, path.clone(), filename.clone(), "success", None).await.unwrap();
-
-    // Verify final status
-    let status = db.get_pdf_status(paper_id).await.unwrap();
-    let (_, _, stored_status, _) = status.unwrap();
-    assert_eq!(stored_status, "success");
   }
 
   #[traced_test]

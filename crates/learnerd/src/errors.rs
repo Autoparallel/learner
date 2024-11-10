@@ -13,6 +13,9 @@
 
 use thiserror::Error;
 
+/// Error type alias used for the [`learnerd`] crate.
+pub type Result<T> = core::result::Result<T, LearnerdErrors>;
+
 /// Errors that can occur during CLI operations.
 ///
 /// This enum wraps various error types from dependencies and the underlying

@@ -42,7 +42,7 @@ pub const SERVICE_FILE: &str = "learnerd.daemon.plist";
 /// Returns `LearnerdErrors` if:
 /// - Cannot determine current executable path
 /// - Fails to write property list file
-pub fn install_system_daemon(daemon: &Daemon) -> Result<(), LearnerdErrors> {
+pub fn install_system_daemon(daemon: &Daemon) -> Result<()> {
   let plist = format!(
     r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -88,7 +88,7 @@ pub fn install_system_daemon(daemon: &Daemon) -> Result<(), LearnerdErrors> {
 /// # Errors
 ///
 /// Returns `LearnerdErrors` if the property list file cannot be removed.
-pub fn uninstall_system_daemon() -> Result<(), LearnerdErrors> {
+pub fn uninstall_system_daemon() -> Result<()> {
   Ok(fs::remove_file(format!("/Library/LaunchDaemons/{}", SERVICE_FILE))?)
 }
 

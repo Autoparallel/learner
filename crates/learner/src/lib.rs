@@ -28,9 +28,9 @@ use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
 use paper::{Author, Paper, Source};
 use regex::Regex;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, trace, warn};
-use url::Url;
 #[cfg(test)]
 use {tempfile::tempdir, tracing_test::traced_test};
 

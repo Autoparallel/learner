@@ -119,7 +119,7 @@ use super::*;
 #[cfg(target_os = "macos")] pub use macos::*;
 
 /// Commands available for daemon management through the CLI.
-#[derive(Subcommand)]
+#[derive(Subcommand, Clone, Copy)]
 pub enum DaemonCommands {
   /// Start the daemon process.
   ///
@@ -235,7 +235,7 @@ impl Daemon {
   /// - Directory creation fails
   /// - Log initialization fails
   /// - Daemon process fails to start
-  pub fn start(&self) -> Result<(), LearnerdErrors> {
+  pub fn start(&self) -> Result<()> {
     // Ensure directories exist
     fs::create_dir_all(&self.working_dir)?;
     fs::create_dir_all(&self.log_dir)?;
@@ -288,7 +288,7 @@ impl Daemon {
   /// # Note
   ///
   /// Currently has limited functionality - see TODO in implementation.
-  pub fn stop(&self) -> Result<(), LearnerdErrors> {
+  pub fn stop(&self) -> Result<()> {
     if let Ok(pid) = fs::read_to_string(&self.pid_file) {
       let pid: i32 = pid.trim().parse().map_err(|e: std::num::ParseIntError| {
         LearnerdErrors::Daemon(format!("pid.trim().parse() gave error: {}", e))
@@ -320,7 +320,7 @@ impl Daemon {
   /// # Errors
   ///
   /// Returns `LearnerdErrors` if either stop or start operations fail.
-  pub fn restart(&self) -> Result<(), LearnerdErrors> {
+  pub fn restart(&self) -> Result<()> {
     self.stop()?;
     std::thread::sleep(std::time::Duration::from_secs(1));
     self.start()
@@ -336,19 +336,19 @@ impl Daemon {
   /// # Errors
   ///
   /// Returns `LearnerdErrors` if service installation fails.
-  pub fn install(&self) -> Result<(), LearnerdErrors> { install_system_daemon(self) }
+  pub fn install(&self) -> Result<()> { install_system_daemon(self) }
 
   /// Removes the daemon from system services.
   ///
   /// # Errors
   ///
   /// Returns `LearnerdErrors` if service removal fails.
-  pub fn uninstall(&self) -> Result<(), LearnerdErrors> { uninstall_system_daemon() }
+  pub fn uninstall(&self) -> Result<()> { uninstall_system_daemon() }
 
   /// Main daemon loop that handles background tasks.
   ///
   /// Currently implements a basic heartbeat for monitoring.
-  fn run(&self) -> Result<(), LearnerdErrors> {
+  fn run(&self) -> Result<()> {
     info!("Daemon running");
 
     // TODO: Implement actual daemon functionality
