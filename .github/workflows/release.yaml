@@ -10,45 +10,11 @@ on:
       - main
 
 jobs:
-  check-learner:
-    name: Check Learner Release
-    runs-on: ubuntu-latest
-    outputs:
-      has_release: ${{ steps.check_release.outputs.has_release }}
-      new_version: ${{ steps.check_release.outputs.version }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@nightly
-
-      - name: Install release-plz
-        run: cargo install release-plz
-
-      - name: Check for learner release
-        id: check_release
-        run: |
-          # Use release-plz to check if learner has changes requiring release
-          cd crates/learner
-          if release-plz check; then
-            echo "has_release=true" >> $GITHUB_OUTPUT
-            # Get the next version that would be released
-            VERSION=$(cargo metadata --format-version=1 | jq -r '.packages[] | select(.name == "learner") | .version')
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "Learner has changes for release, next version: $VERSION"
-          else
-            echo "has_release=false" >> $GITHUB_OUTPUT
-            echo "No release needed for learner"
-          fi
-
   release-learner:
     name: Release Learner
-    needs: check-learner
-    if: needs.check-learner.outputs.has_release == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.release.outputs.released }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,67 +27,31 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Install cargo-semver-checks
-        uses: taiki-e/install-action@cargo-semver-checks
-
-      - name: Run semver checks for learner
-        run: cd crates/learner && cargo semver-checks check-release
-
-      - name: Run release-plz for learner
+      - name: Release learner
+        id: release
         uses: MarcoIeni/release-plz-action@v0.5.41
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
           RELEASE_PLZ_PATH: crates/learner
 
-      - name: Create PR for workspace update
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION=${{ needs.check-learner.outputs.new_version }}
-          BRANCH="chore/update-learner-version-$VERSION"
-          
-          # Create new branch
-          git checkout -b $BRANCH
-          
-          # Update version using perl
-          perl -i -pe "s/(learner = \{ path = \"crates\/learner\", version = \")[\d\.]+(\"\})/\${1}$VERSION\${2}/" Cargo.toml
-          
-          # Commit and push
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml
-          git commit -m "chore: update workspace manifest learner version to $VERSION"
-          git push origin $BRANCH
-          
-          # Create PR
-          gh pr create \
-            --title "chore: update workspace manifest learner version to $VERSION" \
-            --body "This PR updates the workspace manifest to use learner version $VERSION following its release." \
-            --base main \
-            --head $BRANCH
-
   release-learnerd:
     name: Release Learnerd
-    needs: [check-learner, release-learner]
-    if: |
-      always() &&
-      (needs.check-learner.outputs.has_release == 'false' ||
-       (needs.check-learner.outputs.has_release == 'true' && needs.release-learner.result == 'success'))
+    needs: release-learner
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+          
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Run release-plz for learnerd
+      - name: Release learnerd
         uses: MarcoIeni/release-plz-action@v0.5.41
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,6 @@
 [workspace]
 allow_dirty         = false
-dependencies_update = false
+dependencies_update = true
 semver_check        = true
 
 [[package]]
