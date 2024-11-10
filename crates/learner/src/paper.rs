@@ -24,8 +24,6 @@
 //! # }
 //! ```
 
-use url::Url;
-
 use super::*;
 
 /// The source repository or system from which a paper originates.
@@ -43,7 +41,7 @@ pub enum Source {
   DOI,
 }
 
-impl std::fmt::Display for Source {
+impl Display for Source {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Source::Arxiv => write!(f, "Arxiv"),

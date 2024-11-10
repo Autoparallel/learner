@@ -141,9 +141,27 @@ pub enum LearnerError {
   #[error(transparent)]
   Lopdf(#[from] lopdf::Error),
 
+  /// A model was not specified for the LLM request.
+  ///
+  /// This occurs when attempting to send a request to the LLM without
+  /// first specifying which model to use. This can happen when:
+  /// - The request is built without calling `with_model()`
+  /// - The model field is explicitly set to None
+  ///
+  /// The error helps ensure that requests are properly configured
+  /// before being sent to avoid API errors.
   #[error("No model was chosen for the LLM.")]
   LLMMissingModel,
 
+  /// No messages were provided in the LLM request.
+  ///
+  /// This occurs when attempting to send a request to the LLM with
+  /// an empty message queue. This can happen when:
+  /// - The request is built without calling `with_message()`
+  /// - All messages are removed before sending
+  ///
+  /// The error prevents sending empty requests to the LLM which
+  /// would result in API errors or meaningless responses.
   #[error("No messages were supplied to send to the LLM.")]
   LLMMissingMessage,
 }
