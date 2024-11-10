@@ -1085,10 +1085,12 @@ version = "0.4.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "crossterm",
  "dirs",
  "lazy_static",
  "lopdf",
  "quick-xml",
+ "ratatui",
  "regex",
  "reqwest",
  "rusqlite",
