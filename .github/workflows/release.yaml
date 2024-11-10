@@ -10,11 +10,9 @@ on:
       - main
 
 jobs:
-  release-learner:
-    name: Release Learner
+  release:
+    name: Release
     runs-on: ubuntu-latest
-    outputs:
-      released: ${{ steps.release.outputs.released }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,38 +20,25 @@ jobs:
           fetch-depth: 0
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Release learner
-        id: release
-        uses: MarcoIeni/release-plz-action@v0.5.41
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          RELEASE_PLZ_PATH: crates/learner
+      - name: Install cargo-semver-checks
+        uses: taiki-e/install-action@cargo-semver-checks
 
-  release-learnerd:
-    name: Release Learnerd
-    needs: release-learner
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Run semver checks
+        run: cargo semver-checks check-release --workspace
+
+      - name: Update Cargo.lock
+        uses: stefanzweifel/git-auto-commit-action@v5  # Better commit action
         with:
-          fetch-depth: 0
-          
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@nightly
+          commit_message: "chore: update Cargo.lock"
+          file_pattern: "Cargo.lock"
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Release learnerd
+      - name: Run release-plz
         uses: MarcoIeni/release-plz-action@v0.5.41
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          RELEASE_PLZ_PATH: crates/learnerd
