@@ -10,7 +10,7 @@ use serial_test::serial;
 use tempfile::tempdir;
 
 // Helper function to create a clean command instance
-fn learnerd() -> Command { Command::cargo_bin("learnerd").unwrap() }
+fn learner() -> Command { Command::cargo_bin("learner").unwrap() }
 
 // Helper to get a temporary database path
 fn temp_db() -> (tempfile::TempDir, PathBuf) {
@@ -25,7 +25,7 @@ fn test_init_and_clean() {
   let (dir, db_path) = temp_db();
 
   // Initialize database
-  learnerd()
+  learner()
     .arg("init")
     .arg("--path")
     .arg(&db_path)
@@ -37,7 +37,7 @@ fn test_init_and_clean() {
   assert!(db_path.exists());
 
   // Clean with force flag
-  learnerd()
+  learner()
     .arg("clean")
     .arg("--path")
     .arg(&db_path)
@@ -56,10 +56,10 @@ async fn test_basic_paper_workflow() {
   let (dir, db_path) = temp_db();
 
   // Initialize database
-  learnerd().arg("init").arg("--path").arg(&db_path).arg("--accept-defaults").assert().success();
+  learner().arg("init").arg("--path").arg(&db_path).arg("--accept-defaults").assert().success();
 
   // Add a paper
-  learnerd()
+  learner()
     .arg("add")
     .arg("2301.07041")
     .arg("--path")
@@ -71,7 +71,7 @@ async fn test_basic_paper_workflow() {
     .stdout(predicate::str::contains("Verifiable Fully Homomorphic"));
 
   // Try adding same paper again to test duplicate handling
-  learnerd()
+  learner()
     .arg("add")
     .arg("2301.07041")
     .arg("--path")
@@ -82,7 +82,7 @@ async fn test_basic_paper_workflow() {
     .stdout(predicate::str::contains("already in your database"));
 
   // Get the paper
-  learnerd()
+  learner()
     .arg("get")
     .arg("arxiv")
     .arg("2301.07041")
@@ -95,7 +95,7 @@ async fn test_basic_paper_workflow() {
     .stdout(predicate::str::contains("Verifiable Fully Homomorphic"));
 
   // Search for the paper
-  learnerd()
+  learner()
     .arg("search")
     .arg("Homomorphic")
     .arg("--path")
@@ -107,7 +107,7 @@ async fn test_basic_paper_workflow() {
     .stdout(predicate::str::contains("Verifiable Fully Homomorphic"));
 
   // Search for nonexistent paper
-  learnerd()
+  learner()
     .arg("search")
     .arg("ThisPaperDoesNotExist123")
     .arg("--path")

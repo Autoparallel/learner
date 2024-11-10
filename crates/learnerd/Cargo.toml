@@ -9,6 +9,10 @@ readme.workspace     = true
 repository.workspace = true
 version              = "0.1.4"
 
+[[bin]]
+name = "learner"
+path = "src/main.rs"
+
 [features]
 default = []
 tui     = ["dep:ratatui", "dep:crossterm"]

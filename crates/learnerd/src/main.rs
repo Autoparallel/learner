@@ -88,7 +88,7 @@ struct Cli {
 
   /// The subcommand to execute
   #[command(subcommand)]
-  command: Commands,
+  command: Option<Commands>,
 
   /// Skip all prompts and accept defaults (mostly for testing)
   #[arg(long, hide = true, global = true)]
@@ -98,6 +98,11 @@ struct Cli {
 /// Available commands for the CLI
 #[derive(Subcommand)]
 enum Commands {
+  /// Launch the Terminal User Interface (default when no command specified)
+  #[cfg(feature = "tui")]
+  #[clap(hide = true)] // Hide from help since it's the default
+  Tui,
+
   /// Initialize a new learner database
   Init,
 
@@ -206,12 +211,25 @@ fn setup_logging(verbosity: u8) {
 #[tokio::main]
 async fn main() -> Result<(), LearnerdErrors> {
   let cli = Cli::parse();
-  if let Commands::Daemon { .. } = cli.command {
+
+  // Handle the command, using TUI as default when enabled
+  let command = cli.command.unwrap_or_else(|| {
+    #[cfg(feature = "tui")]
+    return Commands::Tui;
+
+    #[cfg(not(feature = "tui"))]
+    {
+      println!("Please specify a command. Use --help for usage information.");
+      std::process::exit(1);
+    }
+  });
+
+  if let Commands::Daemon { .. } = command {
   } else {
     setup_logging(cli.verbose);
   }
 
-  match cli.command {
+  match command {
     Commands::Init => {
       let db_path = cli.path.unwrap_or_else(|| {
         let default_path = Database::default_path();
@@ -924,6 +942,10 @@ async fn main() -> Result<(), LearnerdErrors> {
         },
       }
       Ok(())
+    },
+    #[cfg(feature = "tui")]
+    Commands::Tui => {
+      todo!()
     },
   }
 }

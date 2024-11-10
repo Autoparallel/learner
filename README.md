@@ -59,6 +59,7 @@ learner = "0.2"  # Core library
 ```bash
 cargo install learnerd
 ```
+which will install a binary you can reference with the command `learner`.
 
 ## Usage
 
@@ -92,30 +93,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```bash
 # Initialize a new database (interactive)
-learnerd init
+learner init
 
 # Add a paper (auto-detects source)
-learnerd add 2301.07041
-learnerd add "https://arxiv.org/abs/2301.07041"
-learnerd add "10.1145/1327452.1327492"
+learner add 2301.07041
+learner add "https://arxiv.org/abs/2301.07041"
+learner add "10.1145/1327452.1327492"
 
 # Skip PDF download
-learnerd add 2301.07041 --no-pdf
+learner add 2301.07041 --no-pdf
 
 # Download PDF for existing paper
-learnerd download arxiv 2301.07041
+learner download arxiv 2301.07041
 
 # Retrieve paper details
-learnerd get arxiv 2301.07041
+learner get arxiv 2301.07041
 
 # Search papers
-learnerd search "neural networks"
+learner search "neural networks"
 
 # Verbose output for debugging
-learnerd -v add 2301.07041
+learner -v add 2301.07041
 
 # Clean up database (with confirmation)
-learnerd clean
+learner clean
 ```
 
 ### Daemon Management
@@ -143,7 +144,7 @@ sudo learnerd daemon uninstall
 **MacOS (`launchd`):**
 ```bash
 # Install and start
-sudo learnerd daemon install
+sudo learner daemon install
 sudo launchctl load /Library/LaunchDaemons/learnerd.daemon.plist
 
 # Manage
@@ -153,7 +154,7 @@ sudo launchctl kickstart -k system/learnerd.daemon  # Restart
 
 # Remove
 sudo launchctl bootout system/learnerd.daemon
-sudo learnerd daemon uninstall
+sudo learner daemon uninstall
 ```
 
 #### Logs
