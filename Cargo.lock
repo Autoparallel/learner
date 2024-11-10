@@ -1005,7 +1005,6 @@ dependencies = [
  "tokio-test",
  "tracing",
  "tracing-test",
- "url",
 ]
 
 [[package]]

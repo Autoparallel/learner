@@ -84,13 +84,6 @@ pub enum LearnerError {
   #[error("API error: {0}")]
   ApiError(String),
 
-  /// Failed to parse a URL.
-  ///
-  /// This occurs when attempting to parse paper URLs from various
-  /// sources and the URL format is invalid.
-  #[error(transparent)]
-  InvalidUrl(#[from] url::ParseError),
-
   /// A SQLite operation failed.
   ///
   /// This wraps errors from the `rusqlite` crate, covering:
