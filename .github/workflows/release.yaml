@@ -25,6 +25,9 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
 
+      - name: Install release-plz
+        run: cargo install release-plz
+
       - name: Check for learner release
         id: check_release
         run: |
