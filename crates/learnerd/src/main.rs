@@ -47,6 +47,7 @@ use tracing_subscriber::EnvFilter;
 
 pub mod daemon;
 pub mod errors;
+#[cfg(feature = "tui")] pub mod tui;
 
 use daemon::*;
 
