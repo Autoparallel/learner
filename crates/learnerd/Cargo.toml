@@ -9,6 +9,10 @@ readme.workspace     = true
 repository.workspace = true
 version              = "0.1.4"
 
+[features]
+default = []
+tui     = ["dep:ratatui", "dep:crossterm"]
+
 [dependencies]
 clap               = { workspace = true }
 console            = { workspace = true }
@@ -22,6 +26,10 @@ tokio              = { workspace = true }
 tracing            = { workspace = true }
 tracing-appender   = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+# TUI dependencies (optional)
+crossterm = { workspace = true, optional = true }
+ratatui   = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow      = { workspace = true }
