@@ -89,6 +89,10 @@ lint-linux:
     @echo "Checking lint on Linux x86_64..."
     cargo clippy --workspace --all-targets --target x86_64-unknown-linux-musl
 
+# Check for semver issues in the workspace
+semver: 
+    cargo semver-checks check-release --workspace
+
 # Format code
 fmt:
     cargo fmt --all
@@ -110,82 +114,26 @@ info:
     @echo "Installed targets:"
     @rustup target list --installed
 
-# Run all CI checks
-# ci:
-#     #!/usr/bin/env bash
-#     set -euo pipefail
-    
-#     echo "Running CI checks..."
-    
-#     # Format check
-#     echo "\nChecking formatting..."
-#     if ! cargo fmt --all -- --check; then
-#         echo "❌ Formatting check failed"
-#         exit 1
-#     fi
-#     if ! taplo fmt --check; then
-#         echo "❌ TOML formatting check failed"
-#         exit 1
-#     fi
-    
-#     # Clippy with denied warnings
-#     echo "\nRunning clippy checks..."
-#     if ! cargo clippy --target x86_64-unknown-linux-musl --all-targets --all-features -- --deny warnings; then
-#         echo "❌ Linux clippy check failed"
-#         exit 1
-#     fi
-#     if ! cargo clippy --target aarch64-apple-darwin --all-targets --all-features -- --deny warnings; then
-#         echo "❌ macOS clippy check failed"
-#         exit 1
-#     fi
-    
-#     # Tests
-#     echo "\nRunning tests..."
-#     if ! cargo test --verbose --workspace; then
-#         echo "❌ Tests failed"
-#         exit 1
-#     fi
-    
-#     # Build checks
-#     echo "\nChecking builds..."
-#     if ! cargo build --target x86_64-unknown-linux-musl --workspace; then
-#         echo "❌ Linux build failed"
-#         exit 1
-#     fi
-#     if ! cargo build --target aarch64-apple-darwin --workspace; then
-#         echo "❌ macOS build failed"
-#         exit 1
-#     fi
-    
-#     # Dependency checks
-#     echo "\nChecking for unused dependencies..."
-#     if ! cargo +nightly udeps --workspace; then
-#         echo "❌ Unused dependency check failed"
-#         exit 1
-#     fi
-    
-#     # Semver checks
-#     echo "\nChecking semver compatibility..."
-#     if ! cargo semver-checks check-release --workspace; then
-#         echo "❌ Semver check failed"
-#         exit 1
-#     fi
-    
-#     echo "✅ All CI checks passed!"
-
-# Run all CI checks
 ci:
     #!/usr/bin/env bash
     set -euo pipefail
-    
+
+    # Colors
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    BLUE='\033[0;34m'
+    CYAN='\033[0;36m'
+    BOLD='\033[1m'
+    NC='\033[0m' # No Color
+
     # Array to store failures
     declare -a failures=()
-    
+
     # Helper function for progress indicator
     function progress() {
-        echo "⏳ ${1}..."
+        echo -e "${BLUE}${BOLD}Running${NC} ${CYAN}${1}${NC}..."
     }
-    
+
     # Helper function to capture failures
     function run_check() {
         local name=$1
@@ -193,17 +141,17 @@ ci:
         progress "$name"
         if ! "$@" > /tmp/check-output 2>&1; then
             failures+=("$name")
-            echo "  ❌ Failed"
-            echo "----------------------------------------"
-            cat /tmp/check-output
-            echo "----------------------------------------"
+            echo -e "  ${RED}${BOLD}FAILED${NC}"
+            echo -e "${RED}----------------------------------------"
+            cat /tmp/check-output | sed "s/^/${RED}/" # Prefix each line with red color
+            echo -e "----------------------------------------${NC}"
         else
-            echo "  ✅ Passed"
+            echo -e "  ${GREEN}${BOLD}PASSED${NC}"
         fi
     }
-    
-    echo "🚀 Starting CI checks\n"
-    
+
+    echo -e "${BOLD}Starting CI checks${NC}\n"
+
     # Run all checks
     run_check "Rust formatting" cargo fmt --all -- --check
     run_check "TOML formatting" taplo fmt --check
@@ -214,15 +162,15 @@ ci:
     run_check "Test suite" cargo test --verbose --workspace
     run_check "Unused dependencies" cargo +nightly udeps --workspace
     run_check "Semver compatibility" cargo semver-checks check-release --workspace
-    
-    echo "\n📊 CI Summary:"
+
+    echo -e "\n${BOLD}CI Summary:${NC}"
     if [ ${#failures[@]} -eq 0 ]; then
-        echo "✨ All checks passed successfully!"
+        echo -e "${GREEN}${BOLD}All checks passed successfully!${NC}"
         exit 0
     else
-        echo "❌ The following checks failed:"
+        echo -e "${RED}${BOLD}The following checks failed:${NC}"
         for failure in "${failures[@]}"; do
-            echo "  • $failure"
+            echo -e "${RED}  • ${failure}${NC}"
         done
         exit 1
     fi

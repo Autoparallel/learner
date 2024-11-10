@@ -37,7 +37,7 @@ pub const DEFAULT_LOG_DIR: &str = "/var/log/learnerd";
 /// - Binary installation fails
 /// - Service file creation fails
 /// - Systemd reload fails
-pub fn install_system_daemon(_daemon: &Daemon) -> Result<(), LearnerdErrors> {
+pub fn install_system_daemon(_daemon: &Daemon) -> Result<()> {
   let service = String::from(
     r#"[Unit]
 Description=Academic Paper Management Daemon
@@ -84,7 +84,7 @@ WantedBy=multi-user.target
 /// # Errors
 ///
 /// Returns `LearnerdErrors` if service file removal fails.
-pub fn uninstall_system_daemon() -> Result<(), LearnerdErrors> {
+pub fn uninstall_system_daemon() -> Result<()> {
   Ok(fs::remove_file("/etc/systemd/system/learnerd.service")?)
 }
 
