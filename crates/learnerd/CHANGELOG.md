@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/Autoparallel/learner/compare/learnerd-v0.1.3...learnerd-v0.1.4) - 2024-11-10
+
+### Other
+- update Cargo.lock dependencies
+
 ## [0.1.3](https://github.com/Autoparallel/learner/compare/learnerd-v0.1.2...learnerd-v0.1.3) - 2024-11-09
 
 ### Added
