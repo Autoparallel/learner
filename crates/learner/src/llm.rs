@@ -32,7 +32,8 @@ use super::*;
 ///
 /// Each variant represents a different API endpoint with specific functionality.
 /// Currently, primary support is for the Chat endpoint, with others marked as
-/// experimental through runtime warnings.
+/// experimental through runtime warnings. See the
+/// [API documentation](https://github.com/ollama/ollama/blob/main/docs/api.md) for more.
 #[derive(Debug, Clone)]
 pub enum OllamaEndpoint {
   /// Chat completion endpoint for conversation-style interactions
