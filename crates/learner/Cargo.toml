@@ -12,7 +12,7 @@ version              = "0.3.0"
 
 [dependencies]
 chrono         = { workspace = true }
-dirs           = { workspace = true } # TODO (autoparallel): move into workspace
+dirs           = { workspace = true }
 lazy_static    = { workspace = true }
 lopdf          = { workspace = true }
 quick-xml      = { workspace = true }
@@ -26,7 +26,6 @@ tokio          = { workspace = true }
 tokio-rusqlite = { workspace = true }
 tracing        = { workspace = true }
 url            = { workspace = true }
-tiktoken-rs    = "0.6.0"
 
 [dev-dependencies]
 anyhow       = { workspace = true }

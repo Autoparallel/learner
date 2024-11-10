@@ -141,8 +141,11 @@ pub enum LearnerError {
   #[error(transparent)]
   Lopdf(#[from] lopdf::Error),
 
-  #[error("Content sent to LLM contained too many tokens.")]
-  LLMContentTooLong,
+  #[error("No model was chosen for the LLM.")]
+  LLMMissingModel,
+
+  #[error("No messages were supplied to send to the LLM.")]
+  LLMMissingMessage,
 }
 
 impl LearnerError {

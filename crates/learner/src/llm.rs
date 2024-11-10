@@ -1,9 +1,42 @@
-#![allow(missing_docs, clippy::missing_docs_in_private_items)]
-use std::{error::Error, fmt::Display};
+use std::fmt::Display;
 
-use tiktoken_rs::{cl100k_base, CoreBPE};
+use tracing::warn;
+use url::Url;
 
 use super::*;
+
+#[derive(Debug, Clone)]
+pub enum OllamaEndpoint {
+  Chat,
+  Generate,
+  Embed,
+  Pull,
+  Push,
+  Create,
+  Copy,
+  Delete,
+  Show,
+  ListRunning,
+  ListLocal,
+}
+
+impl OllamaEndpoint {
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      Self::Chat => "/api/chat",
+      Self::Generate => "/api/generate",
+      Self::Embed => "/api/embed",
+      Self::Pull => "/api/pull",
+      Self::Push => "/api/push",
+      Self::Create => "/api/create",
+      Self::Copy => "/api/copy",
+      Self::Delete => "/api/delete",
+      Self::Show => "/api/show",
+      Self::ListRunning => "/api/ps",
+      Self::ListLocal => "/api/tags",
+    }
+  }
+}
 
 #[derive(Serialize)]
 pub enum Model {
@@ -19,53 +52,16 @@ impl Display for Model {
   }
 }
 
-pub struct TokenCounter {
-  bpe:            CoreBPE,
-  context_window: usize,
-}
-
-impl Default for TokenCounter {
-  fn default() -> Self { Self::new(1024).unwrap() }
-}
-
-impl TokenCounter {
-  // TODO: this returning a result is stupid
-  pub fn new(context_window: usize) -> Result<Self, Box<dyn Error>> {
-    Ok(Self { bpe: cl100k_base()?, context_window })
-  }
-
-  pub fn count_tokens(&self, text: &str) -> usize {
-    self.bpe.encode_with_special_tokens(text).len()
-  }
-
-  pub fn get_max_completion_tokens(&self, prompt: &str, buffer: usize) -> usize {
-    let prompt_tokens = self.count_tokens(prompt);
-    self.context_window.saturating_sub(prompt_tokens).saturating_sub(buffer)
-  }
-}
-
-#[derive(Debug)]
-pub enum ProcessingMode {
-  Single,
-  Chunked { max_completion_tokens: usize, buffer_tokens: usize },
-}
-
-impl Default for ProcessingMode {
-  fn default() -> Self { ProcessingMode::Single }
-}
-
-#[derive(Serialize)]
-pub struct LlamaRequestBuilder {
-  model:           Option<Model>,
-  messages:        Vec<Message>,
-  stream:          bool,
-  options:         Options,
+// TODO (autoparallel): We could make an API like this very nice by having it be a typestate for the
+// type of request you're doing so that only the relevant methods appear on a given type.
+#[derive(Serialize, Default)]
+pub struct LlamaRequest {
+  model:    Option<Model>,
+  messages: Vec<Message>,
+  stream:   bool,
+  options:  Options,
   #[serde(skip)]
-  url:             Option<String>,
-  #[serde(skip)]
-  processing_mode: ProcessingMode,
-  #[serde(skip)]
-  token_counter:   TokenCounter,
+  url:      Option<Url>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -82,8 +78,9 @@ pub struct Options {
   temperature: f64,
 }
 
+// NOTE (autoparallel): Chosen somewhat arbitrarily.
 impl Default for Options {
-  fn default() -> Self { Self { num_predict: 1024, top_k: 50, top_p: 0.95, temperature: 0.7 } }
+  fn default() -> Self { Self { num_predict: 16384, top_k: 50, top_p: 0.95, temperature: 0.7 } }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -101,21 +98,28 @@ pub struct LlamaResponse {
   pub eval_duration:        u64,
 }
 
-impl LlamaRequestBuilder {
-  pub fn new() -> Self {
-    Self {
-      model:           None,
-      messages:        vec![],
-      stream:          false,
-      options:         Default::default(),
-      url:             None,
-      token_counter:   Default::default(),
-      processing_mode: Default::default(),
-    }
+impl LlamaRequest {
+  pub fn new() -> Self { Self::default() }
+
+  pub fn with_host(mut self, host: &str) -> Self {
+    self.url = Url::parse(host).ok();
+    self
   }
 
-  pub fn with_url(mut self, url: &str) -> Self {
-    self.url.replace(url.to_string());
+  pub fn with_endpoint(mut self, endpoint: OllamaEndpoint) -> Self {
+    if !matches!(endpoint, OllamaEndpoint::Chat) {
+      warn!("Endpoint {:?} is not fully supported yet", endpoint);
+    }
+
+    let base = self.url.take().unwrap_or_else(|| {
+      warn!("No host set, using localhost");
+      Url::parse("http://localhost:11434").unwrap()
+    });
+
+    self.url = Some(base.join(endpoint.as_str().trim_start_matches('/')).unwrap_or_else(|_| {
+      warn!("Failed to set endpoint, using /api/chat");
+      base.join("/api/chat").unwrap()
+    }));
     self
   }
 
@@ -129,81 +133,25 @@ impl LlamaRequestBuilder {
     self
   }
 
-  async fn send_single_request(&self) -> Result<LlamaResponse, LearnerError> {
+  pub async fn send(&self) -> Result<LlamaResponse, LearnerError> {
+    let url = self.url.clone().unwrap_or_else(|| {
+      warn!("No URL set, using localhost/chat");
+      Url::parse("http://localhost:11434/api/chat").unwrap()
+    });
+
+    if self.model.is_none() {
+      return Err(LearnerError::LLMMissingModel);
+    }
+
+    if self.messages.is_empty() {
+      return Err(LearnerError::LLMMissingMessage);
+    }
+
     let client = reqwest::Client::new();
-    // TODO: this unwrap won't fail if we check the shit outside of this function
-    let response = client.post(self.url.as_ref().unwrap()).json(&self).send().await?;
+    let response = client.post(url).json(&self).send().await?;
     let llama_response: LlamaResponse = response.json().await?;
     Ok(llama_response)
   }
-
-  // TODO: When we process chunked, we should have this know its going to process chunks and
-  // summarize each chunk, then come back and take the summaries to rethink them
-  // pub async fn process(
-  //   &self,
-  //   content: &str,
-  //   system_prompt: &str,
-  // ) -> Result<Vec<LlamaResponse>, LearnerError> {
-  //   // TODO: check that the necessary fields are filled here and return error otherwise.
-
-  //   match &self.processing_mode {
-  //     ProcessingMode::Single => {
-  //       let full_prompt = format!("{}\n{}", system_prompt, content);
-  //       let max_tokens = self.token_counter.get_max_completion_tokens(&full_prompt, 100);
-
-  //       if max_tokens == 0 {
-  //         return Err(LearnerError::LLMContentTooLong);
-  //       }
-
-  //       let response = self.send_single_request().await?;
-  //       Ok(vec![response])
-  //     },
-
-  //     ProcessingMode::Chunked { max_completion_tokens, buffer_tokens } => {
-  //       let base_tokens = self.token_counter.count_tokens(system_prompt);
-  //       let available_for_content =
-  //         self.token_counter.context_window - base_tokens - max_completion_tokens -
-  // buffer_tokens;
-
-  //       // Split content into chunks
-  //       let mut chunks = Vec::new();
-  //       let mut current_chunk = String::new();
-  //       let mut current_tokens = 0;
-
-  //       // Simple splitting strategy - could be improved based on your needs
-  //       for line in content.lines() {
-  //         let line_content = format!("{}\n", line);
-  //         let line_tokens = self.token_counter.count_tokens(&line_content);
-
-  //         if current_tokens + line_tokens > available_for_content && !current_chunk.is_empty() {
-  //           chunks.push(current_chunk);
-  //           current_chunk = String::new();
-  //           current_tokens = 0;
-  //         }
-
-  //         current_chunk.push_str(&line_content);
-  //         current_tokens += line_tokens;
-  //       }
-
-  //       if !current_chunk.is_empty() {
-  //         chunks.push(current_chunk);
-  //       }
-
-  //       // Process each chunk
-  //       let mut responses = Vec::new();
-  //       for (i, chunk) in chunks.iter().enumerate() {
-  //         let chunk_prompt =
-  //           format!("{} [Part {}/{}]\n{}", system_prompt, i + 1, chunks.len(), chunk);
-
-  //         let response = self.send_single_request(&chunk_prompt, *max_completion_tokens).await?;
-
-  //         responses.push(response);
-  //       }
-
-  //       Ok(responses)
-  //     },
-  //   }
-  // }
 }
 
 #[cfg(test)]
@@ -213,13 +161,25 @@ mod tests {
   #[ignore = "Can't run this in general -- relies on local LLM endpoint."]
   #[tokio::test]
   async fn test_send_request() {
-    let url = "http://localhost:11434/api/chat";
+    let host = "http://localhost:11434/";
     let content = "Please tell me what is the capital of France?";
-    let request =
-      LlamaRequestBuilder::new().with_url(url).with_model(Model::Llama3p2c3b).with_message(content);
+    let request = LlamaRequest::new()
+      .with_host(host)
+      .with_endpoint(OllamaEndpoint::Chat)
+      .with_model(Model::Llama3p2c3b)
+      .with_message(content);
 
-    let response = request.send_single_request().await.unwrap();
+    let response = request.send().await.unwrap();
     dbg!(&response);
     assert!(response.message.content.contains("Paris"))
+  }
+
+  #[traced_test]
+  #[test]
+  fn test_warnings() {
+    let request = LlamaRequest::new().with_endpoint(OllamaEndpoint::Chat);
+    request.with_endpoint(OllamaEndpoint::Create);
+    assert!(logs_contain("No host set"));
+    assert!(logs_contain("Endpoint Create"));
   }
 }

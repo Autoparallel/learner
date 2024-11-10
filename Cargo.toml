@@ -58,4 +58,4 @@ predicates   = { version = "3.1" }
 serial_test  = { version = "3.1" }
 tempfile     = { version = "3.13" }
 tokio-test   = { version = "0.4" }
-tracing-test = { version = "0.2" }
+tracing-test = { version = "0.2", features = ["no-env-filter"] }
