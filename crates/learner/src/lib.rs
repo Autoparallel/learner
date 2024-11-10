@@ -19,6 +19,7 @@
 #![feature(str_from_utf16_endian)]
 
 use std::{
+  fmt::Display,
   path::{Path, PathBuf},
   str::FromStr,
 };
@@ -28,7 +29,8 @@ use lazy_static::lazy_static;
 use paper::{Author, Paper, Source};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
+use url::Url;
 #[cfg(test)]
 use {tempfile::tempdir, tracing_test::traced_test};
 
@@ -36,6 +38,7 @@ pub mod clients;
 pub mod database;
 pub mod errors;
 pub mod format;
+pub mod llm;
 pub mod paper;
 pub mod pdf;
 
