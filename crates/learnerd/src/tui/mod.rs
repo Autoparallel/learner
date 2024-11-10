@@ -7,7 +7,7 @@
 use std::io;
 
 use crossterm::{
-  event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
+  event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
   execute,
   terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -16,31 +16,19 @@ use ratatui::{
   backend::CrosstermBackend,
   layout::{Constraint, Direction, Layout},
   style::{Color, Style},
-  widgets::{Block, Borders, List, ListItem},
+  widgets::{Block, Borders, List, ListItem, ListState},
   Terminal,
 };
-use tokio::signal::unix::{signal, SignalKind};
 
 use crate::errors::LearnerdErrors;
 
 /// Runs the Terminal User Interface.
-///
-/// This function initializes the terminal, sets up event handling,
-/// and manages the main application loop. It restores the terminal
-/// state when exiting.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Terminal initialization fails
-/// - Event handling fails
-/// - Drawing the UI fails
 pub async fn run() -> Result<(), LearnerdErrors> {
   // Create app state
   let db = Database::open(Database::default_path()).await?;
-
-  // For now, let's just get all papers from the database
   let papers = db.list_papers("title", true).await?;
+  let mut selected = ListState::default();
+  selected.select(Some(0));
 
   // Setup terminal
   enable_raw_mode()?;
@@ -51,57 +39,60 @@ pub async fn run() -> Result<(), LearnerdErrors> {
   let backend = CrosstermBackend::new(stdout);
   let mut terminal = Terminal::new(backend)?;
 
-  // Set up signal handlers
-  let mut sigint = signal(SignalKind::interrupt())?;
-  let mut sigterm = signal(SignalKind::terminate())?;
-
   // Main loop
-  'main: loop {
+  let mut running = true;
+  while running {
     // Draw UI
     terminal.draw(|f| {
-      // Create main layout
       let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(1)])
-        .split(f.area());
+        .split(f.size());
 
-      // Create list items
       let items: Vec<ListItem> = papers
         .iter()
         .map(|p| {
-          ListItem::new(format!("{} ({})", p.title, p.authors.first().map_or("", |a| &a.name)))
+          ListItem::new(format!(
+            "{} ({}, {})",
+            p.title,
+            p.source.to_string(),
+            p.authors.first().map_or("No author", |a| &a.name)
+          ))
         })
         .collect();
 
-      // Create and render list widget
       let list = List::new(items)
         .block(Block::default().title("Papers").borders(Borders::ALL))
         .highlight_style(Style::default().bg(Color::DarkGray));
 
-      f.render_widget(list, chunks[0]);
+      f.render_stateful_widget(list, chunks[0], &mut selected);
 
-      // Render help text at bottom
-      let help = ratatui::widgets::Paragraph::new("q: quit  |  Ctrl-c: exit");
+      let help = ratatui::widgets::Paragraph::new("↑/k: up  |  ↓/j: down  |  q: quit");
       f.render_widget(help, chunks[1]);
     })?;
 
-    // Handle input events with a timeout
-    if event::poll(std::time::Duration::from_millis(100))? {
+    // Handle input
+    if event::poll(std::time::Duration::from_millis(50))? {
       if let Event::Key(key) = event::read()? {
-        match (key.code, key.modifiers) {
-          (KeyCode::Char('q'), _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-            break 'main;
+        match key.code {
+          KeyCode::Char('q') => {
+            running = false;
+          },
+          KeyCode::Up | KeyCode::Char('k') => {
+            let i = selected.selected().unwrap_or(0);
+            if i > 0 {
+              selected.select(Some(i - 1));
+            }
+          },
+          KeyCode::Down | KeyCode::Char('j') => {
+            let i = selected.selected().unwrap_or(0);
+            if i < papers.len().saturating_sub(1) {
+              selected.select(Some(i + 1));
+            }
           },
           _ => {},
         }
       }
-    }
-
-    // Check for signals
-    tokio::select! {
-        _ = sigint.recv() => break 'main,
-        _ = sigterm.recv() => break 'main,
-        else => {}
     }
   }
 
