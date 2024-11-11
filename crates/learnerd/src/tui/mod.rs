@@ -115,7 +115,7 @@ pub async fn run() -> Result<(), LearnerdErrors> {
     }
 
     // Wait for input with timeout
-    if event::poll(std::time::Duration::from_millis(50))? {
+    if event::poll(std::time::Duration::from_millis(5))? {
       match event::read()? {
         Event::Key(key) =>
           if app.handle_input(key.code) {
@@ -126,9 +126,6 @@ pub async fn run() -> Result<(), LearnerdErrors> {
         },
         _ => {},
       }
-    } else {
-      // No event received, sleep a bit to prevent CPU spinning
-      std::thread::sleep(std::time::Duration::from_millis(50));
     }
   }
 
