@@ -1,4 +1,4 @@
-use learner::{database::Database, format::format_title};
+use learner::format::format_title;
 use ratatui::{
   layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
   style::{Color, Style},
@@ -9,7 +9,7 @@ use ratatui::{
 
 use super::{
   state::{DialogType, FocusedPane, UIState},
-  styles,
+  *,
 };
 
 pub struct UIDrawer<'a, 'b> {
@@ -165,8 +165,8 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     let abstract_header = Paragraph::new(Span::styled("Abstract:", styles::LABEL));
     self.frame.render_widget(abstract_header, header_area);
 
-    let abstract_text = self.normalize_whitespace(&paper.abstract_text);
-    let lines = self.calculate_abstract_lines(&abstract_text, content_area);
+    let abstract_text = normalize_whitespace(&paper.abstract_text);
+    let lines = calculate_abstract_lines(&abstract_text, content_area);
 
     let abstract_content = Paragraph::new(abstract_text)
       .style(styles::NORMAL)
@@ -259,7 +259,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
 
   fn draw_dialog(&mut self, title: &str, content: &[Line], color: Color) {
     let area = self.frame.area();
-    let dialog_box = self.create_dialog_box(title, content, area);
+    let dialog_box = create_dialog_box(title, content, area);
 
     self.frame.render_widget(Clear, dialog_box);
     self.frame.render_widget(
@@ -277,64 +277,62 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
       dialog_box.inner(Margin { vertical: 1, horizontal: 2 }),
     );
   }
+}
 
-  // TODO: this doesn't need to be a method
-  fn create_dialog_box(&self, title: &str, content: &[Line], r: Rect) -> Rect {
-    let content_width = content.iter().map(|line| line.width()).max().unwrap_or(0);
-    let width = title.len().max(content_width).max(40) as u16 + 4;
-    let height = (content.len() as u16) + 2;
+// TODO: this doesn't need to be a method
+fn create_dialog_box(title: &str, content: &[Line], r: Rect) -> Rect {
+  let content_width = content.iter().map(|line| line.width()).max().unwrap_or(0);
+  let width = title.len().max(content_width).max(40) as u16 + 4;
+  let height = (content.len() as u16) + 2;
 
-    let popup_layout = Layout::default()
-      .direction(Direction::Vertical)
-      .constraints([
-        Constraint::Length((r.height - height) / 2),
-        Constraint::Length(height),
-        Constraint::Length((r.height - height) / 2),
-      ])
-      .split(r);
+  let popup_layout = Layout::default()
+    .direction(Direction::Vertical)
+    .constraints([
+      Constraint::Length((r.height - height) / 2),
+      Constraint::Length(height),
+      Constraint::Length((r.height - height) / 2),
+    ])
+    .split(r);
 
-    Layout::default()
-      .direction(Direction::Horizontal)
-      .constraints([
-        Constraint::Length((r.width - width) / 2),
-        Constraint::Length(width),
-        Constraint::Length((r.width - width) / 2),
-      ])
-      .split(popup_layout[1])[1]
-  }
+  Layout::default()
+    .direction(Direction::Horizontal)
+    .constraints([
+      Constraint::Length((r.width - width) / 2),
+      Constraint::Length(width),
+      Constraint::Length((r.width - width) / 2),
+    ])
+    .split(popup_layout[1])[1]
+}
 
-  // TODO: this doesn't need to be a method and can probably be addressed in `learner` itself.
-  fn normalize_whitespace(&self, text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
-  }
+fn normalize_whitespace(text: &str) -> String {
+  text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
 
-  // TODO: this also doesn't need to be a method.
-  fn calculate_abstract_lines(&self, text: &str, area: Rect) -> usize {
-    text
-      .lines()
-      .flat_map(|line| {
-        let mut wrapped_lines = Vec::new();
-        let mut current_line = String::new();
-        let available_width = area.width.saturating_sub(2) as usize;
+fn calculate_abstract_lines(text: &str, area: Rect) -> usize {
+  text
+    .lines()
+    .flat_map(|line| {
+      let mut wrapped_lines = Vec::new();
+      let mut current_line = String::new();
+      let available_width = area.width.saturating_sub(2) as usize;
 
-        for word in line.split_whitespace() {
-          if current_line.len() + word.len() < available_width {
-            if !current_line.is_empty() {
-              current_line.push(' ');
-            }
-            current_line.push_str(word);
-          } else {
-            if !current_line.is_empty() {
-              wrapped_lines.push(current_line);
-            }
-            current_line = word.to_string();
+      for word in line.split_whitespace() {
+        if current_line.len() + word.len() < available_width {
+          if !current_line.is_empty() {
+            current_line.push(' ');
           }
+          current_line.push_str(word);
+        } else {
+          if !current_line.is_empty() {
+            wrapped_lines.push(current_line);
+          }
+          current_line = word.to_string();
         }
-        if !current_line.is_empty() {
-          wrapped_lines.push(current_line);
-        }
-        wrapped_lines
-      })
-      .count()
-  }
+      }
+      if !current_line.is_empty() {
+        wrapped_lines.push(current_line);
+      }
+      wrapped_lines
+    })
+    .count()
 }

@@ -1,6 +1,7 @@
 use crossterm::event::KeyCode;
-use learner::{database::Database, format::format_title, paper::Paper};
 use ratatui::widgets::ListState;
+
+use super::*;
 
 #[derive(Debug, PartialEq)]
 pub enum FocusedPane {
