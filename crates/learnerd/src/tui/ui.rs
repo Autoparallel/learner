@@ -143,18 +143,43 @@ fn draw_paper_details(paper_idx: usize, f: &mut Frame, area: Rect, app: &mut App
 
   // Abstract content with scrolling
   let abstract_text = normalize_whitespace(&paper.abstract_text);
-  // TODO: should avoid this clone
-  let abstract_content = Paragraph::new(abstract_text.clone())
+
+  // Split the text into lines based on available width
+  let lines = abstract_text
+    .lines()
+    .flat_map(|line| {
+      let mut wrapped_lines = Vec::new();
+      let mut current_line = String::new();
+      let available_width = chunks[4].width.saturating_sub(2) as usize; // Subtract 2 for padding
+
+      for word in line.split_whitespace() {
+        if current_line.len() + word.len() < available_width {
+          if !current_line.is_empty() {
+            current_line.push(' ');
+          }
+          current_line.push_str(word);
+        } else {
+          if !current_line.is_empty() {
+            wrapped_lines.push(current_line);
+          }
+          current_line = word.to_string();
+        }
+      }
+      if !current_line.is_empty() {
+        wrapped_lines.push(current_line);
+      }
+      wrapped_lines
+    })
+    .count();
+
+  let abstract_content = Paragraph::new(abstract_text)
     .style(NORMAL_TEXT)
     .wrap(Wrap { trim: true })
     .block(Block::default().padding(Padding::new(0, 1, 0, 0)))
     .scroll((app.scroll_position as u16, 0));
 
-  // TODO (autoparallel): This doesn't work right as it's just counting new lines, we need to know
-  // how long the text actually goes.
-  // Calculate max scroll position
-  let content_height = abstract_text.chars().filter(|c| *c == '\n').count() + 10;
-  app.max_scroll = Some(content_height.saturating_sub(chunks[4].height as usize));
+  // Calculate max scroll position based on actual wrapped height
+  app.max_scroll = Some(lines.saturating_sub(chunks[4].height as usize));
 
   f.render_widget(abstract_content, chunks[4]);
 
