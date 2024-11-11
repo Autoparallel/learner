@@ -3,7 +3,12 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    # Group all updates together
+    groups:
+      all-updates:
+        patterns:
+          - "*"
     # Specify rules for version updates
     open-pull-requests-limit: 10
     # Assign reviewers (optional)
