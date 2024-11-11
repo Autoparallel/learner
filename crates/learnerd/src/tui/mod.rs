@@ -68,11 +68,10 @@ const HIGHLIGHT_KEY: Style = Style::new().fg(Color::Yellow);
 ///
 /// Used to track whether a dialog is currently being displayed
 /// and what type of dialog it is.
-enum DialogState {
-  /// No dialog is currently active
+pub enum DialogState {
   None,
-  /// Exit confirmation dialog is being shown
   ExitConfirm,
+  PDFNotFound,
 }
 
 /// Runs the Terminal User Interface.

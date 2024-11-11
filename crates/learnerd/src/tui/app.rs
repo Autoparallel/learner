@@ -57,6 +57,10 @@ impl AppState {
         },
         _ => {},
       },
+      DialogState::PDFNotFound => {
+        self.dialog = DialogState::None;
+        self.needs_redraw = true;
+      },
       DialogState::None => match key {
         KeyCode::Char('q') => {
           self.dialog = DialogState::ExitConfirm;
@@ -104,16 +108,27 @@ impl AppState {
               }
             },
         },
-        // Page up/down for faster scrolling
-        KeyCode::PageUp =>
-          if self.focused_pane == FocusedPane::Details {
-            self.scroll_position = self.scroll_position.saturating_sub(10);
-            self.needs_redraw = true;
-          },
-        KeyCode::PageDown =>
-          if self.focused_pane == FocusedPane::Details {
-            if let Some(max) = self.max_scroll {
-              self.scroll_position = (self.scroll_position + 10).min(max);
+        KeyCode::Char('o') =>
+          if let Some(paper_idx) = self.selected.selected() {
+            let paper = &self.papers[paper_idx];
+            let pdf_path = format!(
+              "{}/{}.pdf",
+              Database::default_pdf_path().display(),
+              format_title(&paper.title, Some(50))
+            );
+
+            if std::path::Path::new(&pdf_path).exists() {
+              #[cfg(target_os = "windows")]
+              let _ =
+                std::process::Command::new("cmd").args(["/C", "start", "", &pdf_path]).spawn();
+
+              #[cfg(target_os = "macos")]
+              let _ = std::process::Command::new("open").arg(&pdf_path).spawn();
+
+              #[cfg(target_os = "linux")]
+              let _ = std::process::Command::new("xdg-open").arg(&pdf_path).spawn();
+            } else {
+              self.dialog = DialogState::PDFNotFound;
               self.needs_redraw = true;
             }
           },

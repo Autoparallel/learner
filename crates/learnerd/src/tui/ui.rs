@@ -20,9 +20,11 @@ pub fn draw_ui(app: &mut AppState, f: &mut Frame) {
     draw_paper_details(i, f, right_area, app); // Updated signature
   }
 
-  // Draw dialog if active
-  if let DialogState::ExitConfirm = app.dialog {
-    draw_exit_dialog(f);
+  // Draw dialogs if active
+  match app.dialog {
+    DialogState::ExitConfirm => draw_exit_dialog(f),
+    DialogState::PDFNotFound => draw_pdf_not_found_dialog(f),
+    DialogState::None => {},
   }
 }
 
@@ -56,23 +58,19 @@ fn draw_paper_list(app: &mut AppState, f: &mut Frame, area: Rect) {
 
   // Updated help text with new controls
   let help = Paragraph::new(Line::from(vec![
-    Span::styled("↑/k", HIGHLIGHT_KEY),
-    Span::styled(": up", HELP_STYLE),
-    Span::raw(" • "),
-    Span::styled("↓/j", HIGHLIGHT_KEY),
-    Span::styled(": down", HELP_STYLE),
-    Span::raw(" • "),
-    Span::styled("←/h", HIGHLIGHT_KEY),
-    Span::styled(": left pane", HELP_STYLE),
-    Span::raw(" • "),
-    Span::styled("→/l", HIGHLIGHT_KEY),
-    Span::styled(": right pane", HELP_STYLE),
-    Span::raw(" • "),
-    Span::styled("PgUp/PgDn", HIGHLIGHT_KEY),
-    Span::styled(": scroll", HELP_STYLE),
-    Span::raw(" • "),
-    Span::styled("q", HIGHLIGHT_KEY),
-    Span::styled(": quit", HELP_STYLE),
+    // Navigation group
+    Span::styled("↑↓←→", Style::default().fg(Color::Yellow).bold()),
+    Span::styled(":nav", Style::default().fg(Color::DarkGray)),
+    // Separator
+    Span::styled(" • ", Style::default().fg(Color::Blue)),
+    // Open group
+    Span::styled("o", Style::default().fg(Color::Yellow).bold()),
+    Span::styled(":open", Style::default().fg(Color::DarkGray)),
+    // Separator
+    Span::styled(" • ", Style::default().fg(Color::Blue)),
+    // Quit group
+    Span::styled("q", Style::default().fg(Color::Yellow).bold()),
+    Span::styled(":quit", Style::default().fg(Color::DarkGray)),
   ]));
   f.render_widget(help, chunks[1]);
 }
@@ -268,7 +266,9 @@ fn draw_exit_dialog(f: &mut Frame) {
 /// Returns a `Rect` defining the position and size of the dialog box
 fn create_dialog_box(title: &str, message: &str, r: Rect) -> Rect {
   let width = title.len().max(message.len()).max(40) as u16 + 4;
-  let height = 3;
+  let height = 7; // Increased from 3 to 7 to accommodate content + margins + borders // TODO: we should just count
+                  // this?
+
   let popup_layout = Layout::default()
     .direction(Direction::Vertical)
     .constraints([
@@ -291,4 +291,43 @@ fn create_dialog_box(title: &str, message: &str, r: Rect) -> Rect {
 // TODO (autoparallel): This should maybe be handled back in the paper impl?
 fn normalize_whitespace(text: &str) -> String {
   text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn draw_pdf_not_found_dialog(f: &mut Frame) {
+  let area = f.area();
+  let dialog_box = create_dialog_box(
+    "PDF Not Found",
+    "The PDF file for this paper has not been downloaded.",
+    area,
+  );
+
+  f.render_widget(Clear, dialog_box);
+  f.render_widget(
+    Block::default()
+      .borders(Borders::ALL)
+      .border_style(Style::default().fg(Color::Yellow))
+      .title(Span::styled("PDF Not Found", Style::default().fg(Color::Yellow).bold())),
+    dialog_box,
+  );
+
+  f.render_widget(
+    Paragraph::new(vec![
+      Line::from(Span::styled(
+        "The PDF file for this paper has not been downloaded.",
+        Style::default().fg(Color::White),
+      )),
+      Line::from(""),
+      Line::from("Use the download command to get the PDF first."),
+      Line::from(""),
+      Line::from(vec![
+        Span::styled("Press ", NORMAL_TEXT),
+        Span::styled("Enter", HIGHLIGHT_KEY),
+        Span::styled(" or ", NORMAL_TEXT),
+        Span::styled("Esc", HIGHLIGHT_KEY),
+        Span::styled(" to continue", NORMAL_TEXT),
+      ]),
+    ])
+    .alignment(Alignment::Center),
+    dialog_box.inner(Margin { vertical: 1, horizontal: 2 }),
+  );
 }
