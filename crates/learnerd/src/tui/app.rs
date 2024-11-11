@@ -71,22 +71,10 @@ impl AppState {
     false
   }
 
-  /// Mark the UI as needing a redraw
-  pub fn mark_needs_redraw(&mut self) { self.needs_redraw = true; }
-
-  /// Get cached list items or create them
-  pub fn get_list_items(&mut self) -> &[ListItem<'static>] {
-    if self.cached_list_items.is_none() {
-      self.cached_list_items =
-        Some(self.papers.iter().map(|p| ListItem::new(p.title.clone())).collect());
-    }
-    self.cached_list_items.as_ref().unwrap()
-  }
-
   /// Update layouts if terminal size changed
   pub fn update_layout(&mut self, frame_size: Rect) -> (Rect, Rect) {
     if self.last_size != frame_size {
-      self.mark_needs_redraw();
+      self.needs_redraw = true;
       self.last_size = frame_size;
 
       // Main split
@@ -114,5 +102,14 @@ impl AppState {
     } else {
       self.update_layout(frame_size)
     }
+  }
+
+  /// Get cached list items or create them
+  pub fn get_list_items(&mut self) -> &[ListItem<'static>] {
+    if self.cached_list_items.is_none() {
+      self.cached_list_items =
+        Some(self.papers.iter().map(|p| ListItem::new(p.title.clone())).collect());
+    }
+    self.cached_list_items.as_ref().unwrap()
   }
 }

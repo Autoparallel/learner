@@ -24,6 +24,8 @@
 //! The TUI is enabled through the "tui" feature flag. When enabled, it becomes
 //! the default interface when no command is specified.
 
+#![allow(missing_docs, clippy::missing_docs_in_private_items)]
+
 use std::io;
 
 use app::AppState;
@@ -96,7 +98,7 @@ enum DialogState {
 pub async fn run() -> Result<(), LearnerdErrors> {
   // Create app state
   let db = Database::open(Database::default_path()).await?;
-  let papers = db.list_papers("title", true).await?;
+  let papers = db.list_papers("title", false).await?;
   let mut app = AppState::new(papers);
 
   // Setup terminal
@@ -122,7 +124,7 @@ pub async fn run() -> Result<(), LearnerdErrors> {
             break;
           },
         Event::Resize(..) => {
-          app.mark_needs_redraw();
+          app.needs_redraw = true;
         },
         _ => {},
       }
