@@ -57,10 +57,11 @@ impl AppState {
         },
         _ => {},
       },
-      DialogState::PDFNotFound => {
-        self.dialog = DialogState::None;
-        self.needs_redraw = true;
-      },
+      DialogState::PDFNotFound =>
+        if key == KeyCode::Enter {
+          self.dialog = DialogState::None;
+          self.needs_redraw = true;
+        },
       DialogState::None => match key {
         KeyCode::Char('q') => {
           self.dialog = DialogState::ExitConfirm;

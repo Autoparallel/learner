@@ -219,37 +219,6 @@ fn draw_paper_details(paper_idx: usize, f: &mut Frame, area: Rect, app: &mut App
   f.render_widget(status, chunks[5]);
 }
 
-fn draw_exit_dialog(f: &mut Frame) {
-  let area = f.area();
-  let dialog_box =
-    create_dialog_box("Exit Confirmation", "Are you sure you want to quit? (y/n)", area);
-
-  f.render_widget(Clear, dialog_box);
-  f.render_widget(
-    Block::default()
-      .borders(Borders::ALL)
-      .border_style(Style::default().fg(Color::Red))
-      .title(Span::styled("Exit Confirmation", Style::default().fg(Color::Red).bold())),
-    dialog_box,
-  );
-
-  f.render_widget(
-    Paragraph::new(vec![
-      Line::from(Span::styled("Are you sure you want to quit?", Style::default().fg(Color::White))),
-      Line::from(""),
-      Line::from(vec![
-        Span::styled("y", HIGHLIGHT_KEY),
-        Span::styled(": yes", HELP_STYLE),
-        Span::raw(" • "),
-        Span::styled("n", HIGHLIGHT_KEY),
-        Span::styled(": no", HELP_STYLE),
-      ]),
-    ])
-    .alignment(Alignment::Center),
-    dialog_box.inner(Margin { vertical: 1, horizontal: 2 }),
-  );
-}
-
 /// Creates a centered dialog box with the given dimensions.
 ///
 /// This helper function calculates the appropriate layout for a centered
@@ -264,10 +233,13 @@ fn draw_exit_dialog(f: &mut Frame) {
 /// # Returns
 ///
 /// Returns a `Rect` defining the position and size of the dialog box
-fn create_dialog_box(title: &str, message: &str, r: Rect) -> Rect {
-  let width = title.len().max(message.len()).max(40) as u16 + 4;
-  let height = 7; // Increased from 3 to 7 to accommodate content + margins + borders // TODO: we should just count
-                  // this?
+fn create_dialog_box(title: &str, content: &[Line], r: Rect) -> Rect {
+  // Calculate width based on content and title
+  let content_width = content.iter().map(|line| line.width()).max().unwrap_or(0);
+  let width = title.len().max(content_width).max(40) as u16 + 4;
+
+  // Calculate required height based on content
+  let height = (content.len() as u16) + 2; // +4 for borders and padding
 
   let popup_layout = Layout::default()
     .direction(Direction::Vertical)
@@ -288,18 +260,58 @@ fn create_dialog_box(title: &str, message: &str, r: Rect) -> Rect {
     .split(popup_layout[1])[1]
 }
 
-// TODO (autoparallel): This should maybe be handled back in the paper impl?
-fn normalize_whitespace(text: &str) -> String {
-  text.split_whitespace().collect::<Vec<_>>().join(" ")
+fn draw_exit_dialog(f: &mut Frame) {
+  let content = vec![
+    Line::from(Span::styled("Are you sure you want to quit?", Style::default().fg(Color::White))),
+    Line::from(""),
+    Line::from(vec![
+      Span::styled("Press ", Style::default().fg(Color::Gray)),
+      Span::styled("y", Style::default().fg(Color::Yellow).bold()),
+      Span::styled(" to confirm, ", Style::default().fg(Color::Gray)),
+      Span::styled("n", Style::default().fg(Color::Yellow).bold()),
+      Span::styled(" to cancel", Style::default().fg(Color::Gray)),
+    ]),
+  ];
+
+  let area = f.area();
+  let dialog_box = create_dialog_box("Exit Confirmation", &content, area);
+
+  f.render_widget(Clear, dialog_box);
+  f.render_widget(
+    Block::default()
+      .borders(Borders::ALL)
+      .border_style(Style::default().fg(Color::Red))
+      .title(Span::styled("Exit Confirmation", Style::default().fg(Color::Red).bold())),
+    dialog_box,
+  );
+
+  f.render_widget(
+    Paragraph::new(content).alignment(Alignment::Center),
+    dialog_box.inner(Margin { vertical: 1, horizontal: 2 }),
+  );
 }
 
 fn draw_pdf_not_found_dialog(f: &mut Frame) {
+  let content = vec![
+    Line::from(Span::styled(
+      "The PDF file for this paper has not been downloaded.",
+      Style::default().fg(Color::White),
+    )),
+    Line::from(""),
+    Line::from(Span::styled(
+      "Use the download command to get the PDF first.",
+      Style::default().fg(Color::Gray),
+    )),
+    Line::from(""),
+    Line::from(vec![
+      Span::styled("Press ", Style::default().fg(Color::Gray)),
+      Span::styled("Enter", Style::default().fg(Color::Yellow).bold()),
+      Span::styled(" to continue", Style::default().fg(Color::Gray)),
+    ]),
+  ];
+
   let area = f.area();
-  let dialog_box = create_dialog_box(
-    "PDF Not Found",
-    "The PDF file for this paper has not been downloaded.",
-    area,
-  );
+  let dialog_box = create_dialog_box("PDF Not Found", &content, area);
 
   f.render_widget(Clear, dialog_box);
   f.render_widget(
@@ -311,23 +323,12 @@ fn draw_pdf_not_found_dialog(f: &mut Frame) {
   );
 
   f.render_widget(
-    Paragraph::new(vec![
-      Line::from(Span::styled(
-        "The PDF file for this paper has not been downloaded.",
-        Style::default().fg(Color::White),
-      )),
-      Line::from(""),
-      Line::from("Use the download command to get the PDF first."),
-      Line::from(""),
-      Line::from(vec![
-        Span::styled("Press ", NORMAL_TEXT),
-        Span::styled("Enter", HIGHLIGHT_KEY),
-        Span::styled(" or ", NORMAL_TEXT),
-        Span::styled("Esc", HIGHLIGHT_KEY),
-        Span::styled(" to continue", NORMAL_TEXT),
-      ]),
-    ])
-    .alignment(Alignment::Center),
+    Paragraph::new(content).alignment(Alignment::Center),
     dialog_box.inner(Margin { vertical: 1, horizontal: 2 }),
   );
+}
+
+// TODO (autoparallel): This should maybe be handled back in the paper impl?
+fn normalize_whitespace(text: &str) -> String {
+  text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
