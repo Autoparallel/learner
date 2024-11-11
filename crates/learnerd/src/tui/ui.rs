@@ -1,3 +1,16 @@
+//! Drawing and layout management for the Terminal User Interface.
+//!
+//! This module handles all rendering aspects of the TUI, including:
+//! - Layout management
+//! - Widget drawing
+//! - Dialog rendering
+//! - Content formatting
+//!
+//! The module uses a drawer pattern where each component has its own
+//! specialized drawing method, making the code modular and maintainable.
+//! Layout is handled through constraint-based positioning, ensuring
+//! proper scaling across different terminal sizes.
+
 use learner::format::format_title;
 use ratatui::{
   layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
@@ -12,14 +25,40 @@ use super::{
   *,
 };
 
+/// Main drawer struct responsible for rendering the UI.
+///
+/// Holds references to both the frame being drawn and the current UI state.
+/// These references are kept separate to avoid borrow checker issues while
+/// still maintaining access to all necessary drawing context.
 pub struct UIDrawer<'a, 'b> {
+  /// Reference to the current frame being rendered.
+  ///
+  /// This is provided by ratatui's Terminal::draw callback and represents
+  /// the current rendering context. It provides methods to render widgets
+  /// and maintains the terminal buffer.
   frame: &'a mut Frame<'b>,
+
+  /// Reference to the current UI state.
+  ///
+  /// Contains all the dynamic state of the UI including:
+  /// - Paper list and selection
+  /// - Current focus and scroll positions
+  /// - Active dialogs
+  /// - Redraw flags
   state: &'a mut UIState,
 }
 
 impl<'a, 'b> UIDrawer<'a, 'b> {
+  /// Creates a new drawer instance.
   pub fn new(frame: &'a mut Frame<'b>, state: &'a mut UIState) -> Self { Self { frame, state } }
 
+  /// Main drawing entry point, handles the entire UI render.
+  ///
+  /// This method:
+  /// 1. Splits the layout into main sections
+  /// 2. Draws the paper list and details
+  /// 3. Handles any active dialogs
+  /// 4. Updates the redraw state
   pub fn draw(&mut self) {
     let frame_size = self.frame.area();
     let (left_area, right_area) = self.split_layout(frame_size);
@@ -39,6 +78,9 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.state.needs_redraw = false;
   }
 
+  /// Splits the main layout into left and right panes.
+  ///
+  /// The layout uses a 30/70 split for optimal content display.
   fn split_layout(&self, area: Rect) -> (Rect, Rect) {
     let chunks = Layout::default()
       .direction(Direction::Horizontal)
@@ -47,6 +89,12 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     (chunks[0], chunks[1])
   }
 
+  /// Draws the paper list with its help bar.
+  ///
+  /// Creates a list widget showing all paper titles with:
+  /// - Selection highlighting
+  /// - Border styling based on focus
+  /// - Paper count in the title
   fn draw_paper_list(&mut self, area: Rect) {
     let chunks = Layout::default()
       .direction(Direction::Vertical)
@@ -75,6 +123,10 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.draw_help_bar(chunks[1]);
   }
 
+  /// Draws the help bar showing available commands.
+  ///
+  /// Shows keyboard shortcuts and their actions in a
+  /// compact, readable format.
   fn draw_help_bar(&mut self, area: Rect) {
     let help = Paragraph::new(Line::from(vec![
       Span::styled("↑↓←→", styles::KEY_HIGHLIGHT.add_modifier(ratatui::style::Modifier::BOLD)),
@@ -89,6 +141,14 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.frame.render_widget(help, area);
   }
 
+  /// Draws the detailed view of a paper.
+  ///
+  /// Shows:
+  /// - Title
+  /// - Authors
+  /// - Source information
+  /// - Abstract (scrollable)
+  /// - PDF status
   fn draw_paper_details(&mut self, paper: &learner::paper::Paper, area: Rect) {
     let chunks = Layout::default()
       .direction(Direction::Vertical)
@@ -124,6 +184,12 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     }
   }
 
+  /// Draws the paper title section.
+  ///
+  /// Renders the title with:
+  /// - A "Title:" label in the defined label style
+  /// - The actual title in white
+  /// - Word wrapping enabled for long titles
   fn draw_title(&mut self, paper: &learner::paper::Paper, area: Rect) {
     let title = Paragraph::new(Line::from(vec![
       Span::styled("Title: ", styles::LABEL),
@@ -133,6 +199,12 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.frame.render_widget(title, area);
   }
 
+  /// Draws the paper authors section.
+  ///
+  /// Displays all authors as a comma-separated list with:
+  /// - An "Authors:" label in the defined label style
+  /// - Author names in the normal text style
+  /// - Word wrapping for long author lists
   fn draw_authors(&mut self, paper: &learner::paper::Paper, area: Rect) {
     let authors = Paragraph::new(Line::from(vec![
       Span::styled("Authors: ", styles::LABEL),
@@ -145,6 +217,13 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.frame.render_widget(authors, area);
   }
 
+  /// Draws the paper source information.
+  ///
+  /// Shows the paper's source system and identifier with:
+  /// - A "Source:" label
+  /// - The source type (e.g., "arXiv", "DOI")
+  /// - The source-specific identifier in parentheses
+  /// - Both source and identifier in light yellow
   fn draw_source(&mut self, paper: &learner::paper::Paper, area: Rect) {
     let source = Paragraph::new(Line::from(vec![
       Span::styled("Source: ", styles::LABEL),
@@ -156,6 +235,23 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.frame.render_widget(source, area);
   }
 
+  /// Draws the paper's abstract with header and content.
+  ///
+  /// Renders the abstract in two parts:
+  /// - A header section with the "Abstract:" label
+  /// - The main content area with:
+  ///   - Normalized whitespace
+  ///   - Word wrapping
+  ///   - Scrolling support
+  ///   - Left padding for better readability
+  ///
+  /// Also updates the maximum scroll position based on content length.
+  ///
+  /// # Arguments
+  ///
+  /// * `paper` - The paper whose abstract is being displayed
+  /// * `header_area` - The area for the "Abstract:" label
+  /// * `content_area` - The area for the abstract text
   fn draw_abstract(
     &mut self,
     paper: &learner::paper::Paper,
@@ -178,6 +274,13 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.frame.render_widget(abstract_content, content_area);
   }
 
+  /// Draws the PDF availability status.
+  ///
+  /// Shows the current status of the paper's PDF:
+  /// - A checkmark (✓) and path in green if the PDF is available
+  /// - A cross (✗) in red if the PDF is not downloaded
+  /// - The full path where the PDF is/would be stored
+  /// - Word wrapping for long paths
   fn draw_pdf_status(&mut self, paper: &learner::paper::Paper, area: Rect) {
     let pdf_path = format!(
       "{}/{}.pdf",
@@ -205,6 +308,14 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.frame.render_widget(status, area);
   }
 
+  /// Draws the scroll position indicator when viewing long content.
+  ///
+  /// Only appears when:
+  /// - The details pane is focused
+  /// - The content is long enough to scroll
+  ///
+  /// Shows the current position in the format "current/total"
+  /// aligned to the right side of the details pane.
   fn draw_scroll_indicator(&mut self, area: Rect) {
     if let Some(max_scroll) = self.state.max_scroll {
       if max_scroll > 0 {
@@ -222,6 +333,13 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     }
   }
 
+  /// Draws the exit confirmation dialog.
+  ///
+  /// Shows a centered dialog box asking the user to confirm exit with:
+  /// - A clear question
+  /// - Instructions for confirming ('y') or canceling ('n')
+  /// - Red border to indicate a destructive action
+  /// - Proper spacing and alignment
   fn draw_exit_dialog(&mut self) {
     let content = vec![
       Line::from(Span::styled("Are you sure you want to quit?", Style::default().fg(Color::White))),
@@ -238,6 +356,13 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.draw_dialog("Exit Confirmation", &content, Color::Red);
   }
 
+  /// Draws the PDF not found error dialog.
+  ///
+  /// Shows a centered dialog explaining that the PDF is not available:
+  /// - Clear error message
+  /// - Instructions for downloading
+  /// - Information about how to dismiss the dialog
+  /// - Yellow border to indicate a warning state
   fn draw_pdf_not_found_dialog(&mut self) {
     let content = vec![
       Line::from(Span::styled(
@@ -257,6 +382,13 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.draw_dialog("PDF Not Found", &content, Color::Yellow);
   }
 
+  /// Draws a centered dialog box with the given content.
+  ///
+  /// # Arguments
+  ///
+  /// * `title` - Dialog title
+  /// * `content` - Vector of lines to display
+  /// * `color` - Color theme for the dialog
   fn draw_dialog(&mut self, title: &str, content: &[Line], color: Color) {
     let area = self.frame.area();
     let dialog_box = create_dialog_box(title, content, area);
@@ -279,7 +411,10 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   }
 }
 
-// TODO: this doesn't need to be a method
+/// Creates a centered dialog box with appropriate dimensions.
+///
+/// Calculates the size based on content and positions the dialog
+/// in the center of the screen.
 fn create_dialog_box(title: &str, content: &[Line], r: Rect) -> Rect {
   let content_width = content.iter().map(|line| line.width()).max().unwrap_or(0);
   let width = title.len().max(content_width).max(40) as u16 + 4;
@@ -304,10 +439,22 @@ fn create_dialog_box(title: &str, content: &[Line], r: Rect) -> Rect {
     .split(popup_layout[1])[1]
 }
 
+/// Normalizes whitespace in text for consistent display.
+///
+/// Converts multiple spaces and newlines into single spaces
+/// for clean presentation.
 fn normalize_whitespace(text: &str) -> String {
   text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Calculates how many lines a text will occupy given a width constraint.
+///
+/// Used for determining scroll limits and content positioning.
+///
+/// # Arguments
+///
+/// * `text` - The text to calculate lines for
+/// * `area` - The rectangle defining the available space
 fn calculate_abstract_lines(text: &str, area: Rect) -> usize {
   text
     .lines()
