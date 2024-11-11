@@ -60,10 +60,13 @@
 pub fn format_title(title: &str, max_length: Option<usize>) -> String {
   // Convert to lowercase and collapse multiple spaces into one, then replace with underscore
   let formatted = title
-        .to_lowercase()
-        .split_whitespace() // This splits on any whitespace and removes empty strings
-        .collect::<Vec<&str>>()
-        .join("_");
+      .to_lowercase()
+      .chars()
+      .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-')
+      .collect::<String>()
+      .split_whitespace() // This splits on any whitespace and removes empty strings
+      .collect::<Vec<&str>>()
+      .join("_");
 
   let max_length = max_length.unwrap_or(50);
 
@@ -114,5 +117,6 @@ mod tests {
     assert_eq!(format_title("short", None), "short");
     assert_eq!(format_title("UPPERCASE TEXT", None), "uppercase_text");
     assert_eq!(format_title("No    Extra    Spaces", None), "no_extra_spaces");
+    assert_eq!(format_title("Title with: </weird things\\>", None), "title_with_weird_things");
   }
 }
