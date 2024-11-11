@@ -24,8 +24,6 @@
 //! The TUI is enabled through the "tui" feature flag. When enabled, it becomes
 //! the default interface when no command is specified.
 
-#![allow(missing_docs, clippy::missing_docs_in_private_items)]
-
 use std::io;
 
 use app::AppState;
@@ -37,10 +35,9 @@ use crossterm::{
 use learner::{database::Database, format::format_title};
 use ratatui::{
   backend::CrosstermBackend,
-  layout::{Constraint, Direction, Layout, Margin, Rect},
+  layout::{Constraint, Direction, Layout, Rect},
   style::{Color, Modifier, Style, Stylize},
-  text::{Line, Span},
-  widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
+  widgets::{ListItem, ListState},
   Terminal,
 };
 use ui::draw_ui;
