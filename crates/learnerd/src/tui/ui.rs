@@ -1,9 +1,9 @@
-use learner::paper::Paper;
+use app::FocusedPane;
 use ratatui::{
   layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
-  style::{Color, Modifier, Style},
+  style::{Color, Style},
   text::{Line, Span},
-  widgets::{Block, Borders, Clear, List, ListItem, Padding, Paragraph, Wrap},
+  widgets::{Block, Borders, Clear, List, Padding, Paragraph, Wrap},
   Frame,
 };
 
@@ -17,7 +17,7 @@ pub fn draw_ui(app: &mut AppState, f: &mut Frame) {
 
   // Right pane for paper details
   if let Some(i) = app.selected.selected() {
-    draw_paper_details(&app.papers[i], f, right_area);
+    draw_paper_details(i, f, right_area, app); // Updated signature
   }
 
   // Draw dialog if active
@@ -32,7 +32,7 @@ fn draw_paper_list(app: &mut AppState, f: &mut Frame, area: Rect) {
     .constraints([Constraint::Min(0), Constraint::Length(1)])
     .split(area);
 
-  // Paper list
+  // Paper list with focus-aware styling
   let items = app.get_list_items();
   let list = List::new(items.to_vec())
     .block(
@@ -43,14 +43,18 @@ fn draw_paper_list(app: &mut AppState, f: &mut Frame, area: Rect) {
           Span::styled(format!(" ({})", app.papers.len()), NORMAL_TEXT),
         ]))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Blue)),
+        .border_style(Style::default().fg(if app.focused_pane == FocusedPane::List {
+          Color::LightBlue
+        } else {
+          Color::Blue
+        })),
     )
     .highlight_style(HIGHLIGHT_STYLE)
     .highlight_symbol("▶ ");
 
   f.render_stateful_widget(list, chunks[0], &mut app.selected);
 
-  // Help text
+  // Updated help text with new controls
   let help = Paragraph::new(Line::from(vec![
     Span::styled("↑/k", HIGHLIGHT_KEY),
     Span::styled(": up", HELP_STYLE),
@@ -58,14 +62,25 @@ fn draw_paper_list(app: &mut AppState, f: &mut Frame, area: Rect) {
     Span::styled("↓/j", HIGHLIGHT_KEY),
     Span::styled(": down", HELP_STYLE),
     Span::raw(" • "),
+    Span::styled("←/h", HIGHLIGHT_KEY),
+    Span::styled(": left pane", HELP_STYLE),
+    Span::raw(" • "),
+    Span::styled("→/l", HIGHLIGHT_KEY),
+    Span::styled(": right pane", HELP_STYLE),
+    Span::raw(" • "),
+    Span::styled("PgUp/PgDn", HIGHLIGHT_KEY),
+    Span::styled(": scroll", HELP_STYLE),
+    Span::raw(" • "),
     Span::styled("q", HIGHLIGHT_KEY),
     Span::styled(": quit", HELP_STYLE),
   ]));
   f.render_widget(help, chunks[1]);
 }
 
-fn draw_paper_details(paper: &Paper, f: &mut Frame, area: Rect) {
-  // Create inner layout for better content organization
+// TODO: This is a really awkward function signature now with the index being used. We should make
+// these function signatures homogeneous.
+fn draw_paper_details(paper_idx: usize, f: &mut Frame, area: Rect, app: &mut AppState) {
+  let paper = &app.papers[paper_idx];
   let chunks = Layout::default()
     .direction(Direction::Vertical)
     .margin(1)
@@ -85,7 +100,11 @@ fn draw_paper_details(paper: &Paper, f: &mut Frame, area: Rect) {
       Span::styled("Paper Details", TITLE_STYLE),
     ]))
     .borders(Borders::ALL)
-    .border_style(Style::default().fg(Color::Blue));
+    .border_style(Style::default().fg(if app.focused_pane == FocusedPane::Details {
+      Color::LightBlue
+    } else {
+      Color::Blue
+    }));
 
   f.render_widget(details_block.clone(), area);
 
@@ -122,13 +141,37 @@ fn draw_paper_details(paper: &Paper, f: &mut Frame, area: Rect) {
   let abstract_header = Paragraph::new(Span::styled("Abstract:", LABEL_STYLE));
   f.render_widget(abstract_header, chunks[3]);
 
-  // Abstract content (with scrolling if implemented)
+  // Abstract content with scrolling
   let abstract_text = normalize_whitespace(&paper.abstract_text);
-  let abstract_content = Paragraph::new(abstract_text)
+  // TODO: should avoid this clone
+  let abstract_content = Paragraph::new(abstract_text.clone())
     .style(NORMAL_TEXT)
     .wrap(Wrap { trim: true })
-    .block(Block::default().padding(Padding::new(0, 1, 0, 0))); // Add slight right padding
+    .block(Block::default().padding(Padding::new(0, 1, 0, 0)))
+    .scroll((app.scroll_position as u16, 0));
+
+  // TODO (autoparallel): This doesn't work right as it's just counting new lines, we need to know
+  // how long the text actually goes.
+  // Calculate max scroll position
+  let content_height = abstract_text.chars().filter(|c| *c == '\n').count() + 10;
+  app.max_scroll = Some(content_height.saturating_sub(chunks[4].height as usize));
+
   f.render_widget(abstract_content, chunks[4]);
+
+  // Scroll position indicator (if in details pane and scrollable)
+  if app.focused_pane == FocusedPane::Details && app.max_scroll.unwrap_or(0) > 0 {
+    let scroll_indicator = format!(" {}/{} ", app.scroll_position + 1, app.max_scroll.unwrap() + 1);
+    let indicator_area = Rect {
+      x:      area.x + area.width - scroll_indicator.len() as u16 - 1,
+      y:      area.y + area.height - 2,
+      width:  scroll_indicator.len() as u16,
+      height: 1,
+    };
+    let scroll_text = Paragraph::new(scroll_indicator)
+      .alignment(Alignment::Right)
+      .style(Style::default().fg(Color::DarkGray));
+    f.render_widget(scroll_text, indicator_area);
+  }
 
   // PDF Status
   let pdf_path = format!(

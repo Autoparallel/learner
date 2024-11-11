@@ -18,6 +18,15 @@ pub struct AppState {
   pub cached_list_items: Option<Vec<ListItem<'static>>>,
   /// Last known terminal size
   pub last_size:         Rect,
+  pub focused_pane:      FocusedPane,
+  pub scroll_position:   usize,
+  pub max_scroll:        Option<usize>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum FocusedPane {
+  List,
+  Details,
 }
 
 impl AppState {
@@ -32,11 +41,13 @@ impl AppState {
       cached_layout: None,
       cached_list_items: None,
       last_size: Rect::default(),
+      focused_pane: FocusedPane::List,
+      scroll_position: 0,
+      max_scroll: None,
     }
   }
 
   pub fn handle_input(&mut self, key: KeyCode) -> bool {
-    // Returns true if should quit
     match self.dialog {
       DialogState::ExitConfirm => match key {
         KeyCode::Char('y') => return true,
@@ -51,20 +62,61 @@ impl AppState {
           self.dialog = DialogState::ExitConfirm;
           self.needs_redraw = true;
         },
-        KeyCode::Up | KeyCode::Char('k') => {
-          let i = self.selected.selected().unwrap_or(0);
-          if i > 0 {
-            self.selected.select(Some(i - 1));
+        // Pane switching
+        KeyCode::Left | KeyCode::Char('h') =>
+          if self.focused_pane == FocusedPane::Details {
+            self.focused_pane = FocusedPane::List;
             self.needs_redraw = true;
-          }
-        },
-        KeyCode::Down | KeyCode::Char('j') => {
-          let i = self.selected.selected().unwrap_or(0);
-          if i < self.papers.len().saturating_sub(1) {
-            self.selected.select(Some(i + 1));
+          },
+        KeyCode::Right | KeyCode::Char('l') =>
+          if self.focused_pane == FocusedPane::List {
+            self.focused_pane = FocusedPane::Details;
             self.needs_redraw = true;
-          }
+          },
+        // Navigation
+        KeyCode::Up | KeyCode::Char('k') => match self.focused_pane {
+          FocusedPane::List => {
+            let i = self.selected.selected().unwrap_or(0);
+            if i > 0 {
+              self.selected.select(Some(i - 1));
+              self.needs_redraw = true;
+            }
+          },
+          FocusedPane::Details =>
+            if self.scroll_position > 0 {
+              self.scroll_position -= 1;
+              self.needs_redraw = true;
+            },
         },
+        KeyCode::Down | KeyCode::Char('j') => match self.focused_pane {
+          FocusedPane::List => {
+            let i = self.selected.selected().unwrap_or(0);
+            if i < self.papers.len().saturating_sub(1) {
+              self.selected.select(Some(i + 1));
+              self.needs_redraw = true;
+            }
+          },
+          FocusedPane::Details =>
+            if let Some(max) = self.max_scroll {
+              if self.scroll_position < max {
+                self.scroll_position += 1;
+                self.needs_redraw = true;
+              }
+            },
+        },
+        // Page up/down for faster scrolling
+        KeyCode::PageUp =>
+          if self.focused_pane == FocusedPane::Details {
+            self.scroll_position = self.scroll_position.saturating_sub(10);
+            self.needs_redraw = true;
+          },
+        KeyCode::PageDown =>
+          if self.focused_pane == FocusedPane::Details {
+            if let Some(max) = self.max_scroll {
+              self.scroll_position = (self.scroll_position + 10).min(max);
+              self.needs_redraw = true;
+            }
+          },
         _ => {},
       },
     }
