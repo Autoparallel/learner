@@ -1,7 +1,7 @@
 // use crate::*;
 
 use add::Add;
-use learner::database::{Database, *};
+use learner::database::*;
 
 use super::setup_test_db;
 use crate::{create_test_paper, traced_test, TestResult};

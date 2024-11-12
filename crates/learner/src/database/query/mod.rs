@@ -1,6 +1,9 @@
 use super::*;
 
 pub mod add;
+pub mod search;
+
+use rusqlite::params;
 
 // We could make this even more specific about what we're doing
 pub trait DatabaseStatement {

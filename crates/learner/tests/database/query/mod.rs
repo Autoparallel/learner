@@ -2,6 +2,7 @@ use learner::database::{Database, *};
 use tempfile::{tempdir, TempDir};
 
 mod add;
+mod search;
 
 fn setup_test_db() -> (Database, TempDir) {
   let dir = tempdir().unwrap();

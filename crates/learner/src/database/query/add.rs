@@ -1,5 +1,3 @@
-use rusqlite::params;
-
 use super::*;
 
 pub struct Add {
