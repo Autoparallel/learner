@@ -38,7 +38,7 @@ use clap::{builder::ArgAction, Parser, Subcommand};
 use console::{style, Emoji};
 use error::LearnerdError;
 use learner::{
-  database::Database,
+  database_old::Database,
   error::LearnerError,
   paper::{Paper, Source},
 };

@@ -45,7 +45,7 @@ use crossterm::{
   execute,
   terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use learner::{database::Database, format::format_title};
+use learner::format::format_title;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use super::*;

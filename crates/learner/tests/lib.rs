@@ -1,7 +1,7 @@
 use std::{error::Error, path::PathBuf};
 
 use learner::{
-  database::Database,
+  database_old::Database,
   format,
   llm::{LlamaRequest, Model},
   paper::{Author, Paper, Source},
