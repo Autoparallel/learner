@@ -1,6 +1,6 @@
 #![allow(missing_docs, clippy::missing_docs_in_private_items)]
 
-use tokio_rusqlite::Connection;
+use rusqlite::Connection;
 
 use super::*;
 
@@ -46,20 +46,10 @@ impl Database {
   /// # Ok(())
   /// # }
   /// ```
-  pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
-    let conn = Connection::open(path.as_ref()).await?;
-
-    // Initialize schema
+  pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+    let conn = Connection::open(path.as_ref())?;
     conn
-      .call(|conn| {
-        conn.execute_batch(include_str!(concat!(
-          env!("CARGO_MANIFEST_DIR"),
-          "/migrations/init.sql"
-        )))?;
-        Ok(())
-      })
-      .await?;
-
+      .execute_batch(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/migrations/init.sql")))?;
     Ok(Self { conn })
   }
 
@@ -98,25 +88,4 @@ impl Database {
   pub fn default_pdf_path() -> PathBuf {
     dirs::document_dir().unwrap_or_else(|| PathBuf::from(".")).join("learner").join("papers")
   }
-
-  /// Execute a query function
-  pub async fn execute<T>(&self, statement: StatementFunction<T>) -> Result<T>
-  where T: Send + 'static {
-    self.conn.call(|conn| Ok(statement(conn))).await?
-  }
-
-  //   /// Start building a save query
-  //   pub fn save(&self) -> QueryBuilder<'_, Add> { QueryBuilder::new(self) }
-
-  //   /// Start building a remove query
-  //   pub fn remove(&self) -> QueryBuilder<'_, Remove> { QueryBuilder::new(self) }
-
-  //   /// Start building a query to get a paper
-  //   pub fn get(&self) -> QueryBuilder<'_, Get> { QueryBuilder::new(self) }
-
-  //   /// Start building a search query
-  //   pub fn search(&self) -> QueryBuilder<'_, Search> { QueryBuilder::new(self) }
-
-  //   /// Start building a list query
-  //   pub fn list(&self) -> QueryBuilder<'_, List> { QueryBuilder::new(self) }
 }

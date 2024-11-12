@@ -40,7 +40,7 @@ reqwest = { version = "0.12", features = [
 ], default-features = false }
 rusqlite = { version = "0.32", features = ["bundled", "functions", "chrono"] }
 serde_json = { version = "1.0" }
-tokio-rusqlite = { version = "0.6" }
+tokio-rusqlite = { version = "0.6" } # REMOVE
 
 ## TUI dependencies
 crossterm = { version = "0.28" }
