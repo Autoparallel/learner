@@ -178,7 +178,7 @@ impl LearnerError {
   /// # Examples
   ///
   /// ```
-  /// use learner::errors::LearnerError;
+  /// use learner::error::LearnerError;
   ///
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// let db = learner::database::Database::open("papers.db").await?;
