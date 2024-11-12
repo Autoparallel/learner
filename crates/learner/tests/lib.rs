@@ -13,6 +13,8 @@ use tracing_test::traced_test;
 mod database;
 mod llm;
 
+pub type TestResult<T> = Result<T, Box<dyn Error>>;
+
 /// Helper function to set up a test database
 async fn setup_test_db() -> (Database, TempDir) {
   let dir = tempdir().unwrap();

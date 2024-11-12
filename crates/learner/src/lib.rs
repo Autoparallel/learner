@@ -35,6 +35,7 @@ use tracing::{debug, trace, warn};
 use {tempfile::tempdir, tracing_test::traced_test};
 
 pub mod clients;
+pub mod database;
 pub mod database_old;
 pub mod error;
 pub mod format;
