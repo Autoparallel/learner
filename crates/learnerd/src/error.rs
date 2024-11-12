@@ -14,7 +14,7 @@
 use thiserror::Error;
 
 /// Error type alias used for the [`learnerd`] crate.
-pub type Result<T> = core::result::Result<T, LearnerdErrors>;
+pub type Result<T> = core::result::Result<T, LearnerdError>;
 
 /// Errors that can occur during CLI operations.
 ///
@@ -41,14 +41,14 @@ pub type Result<T> = core::result::Result<T, LearnerdErrors>;
 /// # }
 /// ```
 #[derive(Error, Debug)]
-pub enum LearnerdErrors {
+pub enum LearnerdError {
   /// Errors from user interaction dialogs
   #[error(transparent)]
   Dialoguer(#[from] dialoguer::Error),
 
   /// Errors from the underlying learner library
   #[error(transparent)]
-  Learner(#[from] learner::errors::LearnerError),
+  Learner(#[from] learner::error::LearnerError),
 
   /// File system and IO operation errors
   #[error(transparent)]

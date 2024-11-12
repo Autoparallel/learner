@@ -172,7 +172,7 @@ impl DOIClient {
   /// # Ok(())
   /// # }
   /// ```
-  pub async fn fetch_paper(&self, doi: &str) -> Result<Paper, LearnerError> {
+  pub async fn fetch_paper(&self, doi: &str) -> Result<Paper> {
     let url = format!("{}/{}", self.base_url, doi);
     debug!("Fetching from Crossref via: {}", url);
 

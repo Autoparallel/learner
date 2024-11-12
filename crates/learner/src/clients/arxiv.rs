@@ -137,7 +137,7 @@ impl ArxivClient {
   /// # Ok(())
   /// # }
   /// ```
-  pub async fn fetch_paper(&self, identifier: &str) -> Result<Paper, LearnerError> {
+  pub async fn fetch_paper(&self, identifier: &str) -> Result<Paper> {
     let url = format!("http://export.arxiv.org/api/query?id_list={}&max_results=1", identifier);
 
     debug!("Fetching from arXiv via: {url}");

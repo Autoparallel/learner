@@ -292,7 +292,7 @@ impl LlamaRequest {
   /// - No messages are provided
   /// - The network request fails
   /// - The response cannot be parsed
-  pub async fn send(&self) -> Result<LlamaResponse, LearnerError> {
+  pub async fn send(&self) -> Result<LlamaResponse> {
     let url = self.url.clone().unwrap_or_else(|| {
       warn!("No URL set, using localhost/chat");
       Url::parse("http://localhost:11434/api/chat").unwrap()

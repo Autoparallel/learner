@@ -36,14 +36,10 @@ use {tempfile::tempdir, tracing_test::traced_test};
 
 pub mod clients;
 pub mod database;
-pub mod errors;
+pub mod error;
 pub mod format;
 pub mod llm;
 pub mod paper;
 pub mod pdf;
 
-use crate::{
-  clients::{ArxivClient, DOIClient, IACRClient},
-  database::Database,
-  errors::LearnerError,
-};
+use crate::{clients::*, database::*, error::*};

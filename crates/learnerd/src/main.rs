@@ -36,10 +36,10 @@ use std::{path::PathBuf, str::FromStr};
 
 use clap::{builder::ArgAction, Parser, Subcommand};
 use console::{style, Emoji};
-use errors::LearnerdErrors;
+use error::LearnerdError;
 use learner::{
   database::Database,
-  errors::LearnerError,
+  error::LearnerError,
   paper::{Paper, Source},
 };
 use tracing::{debug, trace};
@@ -47,10 +47,10 @@ use tracing_subscriber::EnvFilter;
 
 pub mod commands;
 pub mod daemon;
-pub mod errors;
+pub mod error;
 #[cfg(feature = "tui")] pub mod tui;
 
-use crate::{commands::*, daemon::*, errors::*};
+use crate::{commands::*, daemon::*, error::*};
 
 // Emoji constants for prettier output
 /// Search operation indicator

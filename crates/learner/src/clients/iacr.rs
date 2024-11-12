@@ -152,7 +152,7 @@ impl IACRClient {
   /// # Ok(())
   /// # }
   /// ```
-  pub async fn fetch_paper(&self, identifier: &str) -> Result<Paper, LearnerError> {
+  pub async fn fetch_paper(&self, identifier: &str) -> Result<Paper> {
     // IACR identifiers are in the format "YYYY/NNNN"
     let parts: Vec<&str> = identifier.split('/').collect();
     if parts.len() != 2 {
