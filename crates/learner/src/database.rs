@@ -79,7 +79,7 @@ impl Database {
   /// # Ok(())
   /// # }
   /// ```
-  pub async fn open(path: impl AsRef<Path>) -> Result<Self, LearnerError> {
+  pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
     let conn = Connection::open(path.as_ref()).await?;
 
     // Initialize schema
@@ -145,7 +145,7 @@ impl Database {
   /// # Ok(())
   /// # }
   /// ```
-  pub async fn save_paper(&self, paper: &Paper) -> Result<i64, LearnerError> {
+  pub async fn save_paper(&self, paper: &Paper) -> Result<i64> {
     let paper = paper.clone();
     self
       .conn
@@ -229,7 +229,7 @@ impl Database {
     &self,
     source: &Source,
     source_id: &str,
-  ) -> Result<Option<Paper>, LearnerError> {
+  ) -> Result<Option<Paper>> {
     // Clone the values before moving into the async closure
     let source = source.to_string();
     let source_id = source_id.to_string();
@@ -278,7 +278,7 @@ impl Database {
               })
             })?;
 
-            paper.authors = authors.collect::<Result<Vec<_>, _>>()?;
+            paper.authors = authors.collect::<core::result::Result<Vec<_>, _>>()?;
             Ok(Some(paper))
           },
           Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
@@ -324,7 +324,7 @@ impl Database {
   /// # Ok(())
   /// # }
   /// ```
-  pub async fn search_papers(&self, query: &str) -> Result<Vec<Paper>, LearnerError> {
+  pub async fn search_papers(&self, query: &str) -> Result<Vec<Paper>> {
     let query = query.to_lowercase(); // Make search case-insensitive
 
     self
@@ -340,8 +340,9 @@ impl Database {
         )?;
 
         // Collect matching IDs first
-        let paper_ids: Vec<i64> =
-          id_stmt.query_map([&query], |row| row.get(0))?.collect::<Result<Vec<_>, _>>()?;
+        let paper_ids: Vec<i64> = id_stmt
+          .query_map([&query], |row| row.get(0))?
+          .collect::<core::result::Result<Vec<_>, _>>()?;
 
         let mut papers = Vec::new();
 
@@ -389,7 +390,7 @@ impl Database {
                 email:       row.get(2)?,
               })
             })?
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<core::result::Result<Vec<_>, _>>()?;
 
           // Create the complete paper with authors
           let mut paper = paper;
@@ -431,7 +432,7 @@ impl Database {
   /// # Returns
   ///
   /// Returns a [`Result`] indicating success or failure
-  pub async fn set_config(&self, key: &str, value: &str) -> Result<(), LearnerError> {
+  pub async fn set_config(&self, key: &str, value: &str) -> Result<()> {
     let key = key.to_string();
     let value = value.to_string();
     self
@@ -460,7 +461,7 @@ impl Database {
   /// Returns a [`Result`] containing either:
   /// - Some(String) with the configuration value
   /// - None if the key doesn't exist
-  pub async fn get_config(&self, key: &str) -> Result<Option<String>, LearnerError> {
+  pub async fn get_config(&self, key: &str) -> Result<Option<String>> {
     let key = key.to_string();
     self
       .conn
@@ -499,7 +500,7 @@ impl Database {
     filename: String,
     status: &str,
     error: Option<String>,
-  ) -> Result<i64, LearnerError> {
+  ) -> Result<i64> {
     let path_str = path.to_string_lossy().to_string();
     let status = status.to_string();
 
@@ -538,7 +539,7 @@ impl Database {
   pub async fn get_pdf_status(
     &self,
     paper_id: i64,
-  ) -> Result<Option<(PathBuf, String, String, Option<String>)>, LearnerError> {
+  ) -> Result<Option<(PathBuf, String, String, Option<String>)>> {
     self
       .conn
       .call(move |conn| {
@@ -596,7 +597,7 @@ impl Database {
   /// # Ok(())
   /// # }
   /// ```
-  pub async fn list_papers(&self, order_by: &str, desc: bool) -> Result<Vec<Paper>, LearnerError> {
+  pub async fn list_papers(&self, order_by: &str, desc: bool) -> Result<Vec<Paper>> {
     // Validate order_by field
     let order_clause = match order_by.to_lowercase().as_str() {
       "title" => "p.title",
@@ -659,7 +660,7 @@ impl Database {
                 email:       row.get(2)?,
               })
             })?
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<core::result::Result<Vec<_>, _>>()?;
 
           paper.authors = authors;
           papers.push(paper);

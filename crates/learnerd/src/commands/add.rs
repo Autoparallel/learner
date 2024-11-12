@@ -142,7 +142,7 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
         }
       }
     },
-    Err(e) => return Err(LearnerdErrors::Learner(e)),
+    Err(e) => return Err(LearnerdError::Learner(e)),
   }
 
   Ok(())

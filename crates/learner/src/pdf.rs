@@ -196,7 +196,7 @@ impl PDFContentBuilder {
   /// # Ok(())
   /// # }
   /// ```
-  pub fn analyze(self) -> Result<PDFContent, LearnerError> {
+  pub fn analyze(self) -> Result<PDFContent> {
     let path = self.path.ok_or_else(|| {
       LearnerError::Path(std::io::Error::new(std::io::ErrorKind::NotFound, "No PDF path specified"))
     })?;
@@ -222,7 +222,7 @@ impl PDFContentBuilder {
 /// Returns a [`Result`] containing either:
 /// - A [`PDFMetadata`] structure with the extracted metadata
 /// - A [`LearnerError`] if metadata extraction fails
-fn extract_metadata(doc: &Document) -> Result<PDFMetadata, LearnerError> {
+fn extract_metadata(doc: &Document) -> Result<PDFMetadata> {
   let trailer = &doc.trailer;
   let info_ref = trailer.get(b"Info").ok().and_then(|o| o.as_reference().ok());
 
@@ -280,7 +280,7 @@ fn get_text_from_dict(dict: &lopdf::Dictionary, key: &str) -> Option<String> {
 /// Returns a [`Result`] containing either:
 /// - A [`Vec`] of [`PageContent`] with the extracted text
 /// - A [`LearnerError`] if text extraction fails
-fn extract_pages(doc: &Document) -> Result<Vec<PageContent>, LearnerError> {
+fn extract_pages(doc: &Document) -> Result<Vec<PageContent>> {
   let mut pages = Vec::new();
   lazy_static! {
     static ref PDF_TEXT_REGEX: Regex = Regex::new(r"\(([^)]+)\)").unwrap();

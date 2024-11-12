@@ -10,7 +10,7 @@
 //! # Examples
 //!
 //! ```
-//! use learner::{errors::LearnerError, paper::Paper};
+//! use learner::{error::LearnerError, paper::Paper};
 //!
 //! # async fn example() -> Result<(), LearnerError> {
 //! // Network errors are automatically converted
@@ -26,6 +26,9 @@
 //! ```
 
 use thiserror::Error;
+
+/// Error type alias used for the [`learnerd`] crate.
+pub type Result<T> = core::result::Result<T, LearnerError>;
 
 /// Errors that can occur when working with the learner library.
 ///
@@ -175,7 +178,7 @@ impl LearnerError {
   /// # Examples
   ///
   /// ```
-  /// use learner::errors::LearnerError;
+  /// use learner::error::LearnerError;
   ///
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// let db = learner::database::Database::open("papers.db").await?;

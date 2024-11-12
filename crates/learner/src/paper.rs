@@ -54,7 +54,7 @@ impl Display for Source {
 impl FromStr for Source {
   type Err = LearnerError;
 
-  fn from_str(s: &str) -> Result<Self, Self::Err> {
+  fn from_str(s: &str) -> Result<Self> {
     match &s.to_lowercase() as &str {
       "arxiv" => Ok(Source::Arxiv),
       "iacr" => Ok(Source::IACR),
@@ -139,7 +139,7 @@ impl Paper {
   ///
   /// # Returns
   ///
-  /// Returns a `Result<Paper, LearnerError>` which is:
+  /// Returns a `Result<Paper>` which is:
   /// - `Ok(Paper)` - Successfully fetched paper with metadata
   /// - `Err(LearnerError)` - Failed to parse input or fetch paper
   ///
@@ -159,7 +159,7 @@ impl Paper {
   /// # Ok(())
   /// # }
   /// ```
-  pub async fn new(input: &str) -> Result<Self, LearnerError> {
+  pub async fn new(input: &str) -> Result<Self> {
     lazy_static! {
         // arXiv patterns
         static ref ARXIV_NEW: Regex = Regex::new(r"^(\d{4}\.\d{4,5})$").unwrap();
@@ -220,7 +220,7 @@ impl Paper {
   /// - The paper has no PDF URL available
   /// - The download fails
   /// - Writing to the specified path fails
-  pub async fn download_pdf(&self, dir: PathBuf) -> Result<(), LearnerError> {
+  pub async fn download_pdf(&self, dir: PathBuf) -> Result<()> {
     // unimplemented!("Work in progress -- needs integrated with `Database`");
     let Some(pdf_url) = &self.pdf_url else {
       return Err(LearnerError::ApiError("No PDF URL available".into()));
@@ -260,13 +260,13 @@ impl Paper {
   /// # Ok(())
   /// # }
   /// ```
-  pub async fn save(&self, db: &Database) -> Result<i64, LearnerError> { db.save_paper(self).await }
+  pub async fn save(&self, db: &Database) -> Result<i64> { db.save_paper(self).await }
 }
 
 /// Extracts the arXiv identifier from a URL.
 ///
 /// Parses URLs like "https://arxiv.org/abs/2301.07041" to extract "2301.07041".
-fn extract_arxiv_id(url: &Url) -> Result<String, LearnerError> {
+fn extract_arxiv_id(url: &Url) -> Result<String> {
   let path = url.path();
   let re = regex::Regex::new(r"abs/([^/]+)$").unwrap();
   re.captures(path)
@@ -278,7 +278,7 @@ fn extract_arxiv_id(url: &Url) -> Result<String, LearnerError> {
 /// Extracts the IACR identifier from a URL.
 ///
 /// Parses URLs like "https://eprint.iacr.org/2016/260" to extract "2016/260".
-fn extract_iacr_id(url: &Url) -> Result<String, LearnerError> {
+fn extract_iacr_id(url: &Url) -> Result<String> {
   let path = url.path();
   let re = regex::Regex::new(r"(\d{4}/\d+)$").unwrap();
   re.captures(path)
@@ -290,7 +290,7 @@ fn extract_iacr_id(url: &Url) -> Result<String, LearnerError> {
 /// Extracts the DOI from a URL.
 ///
 /// Parses URLs like "https://doi.org/10.1145/1327452.1327492" to extract the DOI.
-fn extract_doi(url: &Url) -> Result<String, LearnerError> {
+fn extract_doi(url: &Url) -> Result<String> {
   url.path().strip_prefix('/').map(|s| s.to_string()).ok_or(LearnerError::InvalidIdentifier)
 }
 

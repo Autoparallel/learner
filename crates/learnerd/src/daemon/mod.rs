@@ -291,7 +291,7 @@ impl Daemon {
   pub fn stop(&self) -> Result<()> {
     if let Ok(pid) = fs::read_to_string(&self.pid_file) {
       let pid: i32 = pid.trim().parse().map_err(|e: std::num::ParseIntError| {
-        LearnerdErrors::Daemon(format!("pid.trim().parse() gave error: {}", e))
+        LearnerdError::Daemon(format!("pid.trim().parse() gave error: {}", e))
       })?;
 
       #[cfg(unix)]
@@ -299,7 +299,7 @@ impl Daemon {
         // Send SIGTERM to the process
         if let Err(e) = signal::kill(Pid::from_raw(pid), Signal::SIGTERM) {
           error!("Failed to send SIGTERM to process: {}", e);
-          return Err(LearnerdErrors::Daemon(format!("Failed to stop daemon: {}", e)));
+          return Err(LearnerdError::Daemon(format!("Failed to stop daemon: {}", e)));
         }
       }
 
@@ -310,7 +310,7 @@ impl Daemon {
       Ok(())
     } else {
       error!("PID file not found");
-      Err(LearnerdErrors::Daemon("Daemon not running".to_string()))
+      Err(LearnerdError::Daemon("Daemon not running".to_string()))
     }
   }
 
