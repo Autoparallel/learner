@@ -2,24 +2,24 @@ use tokio_rusqlite::params;
 
 use super::*;
 
-impl QueryBuilder<Add> {
-  pub fn paper(mut self, paper: Paper) -> Self {
-    self.paper = Some(paper);
-    self
-  }
+pub struct Add {
+  paper: Paper,
+}
 
-  pub fn build(self) -> Result<QueryFn<i64>> {
-    let paper = self.paper.ok_or_else(|| LearnerError::Database("paper required".into()))?;
+impl Add {
+  pub fn paper(paper: Paper) -> Self { Self { paper } }
+}
 
-    // Clone values needed in closure
-    let title = paper.title;
-    let abstract_text = paper.abstract_text;
-    let publication_date = paper.publication_date.to_rfc3339();
-    let source = paper.source.to_string();
-    let source_identifier = paper.source_identifier;
-    let pdf_url = paper.pdf_url;
-    let doi = paper.doi;
-    let authors = paper.authors;
+impl Statement<i64> for Add {
+  fn build(self) -> Result<StatementFunction<i64>> {
+    let title = self.paper.title;
+    let abstract_text = self.paper.abstract_text;
+    let publication_date = self.paper.publication_date.to_rfc3339();
+    let source = self.paper.source.to_string();
+    let source_identifier = self.paper.source_identifier;
+    let pdf_url = self.paper.pdf_url;
+    let doi = self.paper.doi;
+    let authors = self.paper.authors;
 
     Ok(Box::new(move |conn: &mut rusqlite::Connection| {
       // Now we're using the rusqlite::Connection directly
@@ -48,8 +48,8 @@ impl QueryBuilder<Add> {
                      VALUES (?1, ?2, ?3, ?4)",
         )?;
 
-        for author in &authors {
-          stmt.execute(params![paper_id, &author.name, &author.affiliation, &author.email,])?;
+        for author in authors {
+          stmt.execute(params![paper_id, author.name, author.affiliation, author.email,])?;
         }
       }
 

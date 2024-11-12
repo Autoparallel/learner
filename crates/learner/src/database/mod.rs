@@ -1,3 +1,5 @@
+#![allow(missing_docs, clippy::missing_docs_in_private_items)]
+
 use tokio_rusqlite::Connection;
 
 use super::*;
@@ -6,7 +8,7 @@ pub mod models;
 pub mod query;
 #[cfg(test)] mod tests;
 
-pub use self::{models::*, query::*, state::*};
+pub use self::{models::*, query::*};
 
 /// Main database connection handler
 pub struct Database {
@@ -98,9 +100,9 @@ impl Database {
   }
 
   /// Execute a query function
-  pub async fn execute<T>(&self, query: QueryFn<T>) -> Result<T>
+  pub async fn execute<T>(&self, statement: StatementFunction<T>) -> Result<T>
   where T: Send + 'static {
-    self.conn.call(|conn| Ok(query(conn))).await?
+    self.conn.call(|conn| Ok(statement(conn))).await?
   }
 
   //   /// Start building a save query
