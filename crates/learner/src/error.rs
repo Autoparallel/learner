@@ -166,6 +166,12 @@ pub enum LearnerError {
   /// An error working with the database.
   #[error("{0}")]
   Database(String),
+
+  #[error("Tried to add a paper titled \"{0}\" that was already in the database.")]
+  DatabaseDuplicatePaper(String),
+
+  #[error("Tried to query for a paper that was not in the database.")]
+  DatabasePaperNotFound,
 }
 
 impl LearnerError {

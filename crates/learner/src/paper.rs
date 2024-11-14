@@ -196,19 +196,21 @@ impl Paper {
     hasher.finish()
   }
 
-  /// Download the paper's PDF to a specified path.
-  ///
-  /// # Arguments
-  ///
-  /// * `path` - The filesystem path where the PDF should be saved
-  ///
-  /// # Errors
-  ///
-  /// Returns `LearnerError` if:
-  /// - The paper has no PDF URL available
-  /// - The download fails
-  /// - Writing to the specified path fails
-  pub async fn download_pdf(&self, dir: PathBuf) -> Result<()> {
+  // / Download the paper's PDF to a specified path.
+  // /
+  // / # Arguments
+  // /
+  // / * `path` - The filesystem path where the PDF should be saved
+  // /
+  // / # Errors
+  // /
+  // / Returns `LearnerError` if:
+  // / - The paper has no PDF URL available
+  // / - The download fails
+  // / - Writing to the specified path fails
+
+  // TODO: UPDATE DOC HERE ABOUT HOW THIS RETURNS THE FILENAME
+  pub async fn download_pdf(&self, dir: &PathBuf) -> Result<PathBuf> {
     // unimplemented!("Work in progress -- needs integrated with `Database`");
     let Some(pdf_url) = &self.pdf_url else {
       return Err(LearnerError::ApiError("No PDF URL available".into()));
@@ -221,10 +223,11 @@ impl Paper {
     // TODO (autoparallel): uses a fixed max output filename length, should make this configurable
     // in the future.
     let formatted_title = format::format_title(&self.title, Some(50));
-    let path = dir.join(format!("{}.pdf", formatted_title));
+    let filename = PathBuf::from(format!("{}.pdf", formatted_title));
+    let path = dir.join(&filename);
     debug!("Writing PDF to path: {path:?}");
     std::fs::write(path, bytes)?;
-    Ok(())
+    Ok(filename)
   }
 
   // / Save the paper to a database.

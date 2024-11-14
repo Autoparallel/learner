@@ -61,7 +61,7 @@ impl Database {
     let db = Self { conn };
 
     // Check if storage path is set, if not, set default
-    if db.get_storage_path()?.is_none() {
+    if db.get_storage_path().is_err() {
       db.set_storage_path(Self::default_storage_path())?;
     }
 
@@ -69,13 +69,13 @@ impl Database {
   }
 
   /// Get the current storage path for document files
-  pub fn get_storage_path(&self) -> Result<Option<PathBuf>> {
-    self
-      .conn
-      .prepare_cached("SELECT value FROM config WHERE key = 'storage_path'")?
-      .query_row([], |row| Ok(PathBuf::from(row.get::<_, String>(0)?)))
-      .optional()
-      .map_err(|e| e.into())
+  pub fn get_storage_path(&self) -> Result<PathBuf> {
+    Ok(
+      self
+        .conn
+        .prepare_cached("SELECT value FROM config WHERE key = 'storage_path'")?
+        .query_row([], |row| Ok(PathBuf::from(row.get::<_, String>(0)?)))?,
+    )
   }
 
   /// Set the storage path for document files
