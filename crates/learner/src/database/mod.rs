@@ -92,7 +92,5 @@ impl Database {
 
 // TODO:
 // ✅ pub fn add(&self) -> QueryBuilder<'_, Save> { QueryBuilder::new(self) }
-// ✅ pub fn search(&self) -> QueryBuilder<'_, Search> { QueryBuilder::new(self) }
-// ❌ pub fn get(&self) -> QueryBuilder<'_, Get> { QueryBuilder::new(self) } (REPLACE WITH SEARCH)
-//   pub fn list(&self) -> QueryBuilder<'_, List> { QueryBuilder::new(self) }
+// ✅ pub fn query(&self) -> QueryBuilder<'_, Search> { QueryBuilder::new(self) }
 //   pub fn remove(&self) -> QueryBuilder<'_, Remove> { QueryBuilder::new(self) }
