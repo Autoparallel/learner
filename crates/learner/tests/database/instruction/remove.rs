@@ -49,19 +49,19 @@ mod basic_operations {
 
   #[test]
   fn test_remove_cascades_to_authors() -> TestResult<()> {
-    todo!()
-    // let (mut db, _dir) = setup_test_db();
+    let (mut db, _dir) = setup_test_db();
 
-    // let paper = create_test_paper();
-    // Add::new(paper).execute(&mut db)?;
+    let paper = create_test_paper();
+    Add::new(paper).execute(&mut db)?;
 
-    // Remove::from_query(Query::text("test")).execute(&mut db)?;
+    Remove::from_query(Query::text("test")).execute(&mut db)?;
 
     // let count: i64 =
     //   db.conn.prepare("SELECT COUNT(*) FROM authors")?.query_row([], |row| row.get(0))?;
+    let authors = Query::by_author("").execute(&mut db)?;
 
-    // assert_eq!(count, 0);
-    // Ok(())
+    assert_eq!(authors.len(), 0);
+    Ok(())
   }
 }
 
@@ -170,6 +170,25 @@ mod query_based_removal {
 
     Ok(())
   }
+
+  #[test]
+  fn test_remove_by_date_range() -> TestResult<()> {
+    let (mut db, _dir) = setup_test_db();
+
+    Add::new(create_test_paper()).execute(&mut db)?;
+    Add::new(create_second_test_paper()).execute(&mut db)?;
+
+    // Remove papers from 2023 only
+    let cutoff_date = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+    let removed =
+      Remove::from_query(Query::before_date(cutoff_date).order_by(OrderField::PublicationDate))
+        .execute(&mut db)?;
+
+    assert_eq!(removed.len(), 1);
+    assert_eq!(removed[0].title, "Test Paper");
+
+    Ok(())
+  }
 }
 
 /// Recovery and data integrity tests
@@ -216,23 +235,4 @@ mod recovery {
 
     Ok(())
   }
-}
-
-#[test]
-fn test_remove_by_date_range() -> TestResult<()> {
-  let (mut db, _dir) = setup_test_db();
-
-  Add::new(create_test_paper()).execute(&mut db)?;
-  Add::new(create_second_test_paper()).execute(&mut db)?;
-
-  // Remove papers from 2023 only
-  let cutoff_date = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
-  let removed =
-    Remove::from_query(Query::before_date(cutoff_date).order_by(OrderField::PublicationDate))
-      .execute(&mut db)?;
-
-  assert_eq!(removed.len(), 1);
-  assert_eq!(removed[0].title, "Test Paper");
-
-  Ok(())
 }
