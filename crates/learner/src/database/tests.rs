@@ -1,17 +1,17 @@
 use super::*;
 
 /// Helper function to set up a test database
-async fn setup_test_db() -> (Database, PathBuf, tempfile::TempDir) {
+fn setup_test_db() -> (Database, PathBuf, tempfile::TempDir) {
   let dir = tempdir().unwrap();
   let path = dir.path().join("test.db");
-  let db = Database::open(&path).await.unwrap();
+  let db = Database::open(&path).unwrap();
   (db, path, dir)
 }
 
 #[traced_test]
 #[tokio::test]
 async fn test_database_creation() {
-  let (_db, path, _dir) = setup_test_db().await;
+  let (_db, path, _dir) = setup_test_db();
 
   // Check that file exists
   assert!(path.exists());

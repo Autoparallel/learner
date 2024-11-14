@@ -89,3 +89,10 @@ impl Database {
     dirs::document_dir().unwrap_or_else(|| PathBuf::from(".")).join("learner").join("papers")
   }
 }
+
+// TODO:
+// ✅ pub fn add(&self) -> QueryBuilder<'_, Save> { QueryBuilder::new(self) }
+// ✅ pub fn search(&self) -> QueryBuilder<'_, Search> { QueryBuilder::new(self) }
+//   pub fn get(&self) -> QueryBuilder<'_, Get> { QueryBuilder::new(self) }
+//   pub fn list(&self) -> QueryBuilder<'_, List> { QueryBuilder::new(self) }
+//   pub fn remove(&self) -> QueryBuilder<'_, Remove> { QueryBuilder::new(self) }
