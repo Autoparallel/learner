@@ -2,43 +2,64 @@ use rusqlite::params_from_iter;
 
 use super::*;
 
-/// Represents different ways to search for papers
+/// Represents different ways to query papers
 #[derive(Debug)]
-pub enum SearchCriteria {
+pub enum QueryCriteria {
   /// Full-text search across titles
   Text(String),
   /// Search by source and identifier
   SourceId { source: Source, identifier: String },
   /// Search by author name
   Author(String),
-  // We can add more criteria types as needed
+  /// List all papers
+  All,
 }
 
-pub struct Search {
-  criteria:   SearchCriteria,
-  order_by:   Option<String>,
+/// Valid fields for ordering results
+#[derive(Debug, Clone, Copy)]
+pub enum OrderField {
+  Title,
+  PublicationDate,
+  Source,
+}
+
+impl OrderField {
+  fn as_sql_str(&self) -> &'static str {
+    match self {
+      OrderField::Title => "title",
+      OrderField::PublicationDate => "publication_date",
+      OrderField::Source => "source, source_identifier",
+    }
+  }
+}
+
+pub struct Query {
+  criteria:   QueryCriteria,
+  order_by:   Option<OrderField>,
   descending: bool,
 }
 
-impl Search {
-  pub fn new(criteria: SearchCriteria) -> Self {
+impl Query {
+  pub fn new(criteria: QueryCriteria) -> Self {
     Self { criteria, order_by: None, descending: false }
   }
 
   pub fn text(query: impl Into<String>) -> Self {
-    Self::new(SearchCriteria::Text(query.into().to_lowercase()))
+    Self::new(QueryCriteria::Text(query.into().to_lowercase()))
   }
 
   pub fn by_source(source: Source, identifier: impl Into<String>) -> Self {
-    Self::new(SearchCriteria::SourceId { source, identifier: identifier.into() })
+    Self::new(QueryCriteria::SourceId { source, identifier: identifier.into() })
   }
 
   pub fn by_author(name: impl Into<String>) -> Self {
-    Self::new(SearchCriteria::Author(name.into()))
+    Self::new(QueryCriteria::Author(name.into()))
   }
 
-  pub fn order_by(mut self, field: impl Into<String>) -> Self {
-    self.order_by = Some(field.into());
+  pub fn list_all() -> Self { Self::new(QueryCriteria::All) }
+
+  pub fn order_by(mut self, field: OrderField) -> Self {
+    self.order_by = Some(field);
     self
   }
 
@@ -48,7 +69,7 @@ impl Search {
   }
 }
 
-impl DatabaseStatement for Search {
+impl DatabaseStatement for Query {
   type Output = Vec<Paper>;
 
   fn execute(&self, db: &mut Database) -> Result<Self::Output> {
@@ -59,26 +80,27 @@ impl DatabaseStatement for Search {
     let paper_ids = {
       // Get the appropriate SQL and parameters for each criteria
       let (sql, params) = match &self.criteria {
-        SearchCriteria::Text(query) => (
+        QueryCriteria::Text(query) => (
           "SELECT p.id
-                 FROM papers p
-                 JOIN papers_fts f ON p.id = f.rowid
-                 WHERE papers_fts MATCH ?1 
-                 ORDER BY rank",
+           FROM papers p
+           JOIN papers_fts f ON p.id = f.rowid
+           WHERE papers_fts MATCH ?1 || '*' 
+           ORDER BY rank",
           vec![query.to_string()],
         ),
-        SearchCriteria::SourceId { source, identifier } => (
+        QueryCriteria::SourceId { source, identifier } => (
           "SELECT id FROM papers 
-                 WHERE source = ?1 AND source_identifier = ?2",
+                     WHERE source = ?1 AND source_identifier = ?2",
           vec![source.to_string(), identifier.to_string()],
         ),
-        SearchCriteria::Author(name) => (
+        QueryCriteria::Author(name) => (
           "SELECT DISTINCT p.id
-                 FROM papers p
-                 JOIN authors a ON p.id = a.paper_id
-                 WHERE a.name LIKE ?1",
+                     FROM papers p
+                     JOIN authors a ON p.id = a.paper_id
+                     WHERE a.name LIKE ?1",
           vec![format!("%{}%", name)],
         ),
+        QueryCriteria::All => ("SELECT id FROM papers", vec![]),
       };
 
       // Prepare and execute statement
@@ -96,17 +118,18 @@ impl DatabaseStatement for Search {
       let direction = if self.descending { "DESC" } else { "ASC" };
       format!(
         "SELECT title, abstract_text, publication_date,
-                    source, source_identifier, pdf_url, doi
-             FROM papers 
-             WHERE id = ?
-             ORDER BY {} {}",
-        order_field, direction
+                        source, source_identifier, pdf_url, doi
+                 FROM papers 
+                 WHERE id = ?
+                 ORDER BY {} {}",
+        order_field.as_sql_str(),
+        direction
       )
     } else {
       "SELECT title, abstract_text, publication_date,
-                source, source_identifier, pdf_url, doi
-         FROM papers 
-         WHERE id = ?"
+                    source, source_identifier, pdf_url, doi
+             FROM papers 
+             WHERE id = ?"
         .to_string()
     };
 
@@ -136,8 +159,8 @@ impl DatabaseStatement for Search {
       // Get authors
       let mut author_stmt = tx.prepare_cached(
         "SELECT name, affiliation, email
-             FROM authors
-             WHERE paper_id = ?",
+                 FROM authors
+                 WHERE paper_id = ?",
       )?;
 
       let authors = author_stmt
@@ -158,10 +181,11 @@ impl DatabaseStatement for Search {
     // Sort the papers according to the ordering criteria
     if let Some(order_field) = &self.order_by {
       papers.sort_by(|a, b| {
-        let cmp = match order_field.as_str() {
-          "publication_date" => a.publication_date.cmp(&b.publication_date),
-          "title" => a.title.cmp(&b.title),
-          _ => std::cmp::Ordering::Equal,
+        let cmp = match order_field {
+          OrderField::Title => a.title.cmp(&b.title),
+          OrderField::PublicationDate => a.publication_date.cmp(&b.publication_date),
+          OrderField::Source => (a.source.to_string(), &a.source_identifier)
+            .cmp(&(b.source.to_string(), &b.source_identifier)),
         };
         if self.descending {
           cmp.reverse()

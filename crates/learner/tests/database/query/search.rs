@@ -1,6 +1,10 @@
-use chrono::{TimeZone, Utc};
+use chrono::{Datelike, TimeZone, Utc};
 use learner::{
-  database::{add::Add, search::Search, *},
+  database::{
+    add::Add,
+    search::{OrderField, Query, QueryCriteria},
+    *,
+  },
   paper::{Author, Paper, Source},
 };
 
@@ -17,7 +21,7 @@ fn test_search_by_text() -> TestResult<()> {
   Add::new(paper).execute(&mut db)?;
 
   // Search for it
-  let results = Search::text("test paper").execute(&mut db)?;
+  let results = Query::text("test paper").execute(&mut db)?;
 
   assert_eq!(results.len(), 1);
   assert_eq!(results[0].title, "Test Paper");
@@ -33,7 +37,7 @@ fn test_search_by_author() -> TestResult<()> {
   Add::new(paper).execute(&mut db)?;
 
   // Search by author
-  let results = Search::by_author("John Doe").execute(&mut db)?;
+  let results = Query::by_author("John Doe").execute(&mut db)?;
 
   assert_eq!(results.len(), 1);
   assert_eq!(results[0].authors[0].name, "John Doe");
@@ -48,7 +52,7 @@ fn test_search_by_text_case_insensitive() -> TestResult<()> {
   Add::new(paper).execute(&mut db)?;
 
   // Search with different case
-  let results = Search::text("TEST PAPER").execute(&mut db)?;
+  let results = Query::text("TEST PAPER").execute(&mut db)?;
   assert_eq!(results.len(), 1);
   assert_eq!(results[0].title, "Test Paper");
 
@@ -63,12 +67,12 @@ fn test_search_by_source() -> TestResult<()> {
   let paper = create_test_paper();
   Add::new(paper).execute(&mut db)?;
 
-  let results = Search::by_source(Source::Arxiv, "2301.00000").execute(&mut db)?;
+  let results = Query::by_source(Source::Arxiv, "2301.00000").execute(&mut db)?;
   assert_eq!(results.len(), 1);
   assert_eq!(results[0].source_identifier, "2301.00000");
 
   // Search for non-existent paper
-  let results = Search::by_source(Source::Arxiv, "nonexistent").execute(&mut db)?;
+  let results = Query::by_source(Source::Arxiv, "nonexistent").execute(&mut db)?;
   assert_eq!(results.len(), 0);
 
   Ok(())
@@ -86,18 +90,19 @@ fn test_search_ordering() -> TestResult<()> {
   Add::new(paper2).execute(&mut db)?;
 
   // Test ascending order by date
-  let results = Search::text("paper").order_by("publication_date").execute(&mut db)?;
+  let results = Query::text("paper").order_by(OrderField::PublicationDate).execute(&mut db)?;
   assert_eq!(results.len(), 2);
   assert_eq!(results[0].title, "Test Paper");
   assert_eq!(results[1].title, "Test Paper: Two");
 
   // Test descending order by date
-  let results = Search::text("paper").order_by("publication_date").descending().execute(&mut db)?;
+  let results =
+    Query::text("paper").order_by(OrderField::PublicationDate).descending().execute(&mut db)?;
   assert_eq!(results[0].title, "Test Paper: Two");
   assert_eq!(results[1].title, "Test Paper");
 
   // Test ordering by title
-  let results = Search::text("paper").order_by("title").execute(&mut db)?;
+  let results = Query::text("paper").order_by(OrderField::Title).execute(&mut db)?;
   assert_eq!(results[0].title, "Test Paper");
   assert_eq!(results[1].title, "Test Paper: Two");
 
@@ -120,19 +125,19 @@ fn test_search_by_partial_author_name() -> TestResult<()> {
   Add::new(paper).execute(&mut db)?;
 
   // Test partial name matches
-  let results = Search::by_author("Smith").execute(&mut db)?;
+  let results = Query::by_author("Smith").execute(&mut db)?;
   assert_eq!(results.len(), 1);
   assert_eq!(results[0].authors.len(), 2);
 
-  let results = Search::by_author("John").execute(&mut db)?;
+  let results = Query::by_author("John").execute(&mut db)?;
   assert_eq!(results.len(), 1);
 
   // Test case insensitivity
-  let results = Search::by_author("JOHN").execute(&mut db)?;
+  let results = Query::by_author("JOHN").execute(&mut db)?;
   assert_eq!(results.len(), 1);
 
   // Test no matches
-  let results = Search::by_author("Wilson").execute(&mut db)?;
+  let results = Query::by_author("Wilson").execute(&mut db)?;
   assert_eq!(results.len(), 0);
 
   Ok(())
@@ -150,12 +155,12 @@ fn test_search_multiple_results() -> TestResult<()> {
   Add::new(paper2).execute(&mut db)?;
 
   // Search for "quantum" should return 2 papers
-  let results = Search::text("test").execute(&mut db)?;
+  let results = Query::text("test").execute(&mut db)?;
   assert_eq!(results.len(), 2);
   assert!(results.iter().all(|p| p.title.to_lowercase().contains("test")));
 
   // Search for "computing" should return all 3 papers
-  let results = Search::text("two").execute(&mut db)?;
+  let results = Query::text("two").execute(&mut db)?;
   assert_eq!(results.len(), 1);
 
   Ok(())
@@ -163,13 +168,129 @@ fn test_search_multiple_results() -> TestResult<()> {
 
 #[traced_test]
 #[test]
-fn test_invalid_order_field() -> TestResult<()> {
+fn test_list_all_papers() -> TestResult<()> {
   let (mut db, _dir) = setup_test_db();
-  Add::new(create_test_paper()).execute(&mut db)?;
 
-  // Test with invalid order field
-  let result = Search::text("test").order_by("nonexistent_field").execute(&mut db);
-  assert!(result.is_err());
+  // Empty database should return empty list
+  let results = Query::list_all().execute(&mut db)?;
+  assert_eq!(results.len(), 0);
+
+  // Add both test papers
+  let paper1 = create_test_paper();
+  let paper2 = create_second_test_paper();
+  Add::new(paper1).execute(&mut db)?;
+  Add::new(paper2).execute(&mut db)?;
+
+  // Should return all papers
+  let results = Query::list_all().execute(&mut db)?;
+  assert_eq!(results.len(), 2);
+  Ok(())
+}
+
+#[traced_test]
+#[test]
+fn test_ordering_by_source() -> TestResult<()> {
+  let (mut db, _dir) = setup_test_db();
+
+  // Create papers with different sources
+  let mut paper1 = create_test_paper();
+  paper1.source = Source::DOI;
+  let mut paper2 = create_second_test_paper();
+  paper2.source = Source::Arxiv;
+
+  Add::new(paper1).execute(&mut db)?;
+  Add::new(paper2).execute(&mut db)?;
+
+  let results = Query::list_all().order_by(OrderField::Source).execute(&mut db)?;
+  assert_eq!(results[0].source, Source::Arxiv);
+  assert_eq!(results[1].source, Source::DOI);
+
+  Ok(())
+}
+
+#[traced_test]
+#[test]
+fn test_query_with_no_results() -> TestResult<()> {
+  let (mut db, _dir) = setup_test_db();
+
+  let paper = create_test_paper();
+  Add::new(paper).execute(&mut db)?;
+
+  // Test each query type with non-matching criteria
+  let results = Query::text("nonexistent").execute(&mut db)?;
+  assert_eq!(results.len(), 0);
+
+  let results = Query::by_author("nonexistent").execute(&mut db)?;
+  assert_eq!(results.len(), 0);
+
+  let results = Query::by_source(Source::DOI, "nonexistent").execute(&mut db)?;
+  assert_eq!(results.len(), 0);
+
+  Ok(())
+}
+
+#[traced_test]
+#[test]
+fn test_search_respects_word_boundaries() -> TestResult<()> {
+  let (mut db, _dir) = setup_test_db();
+
+  // Create a paper with specific title
+  let mut paper = create_test_paper();
+  paper.title = "Testing Paper".to_string();
+  Add::new(paper).execute(&mut db)?;
+
+  // Should find the paper
+  let results = Query::text("test").execute(&mut db)?;
+  assert_eq!(results.len(), 1);
+
+  // Should also find with full word
+  let results = Query::text("testing").execute(&mut db)?;
+  assert_eq!(results.len(), 1);
+
+  Ok(())
+}
+
+#[traced_test]
+#[test]
+fn test_author_name_exact_match() -> TestResult<()> {
+  let (mut db, _dir) = setup_test_db();
+
+  let paper = create_test_paper();
+  Add::new(paper).execute(&mut db)?;
+
+  // Test exact author name match
+  let results = Query::by_author("John Doe").execute(&mut db)?;
+  assert_eq!(results.len(), 1);
+
+  // Test only first name
+  let results = Query::by_author("John").execute(&mut db)?;
+  assert_eq!(results.len(), 1);
+
+  // Test only last name
+  let results = Query::by_author("Doe").execute(&mut db)?;
+  assert_eq!(results.len(), 1);
+
+  Ok(())
+}
+
+#[traced_test]
+#[test]
+fn test_combined_queries_ordering() -> TestResult<()> {
+  let (mut db, _dir) = setup_test_db();
+
+  let paper1 = create_test_paper();
+  let paper2 = create_second_test_paper();
+
+  Add::new(paper1).execute(&mut db)?;
+  Add::new(paper2).execute(&mut db)?;
+
+  // Search with text and ordering
+  let results =
+    Query::text("test").order_by(OrderField::PublicationDate).descending().execute(&mut db)?;
+
+  assert_eq!(results.len(), 2);
+  assert_eq!(results[0].publication_date.year(), 2024);
+  assert_eq!(results[1].publication_date.year(), 2023);
 
   Ok(())
 }
