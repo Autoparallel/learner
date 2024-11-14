@@ -8,7 +8,7 @@ impl Add {
   pub fn new(paper: Paper) -> Self { Self { paper } }
 }
 
-impl DatabaseStatement for Add {
+impl DatabaseInstruction for Add {
   type Output = i64;
 
   fn execute(&self, db: &mut Database) -> Result<Self::Output> {

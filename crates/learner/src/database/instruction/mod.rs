@@ -1,12 +1,12 @@
 use super::*;
 
 pub mod add;
-pub mod search;
+pub mod query;
 
 use rusqlite::params;
 
 // We could make this even more specific about what we're doing
-pub trait DatabaseStatement {
+pub trait DatabaseInstruction {
   type Output;
 
   // Take &mut reference to avoid taking ownership and allow multiple operations

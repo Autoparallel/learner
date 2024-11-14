@@ -1,11 +1,11 @@
-use chrono::{Datelike, TimeZone, Utc};
+use chrono::Datelike;
 use learner::{
   database::{
     add::Add,
-    search::{OrderField, Query, QueryCriteria},
+    query::{OrderField, Query},
     *,
   },
-  paper::{Author, Paper, Source},
+  paper::{Author, Source},
 };
 
 use super::setup_test_db;

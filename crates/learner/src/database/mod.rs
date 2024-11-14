@@ -4,11 +4,11 @@ use rusqlite::Connection;
 
 use super::*;
 
-pub mod models;
-pub mod query;
+pub mod instruction;
+// pub mod models;
 #[cfg(test)] mod tests;
 
-pub use self::{models::*, query::*};
+pub use self::instruction::*;
 
 /// Main database connection handler
 pub struct Database {

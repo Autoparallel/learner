@@ -69,7 +69,7 @@ impl Query {
   }
 }
 
-impl DatabaseStatement for Query {
+impl DatabaseInstruction for Query {
   type Output = Vec<Paper>;
 
   fn execute(&self, db: &mut Database) -> Result<Self::Output> {
