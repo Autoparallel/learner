@@ -34,8 +34,8 @@ async fn test_default_path() {
 
 #[traced_test]
 #[tokio::test]
-async fn test_default_pdf_path() {
-  let path = Database::default_pdf_path();
+async fn test_default_storage_path() {
+  let path = Database::default_storage_path();
 
   // Should end with learner/papers
   assert!(path.ends_with("learner/papers") || path.ends_with("learner\\papers"));
@@ -57,44 +57,42 @@ async fn test_get_nonexistent_paper() {
 
   //   assert!(result.is_none());
 }
+#[test]
+fn test_new_db_uses_default_storage() -> Result<()> {
+  let (db, _path, _dir) = setup_test_db();
 
-#[traced_test]
-#[tokio::test]
-async fn test_config_operations() {
-  todo!();
-  //   let (db, _path, _dir) = setup_test_db().await;
+  let storage_path = db.get_storage_path()?.expect("Storage path should be set");
+  assert_eq!(storage_path, Database::default_storage_path());
 
-  //   // Test setting and getting a config value
-  //   db.set_config("test_key", "test_value").await.unwrap();
-  //   let value = db.get_config("test_key").await.unwrap();
-  //   assert_eq!(value, Some("test_value".to_string()));
-
-  //   // Test getting non-existent config
-  //   let missing = db.get_config("nonexistent").await.unwrap();
-  //   assert_eq!(missing, None);
-
-  //   // Test updating existing config
-  //   db.set_config("test_key", "new_value").await.unwrap();
-  //   let updated = db.get_config("test_key").await.unwrap();
-  //   assert_eq!(updated, Some("new_value".to_string()));
+  Ok(())
 }
 
-#[traced_test]
-#[tokio::test]
-async fn test_config_persistence() {
-  todo!();
-  //   let dir = tempdir().unwrap();
-  //   let db_path = dir.path().join("test.db");
+#[test]
+fn test_storage_path_persistence() -> Result<()> {
+  let (db, db_path, _dir) = setup_test_db();
 
-  //   // Create database and set config
-  //   {
-  //     let db = Database::open(&db_path).await.unwrap();
-  //     db.set_config("pdf_dir", "/test/path").await.unwrap();
-  //   }
+  // Set custom storage path
+  let custom_path = PathBuf::from("/tmp/custom/storage");
+  db.set_storage_path(&custom_path)?;
 
-  //   // Reopen database and verify config persists
-  //   {
-  //     let db = Database::open(&db_path).await.unwrap();
-  //     let value = db.get_config("pdf_dir").await.unwrap();
-  //     assert_eq!(value, Some("/test/path".to_string()));
+  // Reopen database and check path
+  drop(db);
+  let db = Database::open(db_path)?;
+  let storage_path = db.get_storage_path()?.expect("Storage path should be set");
+  assert_eq!(storage_path, custom_path);
+
+  Ok(())
+}
+
+#[test]
+fn test_storage_path_creates_directory() -> Result<()> {
+  let (db, _path, dir) = setup_test_db();
+
+  let custom_path = dir.path().join("custom_storage");
+  db.set_storage_path(&custom_path)?;
+
+  assert!(custom_path.exists());
+  assert!(custom_path.is_dir());
+
+  Ok(())
 }

@@ -24,58 +24,9 @@
 //! # }
 //! ```
 
+use std::hash::{DefaultHasher, Hash, Hasher};
+
 use super::*;
-
-/// The source repository or system from which a paper originates.
-///
-/// This enum represents the supported academic paper sources, each with its own
-/// identifier format and access patterns.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum Source {
-  /// Papers from arxiv.org, using either new-style (2301.07041) or
-  /// old-style (math.AG/0601001) identifiers
-  Arxiv,
-  /// Papers from the International Association for Cryptologic Research (eprint.iacr.org)
-  IACR,
-  /// Papers identified by a Digital Object Identifier (DOI)
-  DOI,
-}
-
-impl Display for Source {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      Source::Arxiv => write!(f, "Arxiv"),
-      Source::IACR => write!(f, "IACR"),
-      Source::DOI => write!(f, "DOI"),
-    }
-  }
-}
-
-impl FromStr for Source {
-  type Err = LearnerError;
-
-  fn from_str(s: &str) -> Result<Self> {
-    match &s.to_lowercase() as &str {
-      "arxiv" => Ok(Source::Arxiv),
-      "iacr" => Ok(Source::IACR),
-      "doi" => Ok(Source::DOI),
-      s => Err(LearnerError::InvalidSource(s.to_owned())),
-    }
-  }
-}
-
-/// Represents an author of an academic paper.
-///
-/// Contains the author's name and optional affiliation and contact information.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Author {
-  /// The author's full name
-  pub name:        String,
-  /// The author's institutional affiliation, if available
-  pub affiliation: Option<String>,
-  /// The author's email address, if available
-  pub email:       Option<String>,
-}
 
 /// A complete academic paper with its metadata.
 ///
@@ -121,7 +72,37 @@ pub struct Paper {
   pub doi:               Option<String>,
 }
 
+/// Represents an author of an academic paper.
+///
+/// Contains the author's name and optional affiliation and contact information.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Author {
+  /// The author's full name
+  pub name:        String,
+  /// The author's institutional affiliation, if available
+  pub affiliation: Option<String>,
+  /// The author's email address, if available
+  pub email:       Option<String>,
+}
+
+/// The source repository or system from which a paper originates.
+///
+/// This enum represents the supported academic paper sources, each with its own
+/// identifier format and access patterns.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum Source {
+  /// Papers from arxiv.org, using either new-style (2301.07041) or
+  /// old-style (math.AG/0601001) identifiers
+  Arxiv,
+  /// Papers from the International Association for Cryptologic Research (eprint.iacr.org)
+  IACR,
+  /// Papers identified by a Digital Object Identifier (DOI)
+  DOI,
+}
+
 impl Paper {
+  // TODO (autoparallel): This should probably be a `new_from_url` or just `from_url` or something.
+  // May be worth implementing a bunch of `From`s for paper eventually
   /// Create a new paper from a URL, identifier, or DOI.
   ///
   /// This method accepts various formats for paper identification and automatically
@@ -208,6 +189,13 @@ impl Paper {
     }
   }
 
+  // Add method to generate paper ID
+  pub fn id(&self) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    self.hash(&mut hasher);
+    hasher.finish()
+  }
+
   /// Download the paper's PDF to a specified path.
   ///
   /// # Arguments
@@ -239,30 +227,69 @@ impl Paper {
     Ok(())
   }
 
-  /// Save the paper to a database.
-  ///
-  /// # Arguments
-  ///
-  /// * `db` - Reference to an open database connection
-  ///
-  /// # Returns
-  ///
-  /// Returns the database ID of the saved paper on success.
-  ///
-  /// # Examples
-  ///
-  /// ```no_run
-  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// let paper = learner::paper::Paper::new("2301.07041").await?;
-  /// let db = learner::database::Database::open("papers.db").await?;
-  /// let id = paper.save(&db).await?;
-  /// println!("Saved paper with ID: {}", id);
-  /// # Ok(())
-  /// # }
-  /// ```
+  // / Save the paper to a database.
+  // /
+  // / # Arguments
+  // /
+  // / * `db` - Reference to an open database connection
+  // /
+  // / # Returns
+  // /
+  // / Returns the database ID of the saved paper on success.
+  // /
+  // / # Examples
+  // /
+  // / ```no_run
+  // / # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  // / let paper = learner::paper::Paper::new("2301.07041").await?;
+  // / let db = learner::database::Database::open("papers.db").await?;
+  // / let id = paper.save(&db).await?;
+  // / println!("Saved paper with ID: {}", id);
+  // / # Ok(())
+  // / # }
+  // / ```
+  // TODO (autoparallel): Remove this in favor of a single API that handles adding with db
   pub async fn save(&self, db: &Database) -> Result<i64> { db.save_paper(self).await }
 }
 
+// Make Paper hashable for ID generation
+impl Hash for Paper {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    self.title.hash(state);
+    self.abstract_text.hash(state);
+    self.publication_date.to_rfc3339().hash(state);
+    self.source.to_string().hash(state);
+    self.source_identifier.hash(state);
+    // Note: We don't hash PDF URL or DOI as they might not be available
+    // but are still the same paper
+  }
+}
+
+impl Display for Source {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Source::Arxiv => write!(f, "Arxiv"),
+      Source::IACR => write!(f, "IACR"),
+      Source::DOI => write!(f, "DOI"),
+    }
+  }
+}
+
+impl FromStr for Source {
+  type Err = LearnerError;
+
+  fn from_str(s: &str) -> Result<Self> {
+    match &s.to_lowercase() as &str {
+      "arxiv" => Ok(Source::Arxiv),
+      "iacr" => Ok(Source::IACR),
+      "doi" => Ok(Source::DOI),
+      s => Err(LearnerError::InvalidSource(s.to_owned())),
+    }
+  }
+}
+
+// TODO (autoparallel): These three functions should really be some simple generic alongside the
+// rest of the stuff we have in here
 /// Extracts the arXiv identifier from a URL.
 ///
 /// Parses URLs like "https://arxiv.org/abs/2301.07041" to extract "2301.07041".

@@ -4,12 +4,6 @@
 // it should also hold onto a filename it is associated with, this would make life easier down the
 // road too.
 
-// database/instruction/pdf.rs
-use std::{
-  collections::hash_map::DefaultHasher,
-  hash::{Hash, Hasher},
-};
-
 pub enum PdfAction {
   Store(QueryCriteria), // Use existing query criteria
   GetStatus(i64),       // Get status by paper ID
@@ -23,28 +17,6 @@ pub enum PdfStatus {
 
 pub struct Pdf {
   action: PdfAction,
-}
-
-impl Paper {
-  // Add method to generate paper ID
-  pub fn id(&self) -> i64 {
-    let mut hasher = DefaultHasher::new();
-    self.hash(&mut hasher);
-    hasher.finish() as i64
-  }
-}
-
-// Make Paper hashable for ID generation
-impl Hash for Paper {
-  fn hash<H: Hasher>(&self, state: &mut H) {
-    self.title.hash(state);
-    self.abstract_text.hash(state);
-    self.publication_date.to_rfc3339().hash(state);
-    self.source.to_string().hash(state);
-    self.source_identifier.hash(state);
-    // Note: We don't hash PDF URL or DOI as they might not be available
-    // but are still the same paper
-  }
 }
 
 impl Pdf {
@@ -88,8 +60,8 @@ impl DatabaseInstruction for Pdf {
           // Initial status is pending
           tx.execute(
             "INSERT OR REPLACE INTO files (
-                            paper_id, path, filename, download_status, error_message
-                        ) VALUES (?, ?, ?, ?, ?)",
+                              paper_id, path, filename, download_status, error_message
+                          ) VALUES (?, ?, ?, ?, ?)",
             params![
               paper_id,
               path.to_string_lossy().to_string(),

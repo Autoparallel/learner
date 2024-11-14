@@ -1,6 +1,6 @@
 #![allow(missing_docs, clippy::missing_docs_in_private_items)]
 
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 
 use super::*;
 
@@ -47,10 +47,51 @@ impl Database {
   /// # }
   /// ```
   pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+    // Create parent directories if needed
+    if let Some(parent) = path.as_ref().parent() {
+      std::fs::create_dir_all(parent)?;
+    }
+
     let conn = Connection::open(path.as_ref())?;
+
+    // Initialize schema
     conn
       .execute_batch(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/migrations/init.sql")))?;
-    Ok(Self { conn })
+
+    let db = Self { conn };
+
+    // Check if storage path is set, if not, set default
+    if db.get_storage_path()?.is_none() {
+      db.set_storage_path(Self::default_storage_path())?;
+    }
+
+    Ok(db)
+  }
+
+  /// Get the current storage path for document files
+  pub fn get_storage_path(&self) -> Result<Option<PathBuf>> {
+    self
+      .conn
+      .prepare_cached("SELECT value FROM config WHERE key = 'storage_path'")?
+      .query_row([], |row| Ok(PathBuf::from(row.get::<_, String>(0)?)))
+      .optional()
+      .map_err(|e| e.into())
+  }
+
+  /// Set the storage path for document files
+  pub fn set_storage_path(&self, path: impl AsRef<Path>) -> Result<()> {
+    let path_str = path.as_ref().to_string_lossy();
+
+    // Create the directory if it doesn't exist
+    std::fs::create_dir_all(path.as_ref())?;
+
+    self
+      .conn
+      .execute("INSERT OR REPLACE INTO config (key, value) VALUES ('storage_path', ?1)", [
+        path_str.as_ref(),
+      ])?;
+
+    Ok(())
   }
 
   /// Returns the default path for the database file.
@@ -82,15 +123,10 @@ impl Database {
   /// # Examples
   ///
   /// ```no_run
-  /// let path = learner::database::Database::default_pdf_path();
+  /// let path = learner::database::Database::default_storage_path();
   /// println!("PDFs will be stored at: {}", path.display());
   /// ```
-  pub fn default_pdf_path() -> PathBuf {
+  pub fn default_storage_path() -> PathBuf {
     dirs::document_dir().unwrap_or_else(|| PathBuf::from(".")).join("learner").join("papers")
   }
 }
-
-// TODO:
-// ✅ pub fn add(&self) -> QueryBuilder<'_, Save> { QueryBuilder::new(self) }
-// ✅ pub fn query(&self) -> QueryBuilder<'_, Search> { QueryBuilder::new(self) }
-//   pub fn remove(&self) -> QueryBuilder<'_, Remove> { QueryBuilder::new(self) }
