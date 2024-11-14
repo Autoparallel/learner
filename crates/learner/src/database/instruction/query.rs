@@ -1,4 +1,4 @@
-use rusqlite::params_from_iter;
+use rusqlite::{params_from_iter, ToSql};
 
 use super::*;
 
@@ -13,6 +13,8 @@ pub enum QueryCriteria {
   Author(String),
   /// List all papers
   All,
+  /// Papers before a specific date
+  BeforeDate(DateTime<Utc>),
 }
 
 /// Valid fields for ordering results
@@ -58,6 +60,8 @@ impl Query {
 
   pub fn list_all() -> Self { Self::new(QueryCriteria::All) }
 
+  pub fn before_date(date: DateTime<Utc>) -> Self { Self::new(QueryCriteria::BeforeDate(date)) }
+
   pub fn order_by(mut self, field: OrderField) -> Self {
     self.order_by = Some(field);
     self
@@ -66,6 +70,41 @@ impl Query {
   pub fn descending(mut self) -> Self {
     self.descending = true;
     self
+  }
+
+  fn build_criteria_sql(&self, criteria: &QueryCriteria) -> (String, Vec<impl ToSql>) {
+    match criteria {
+      QueryCriteria::Text(query) => (
+        "SELECT p.id
+                 FROM papers p
+                 JOIN papers_fts f ON p.id = f.rowid
+                 WHERE papers_fts MATCH ?1 || '*'
+                 ORDER BY rank"
+          .into(),
+        vec![query.to_string()],
+      ),
+      QueryCriteria::SourceId { source, identifier } => (
+        "SELECT id FROM papers 
+                 WHERE source = ?1 AND source_identifier = ?2"
+          .into(),
+        vec![source.to_string(), identifier.clone()],
+      ),
+      QueryCriteria::Author(name) => (
+        "SELECT DISTINCT p.id
+                 FROM papers p
+                 JOIN authors a ON p.id = a.paper_id
+                 WHERE a.name LIKE ?1"
+          .into(),
+        vec![format!("%{}%", name)],
+      ),
+      QueryCriteria::All => ("SELECT id FROM papers".into(), vec![]),
+      QueryCriteria::BeforeDate(date) => (
+        "SELECT id FROM papers 
+                 WHERE publication_date < ?1"
+          .into(),
+        vec![date.to_rfc3339()],
+      ),
+    }
   }
 }
 
@@ -78,33 +117,10 @@ impl DatabaseInstruction for Query {
 
     // Get paper IDs based on search criteria
     let paper_ids = {
-      // Get the appropriate SQL and parameters for each criteria
-      let (sql, params) = match &self.criteria {
-        QueryCriteria::Text(query) => (
-          "SELECT p.id
-           FROM papers p
-           JOIN papers_fts f ON p.id = f.rowid
-           WHERE papers_fts MATCH ?1 || '*' 
-           ORDER BY rank",
-          vec![query.to_string()],
-        ),
-        QueryCriteria::SourceId { source, identifier } => (
-          "SELECT id FROM papers 
-                     WHERE source = ?1 AND source_identifier = ?2",
-          vec![source.to_string(), identifier.to_string()],
-        ),
-        QueryCriteria::Author(name) => (
-          "SELECT DISTINCT p.id
-                     FROM papers p
-                     JOIN authors a ON p.id = a.paper_id
-                     WHERE a.name LIKE ?1",
-          vec![format!("%{}%", name)],
-        ),
-        QueryCriteria::All => ("SELECT id FROM papers", vec![]),
-      };
+      let (sql, params) = self.build_criteria_sql(&self.criteria);
 
       // Prepare and execute statement
-      let mut stmt = tx.prepare_cached(sql)?;
+      let mut stmt = tx.prepare_cached(&sql)?;
       let mut rows = stmt.query(params_from_iter(params))?;
       let mut ids = Vec::new();
       while let Some(row) = rows.next()? {
