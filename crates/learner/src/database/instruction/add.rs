@@ -35,9 +35,10 @@ impl Add {
   }
 
   /// Helper to check for existing paper
-  fn check_existing_paper(db: &mut Database, paper: &Paper) -> Result<Paper> {
+  async fn check_existing_paper(db: &mut Database, paper: &Paper) -> Result<Paper> {
     Query::by_source(paper.source.clone(), &paper.source_identifier)
-      .execute(db)?
+      .execute(db)
+      .await?
       .into_iter()
       .next()
       .ok_or(LearnerError::DatabasePaperNotFound)
@@ -46,19 +47,18 @@ impl Add {
   /// Helper to check for existing document
   fn check_existing_document(db: &mut Database, paper: &Paper) -> Result<bool> {
     let tx = db.conn.transaction()?;
-
-    Ok(
-      tx.prepare_cached(
+    let res = tx
+      .prepare_cached(
         "SELECT EXISTS(
-                SELECT 1 FROM files f
-                JOIN papers p ON p.id = f.paper_id
-                WHERE p.source = ? 
-                AND p.source_identifier = ? 
-                AND f.download_status = 'Success'
-            )",
+              SELECT 1 FROM files f
+              JOIN papers p ON p.id = f.paper_id
+              WHERE p.source = ? 
+              AND p.source_identifier = ? 
+              AND f.download_status = 'Success'
+          )",
       )?
-      .query_row(params![paper.source.to_string(), paper.source_identifier], |row| row.get(0))?,
-    )
+      .query_row(params![paper.source.to_string(), paper.source_identifier], |row| row.get(0))?;
+    Ok(res)
   }
 
   /// Helper to store document for a paper
@@ -85,21 +85,23 @@ impl Add {
   }
 }
 
+#[async_trait::async_trait]
 impl DatabaseInstruction for Add {
   type Output = Vec<Paper>;
 
   // Return affected papers
 
-  fn execute(&self, db: &mut Database) -> Result<Self::Output> {
-    let storage_path = db
-      .get_storage_path()?
-      .ok_or_else(|| LearnerError::Database("Storage path not configured".into()))?;
+  async fn execute(&self, db: &mut Database) -> Result<Self::Output> {
+    let storage_path = db.get_storage_path()?;
 
     match &self.addition {
       Addition::Paper(paper) => {
         // Check for existing paper
-        if let Some(existing) = Self::check_existing_paper(db, paper)? {
-          return Err(LearnerError::DatabaseDuplicatePaper(existing.title));
+        if let Err(LearnerError::DatabasePaperNotFound) =
+          Self::check_existing_paper(db, paper).await
+        {
+        } else {
+          return Err(LearnerError::DatabaseDuplicatePaper(paper.title.clone()));
         }
 
         // Add the paper
@@ -143,7 +145,7 @@ impl DatabaseInstruction for Add {
 
       Addition::Complete(paper) => {
         // Add paper first
-        Add::paper(paper.clone()).execute(db)?;
+        Add::paper(paper.clone()).execute(db).await?;
 
         // Then add document
         Self::store_document(db, paper).await?;
@@ -152,7 +154,7 @@ impl DatabaseInstruction for Add {
 
       Addition::Documents(query) => {
         let mut added = Vec::new();
-        let papers = query.execute(db)?;
+        let papers = query.execute(db).await?;
 
         for paper in papers {
           if !Self::check_existing_document(db, &paper)? {

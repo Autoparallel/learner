@@ -7,7 +7,7 @@ async fn test_download_then_send_pdf() -> Result<(), Box<dyn Error>> {
   // Download a PDF
   let dir = tempdir().unwrap();
   let paper = Paper::new("https://eprint.iacr.org/2016/260").await.unwrap();
-  paper.download_pdf(dir.path().to_path_buf()).await.unwrap();
+  paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
 
   // Get the content of the PDF
   let formatted_title = format::format_title(&paper.title, None); // use default 50

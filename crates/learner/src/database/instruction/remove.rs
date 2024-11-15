@@ -32,12 +32,13 @@ impl Remove {
   }
 }
 
+#[async_trait::async_trait]
 impl DatabaseInstruction for Remove {
   type Output = Vec<Paper>;
 
-  fn execute(&self, db: &mut Database) -> Result<Self::Output> {
+  async fn execute(&self, db: &mut Database) -> Result<Self::Output> {
     // Use Query to find the papers to remove
-    let papers = self.query.execute(db)?;
+    let papers = self.query.execute(db).await?;
 
     let tx = db.conn.transaction()?;
 

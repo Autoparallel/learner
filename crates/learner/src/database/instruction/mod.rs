@@ -6,9 +6,10 @@ pub mod remove;
 
 use rusqlite::params;
 
+#[async_trait::async_trait]
 pub trait DatabaseInstruction {
   type Output;
 
   // Take &mut reference to avoid taking ownership and allow multiple operations
-  fn execute(&self, db: &mut Database) -> Result<Self::Output>;
+  async fn execute(&self, db: &mut Database) -> Result<Self::Output>;
 }

@@ -16,49 +16,50 @@ use crate::{create_second_test_paper, create_test_paper, traced_test, TestResult
 mod basic_operations {
   use super::*;
 
-  #[test]
-  fn test_remove_existing_paper() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_remove_existing_paper() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
     let paper = create_test_paper();
     let source = paper.source.clone();
     let id = paper.source_identifier.clone();
-    Add::new(paper.clone()).execute(&mut db)?;
+    Add::paper(paper.clone()).execute(&mut db).await?;
 
-    let removed_papers = Remove::by_source(source.clone(), id.clone()).execute(&mut db)?;
+    let removed_papers = Remove::by_source(source.clone(), id.clone()).execute(&mut db).await?;
 
     assert_eq!(removed_papers.len(), 1);
     assert_eq!(removed_papers[0].title, paper.title);
     assert_eq!(removed_papers[0].authors.len(), paper.authors.len());
 
-    let results = Query::by_source(source, id).execute(&mut db)?;
+    let results = Query::by_source(source, id).execute(&mut db).await?;
     assert_eq!(results.len(), 0);
 
     Ok(())
   }
 
-  #[test]
-  fn test_remove_nonexistent_paper() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_remove_nonexistent_paper() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
-    let removed = Remove::by_source(Source::Arxiv, "nonexistent").execute(&mut db)?;
+    let removed = Remove::by_source(Source::Arxiv, "nonexistent").execute(&mut db).await?;
     assert!(removed.is_empty());
 
     Ok(())
   }
 
-  #[test]
-  fn test_remove_cascades_to_authors() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_remove_cascades_to_authors() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
     let paper = create_test_paper();
-    Add::new(paper).execute(&mut db)?;
+    Add::paper(paper).execute(&mut db).await?;
 
-    Remove::from_query(Query::text("test")).execute(&mut db)?;
+    Remove::from_query(Query::text("test")).execute(&mut db).await?;
 
     // let count: i64 =
-    //   db.conn.prepare("SELECT COUNT(*) FROM authors")?.query_row([], |row| row.get(0))?;
-    let authors = Query::by_author("").execute(&mut db)?;
+    //   db.conn.prepare("SELECT COUNT(*) FROM authors").await?.query_row([], |row|
+    // row.get(0)).await?;
+    let authors = Query::by_author("").execute(&mut db).await?;
 
     assert_eq!(authors.len(), 0);
     Ok(())
@@ -69,34 +70,35 @@ mod basic_operations {
 mod dry_run {
   use super::*;
 
-  #[test]
-  fn test_dry_run_basic() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_dry_run_basic() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
     let paper = create_test_paper();
     let source = paper.source.clone();
     let id = paper.source_identifier.clone();
-    Add::new(paper.clone()).execute(&mut db)?;
+    Add::paper(paper.clone()).execute(&mut db).await?;
 
-    let would_remove = Remove::by_source(source.clone(), id.clone()).dry_run().execute(&mut db)?;
+    let would_remove =
+      Remove::by_source(source.clone(), id.clone()).dry_run().execute(&mut db).await?;
 
     assert_eq!(would_remove.len(), 1);
     assert_eq!(would_remove[0].title, paper.title);
 
-    let results = Query::by_source(source, id).execute(&mut db)?;
+    let results = Query::by_source(source, id).execute(&mut db).await?;
     assert_eq!(results.len(), 1);
 
     Ok(())
   }
 
-  #[test]
-  fn test_dry_run_returns_complete_paper() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_dry_run_returns_complete_paper() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
     let paper = create_test_paper();
-    Add::new(paper.clone()).execute(&mut db)?;
+    Add::paper(paper.clone()).execute(&mut db).await?;
 
-    let would_remove = Remove::from_query(Query::text("test")).dry_run().execute(&mut db)?;
+    let would_remove = Remove::from_query(Query::text("test")).dry_run().execute(&mut db).await?;
 
     assert_eq!(would_remove.len(), 1);
     let removed = &would_remove[0];
@@ -125,44 +127,45 @@ mod dry_run {
 mod query_based_removal {
   use super::*;
 
-  #[test]
-  fn test_remove_by_text_search() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_remove_by_text_search() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
-    Add::new(create_test_paper()).execute(&mut db)?;
-    Add::new(create_second_test_paper()).execute(&mut db)?;
+    Add::paper(create_test_paper()).execute(&mut db).await?;
+    Add::paper(create_second_test_paper()).execute(&mut db).await?;
 
-    let removed = Remove::from_query(Query::text("two")).execute(&mut db)?;
+    let removed = Remove::from_query(Query::text("two")).execute(&mut db).await?;
     assert_eq!(removed.len(), 1);
     assert_eq!(removed[0].title, "Test Paper: Two");
 
     Ok(())
   }
 
-  #[test]
-  fn test_remove_by_author() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_remove_by_author() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
-    Add::new(create_test_paper()).execute(&mut db)?;
-    Add::new(create_second_test_paper()).execute(&mut db)?;
+    Add::paper(create_test_paper()).execute(&mut db).await?;
+    Add::paper(create_second_test_paper()).execute(&mut db).await?;
 
-    let removed = Remove::from_query(Query::by_author("John Doe")).execute(&mut db)?;
+    let removed = Remove::from_query(Query::by_author("John Doe")).execute(&mut db).await?;
     assert_eq!(removed.len(), 1);
     assert_eq!(removed[0].authors[0].name, "John Doe");
 
     Ok(())
   }
 
-  #[test]
-  fn test_remove_with_ordering() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_remove_with_ordering() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
-    Add::new(create_test_paper()).execute(&mut db)?;
-    Add::new(create_second_test_paper()).execute(&mut db)?;
+    Add::paper(create_test_paper()).execute(&mut db).await?;
+    Add::paper(create_second_test_paper()).execute(&mut db).await?;
 
     let removed =
       Remove::from_query(Query::text("test").order_by(OrderField::PublicationDate).descending())
-        .execute(&mut db)?;
+        .execute(&mut db)
+        .await?;
 
     assert_eq!(removed.len(), 2);
     assert_eq!(removed[0].title, "Test Paper: Two"); // More recent
@@ -171,18 +174,19 @@ mod query_based_removal {
     Ok(())
   }
 
-  #[test]
-  fn test_remove_by_date_range() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_remove_by_date_range() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
-    Add::new(create_test_paper()).execute(&mut db)?;
-    Add::new(create_second_test_paper()).execute(&mut db)?;
+    Add::paper(create_test_paper()).execute(&mut db).await?;
+    Add::paper(create_second_test_paper()).execute(&mut db).await?;
 
     // Remove papers from 2023 only
     let cutoff_date = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
     let removed =
       Remove::from_query(Query::before_date(cutoff_date).order_by(OrderField::PublicationDate))
-        .execute(&mut db)?;
+        .execute(&mut db)
+        .await?;
 
     assert_eq!(removed.len(), 1);
     assert_eq!(removed[0].title, "Test Paper");
@@ -195,42 +199,42 @@ mod query_based_removal {
 mod recovery {
   use super::*;
 
-  #[test]
-  fn test_remove_papers_can_be_readded() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_remove_papers_can_be_readded() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
     let paper = create_test_paper();
-    Add::new(paper.clone()).execute(&mut db)?;
+    Add::paper(paper.clone()).execute(&mut db).await?;
 
-    let removed_papers = Remove::from_query(Query::text("test")).execute(&mut db)?;
+    let removed_papers = Remove::from_query(Query::text("test")).execute(&mut db).await?;
     assert_eq!(removed_papers.len(), 1);
 
-    Add::new(removed_papers[0].clone()).execute(&mut db)?;
+    Add::paper(removed_papers[0].clone()).execute(&mut db).await?;
 
-    let results = Query::text("test").execute(&mut db)?;
+    let results = Query::text("test").execute(&mut db).await?;
     assert_eq!(results.len(), 1);
 
     Ok(())
   }
 
-  #[test]
-  fn test_bulk_remove_and_readd() -> TestResult<()> {
+  #[tokio::test]
+  async fn test_bulk_remove_and_readd() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db();
 
     // Add multiple papers
-    Add::new(create_test_paper()).execute(&mut db)?;
-    Add::new(create_second_test_paper()).execute(&mut db)?;
+    Add::paper(create_test_paper()).execute(&mut db).await?;
+    Add::paper(create_second_test_paper()).execute(&mut db).await?;
 
     // Remove all test papers
-    let removed = Remove::from_query(Query::text("test")).execute(&mut db)?;
+    let removed = Remove::from_query(Query::text("test")).execute(&mut db).await?;
     assert_eq!(removed.len(), 2);
 
     // Readd them all
     for paper in removed {
-      Add::new(paper).execute(&mut db)?;
+      Add::paper(paper).execute(&mut db).await?;
     }
 
-    let results = Query::text("test").execute(&mut db)?;
+    let results = Query::text("test").execute(&mut db).await?;
     assert_eq!(results.len(), 2);
 
     Ok(())

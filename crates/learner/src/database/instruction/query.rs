@@ -108,10 +108,11 @@ impl Query {
   }
 }
 
+#[async_trait::async_trait]
 impl DatabaseInstruction for Query {
   type Output = Vec<Paper>;
 
-  fn execute(&self, db: &mut Database) -> Result<Self::Output> {
+  async fn execute(&self, db: &mut Database) -> Result<Self::Output> {
     let mut papers = Vec::new();
     let tx = db.conn.transaction()?;
 

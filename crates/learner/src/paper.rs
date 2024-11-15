@@ -392,7 +392,7 @@ mod tests {
   async fn test_arxiv_pdf_from_paper() -> anyhow::Result<()> {
     let paper = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
     let dir = tempdir().unwrap();
-    paper.download_pdf(dir.path().to_path_buf()).await.unwrap();
+    paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
     let formatted_title = format::format_title("Verifiable Fully Homomorphic Encryption", Some(50));
     let path = dir.into_path().join(format!("{}.pdf", formatted_title));
     assert!(path.exists());
@@ -404,7 +404,7 @@ mod tests {
   async fn test_iacr_pdf_from_paper() -> anyhow::Result<()> {
     let paper = Paper::new("https://eprint.iacr.org/2016/260").await.unwrap();
     let dir = tempdir().unwrap();
-    paper.download_pdf(dir.path().to_path_buf()).await.unwrap();
+    paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
     let formatted_title =
       format::format_title("On the Size of Pairing-based Non-interactive Arguments", Some(50));
     let path = dir.into_path().join(format!("{}.pdf", formatted_title));
@@ -421,7 +421,7 @@ mod tests {
     let paper = Paper::new("https://doi.org/10.1145/1327452.1327492").await.unwrap();
     dbg!(&paper);
     let dir = tempdir().unwrap();
-    paper.download_pdf(dir.path().to_path_buf()).await.unwrap();
+    paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
     let formatted_title =
       format::format_title("MapReduce: simplified data processing on large clusters", Some(50));
     let path = dir.into_path().join(format!("{}.pdf", formatted_title));
