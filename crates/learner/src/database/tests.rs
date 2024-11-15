@@ -47,16 +47,6 @@ fn test_default_storage_path() {
     .starts_with(dirs::document_dir().unwrap_or_else(|| PathBuf::from("."))));
 }
 
-#[traced_test]
-#[tokio::test]
-async fn test_get_nonexistent_paper() {
-  todo!("Perhaps move this to integration tests with query/get.rs")
-  //   let (db, _path, _dir) = setup_test_db().await;
-
-  //   let result = db.get_paper_by_source_id(&Source::Arxiv, "nonexistent").await.unwrap();
-
-  //   assert!(result.is_none());
-}
 #[test]
 fn test_new_db_uses_default_storage() {
   let (db, _path, _dir) = setup_test_db();
