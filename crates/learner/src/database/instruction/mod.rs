@@ -11,5 +11,5 @@ pub trait DatabaseInstruction {
   type Output;
 
   // Take &mut reference to avoid taking ownership and allow multiple operations
-  async fn execute(&self, db: &mut Database) -> Result<Self::Output>;
+  async fn execute(self, db: &mut Database) -> Result<Self::Output>;
 }

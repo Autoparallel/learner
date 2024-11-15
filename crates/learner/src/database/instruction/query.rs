@@ -112,106 +112,119 @@ impl Query {
 impl DatabaseInstruction for Query {
   type Output = Vec<Paper>;
 
-  async fn execute(&self, db: &mut Database) -> Result<Self::Output> {
-    let mut papers = Vec::new();
-    let tx = db.conn.transaction()?;
+  async fn execute(self, db: &mut Database) -> Result<Self::Output> {
+    let papers = db
+      .conn
+      .call(move |conn| {
+        let mut papers = Vec::new();
+        let tx = conn.transaction()?;
+        // Get paper IDs based on search criteria
+        let paper_ids = {
+          let (sql, params) = self.build_criteria_sql(&self.criteria);
 
-    // Get paper IDs based on search criteria
-    let paper_ids = {
-      let (sql, params) = self.build_criteria_sql(&self.criteria);
+          // Prepare and execute statement
+          let mut stmt = tx.prepare_cached(&sql)?;
+          let mut rows = stmt.query(params_from_iter(params))?;
+          let mut ids = Vec::new();
+          while let Some(row) = rows.next()? {
+            ids.push(row.get::<_, i64>(0)?);
+          }
+          ids
+        };
 
-      // Prepare and execute statement
-      let mut stmt = tx.prepare_cached(&sql)?;
-      let mut rows = stmt.query(params_from_iter(params))?;
-      let mut ids = Vec::new();
-      while let Some(row) = rows.next()? {
-        ids.push(row.get::<_, i64>(0)?);
-      }
-      ids
-    };
-
-    // Build the full paper query with ordering
-    let paper_query = if let Some(order_field) = &self.order_by {
-      let direction = if self.descending { "DESC" } else { "ASC" };
-      format!(
-        "SELECT title, abstract_text, publication_date,
-                        source, source_identifier, pdf_url, doi
-                 FROM papers 
-                 WHERE id = ?
-                 ORDER BY {} {}",
-        order_field.as_sql_str(),
-        direction
-      )
-    } else {
-      "SELECT title, abstract_text, publication_date,
+        // Build the full paper query with ordering
+        let paper_query = if let Some(order_field) = &self.order_by {
+          let direction = if self.descending { "DESC" } else { "ASC" };
+          format!(
+            "SELECT title, abstract_text, publication_date,
                     source, source_identifier, pdf_url, doi
              FROM papers 
-             WHERE id = ?"
-        .to_string()
-    };
-
-    // Fetch complete paper data for each ID
-    for paper_id in paper_ids {
-      let mut paper_stmt = tx.prepare_cached(&paper_query)?;
-
-      let paper = paper_stmt.query_row([paper_id], |row| {
-        Ok(Paper {
-          title:             row.get(0)?,
-          abstract_text:     row.get(1)?,
-          publication_date:  DateTime::parse_from_rfc3339(&row.get::<_, String>(2)?)
-            .map(|dt| dt.with_timezone(&Utc))
-            .map_err(|e| {
-              rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(e))
-            })?,
-          source:            Source::from_str(&row.get::<_, String>(3)?).map_err(|e| {
-            rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e))
-          })?,
-          source_identifier: row.get(4)?,
-          pdf_url:           row.get(5)?,
-          doi:               row.get(6)?,
-          authors:           Vec::new(),
-        })
-      })?;
-
-      // Get authors
-      let mut author_stmt = tx.prepare_cached(
-        "SELECT name, affiliation, email
-                 FROM authors
-                 WHERE paper_id = ?",
-      )?;
-
-      let authors = author_stmt
-        .query_map([paper_id], |row| {
-          Ok(Author {
-            name:        row.get(0)?,
-            affiliation: row.get(1)?,
-            email:       row.get(2)?,
-          })
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-
-      let mut paper = paper;
-      paper.authors = authors;
-      papers.push(paper);
-    }
-
-    // Sort the papers according to the ordering criteria
-    if let Some(order_field) = &self.order_by {
-      papers.sort_by(|a, b| {
-        let cmp = match order_field {
-          OrderField::Title => a.title.cmp(&b.title),
-          OrderField::PublicationDate => a.publication_date.cmp(&b.publication_date),
-          OrderField::Source => (a.source.to_string(), &a.source_identifier)
-            .cmp(&(b.source.to_string(), &b.source_identifier)),
-        };
-        if self.descending {
-          cmp.reverse()
+             WHERE id = ?
+             ORDER BY {} {}",
+            order_field.as_sql_str(),
+            direction
+          )
         } else {
-          cmp
-        }
-      });
-    }
+          "SELECT title, abstract_text, publication_date,
+                source, source_identifier, pdf_url, doi
+         FROM papers 
+         WHERE id = ?"
+            .to_string()
+        };
 
+        // Fetch complete paper data for each ID
+        for paper_id in paper_ids {
+          let mut paper_stmt = tx.prepare_cached(&paper_query)?;
+
+          let paper = paper_stmt.query_row([paper_id], |row| {
+            Ok(Paper {
+              title:             row.get(0)?,
+              abstract_text:     row.get(1)?,
+              publication_date:  DateTime::parse_from_rfc3339(&row.get::<_, String>(2)?)
+                .map(|dt| dt.with_timezone(&Utc))
+                .map_err(|e| {
+                  rusqlite::Error::FromSqlConversionFailure(
+                    2,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                  )
+                })?,
+              source:            Source::from_str(&row.get::<_, String>(3)?).map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                  3,
+                  rusqlite::types::Type::Text,
+                  Box::new(e),
+                )
+              })?,
+              source_identifier: row.get(4)?,
+              pdf_url:           row.get(5)?,
+              doi:               row.get(6)?,
+              authors:           Vec::new(),
+            })
+          })?;
+
+          // Get authors
+          let mut author_stmt = tx.prepare_cached(
+            "SELECT name, affiliation, email
+             FROM authors
+             WHERE paper_id = ?",
+          )?;
+
+          let authors = author_stmt
+            .query_map([paper_id], |row| {
+              Ok(Author {
+                name:        row.get(0)?,
+                affiliation: row.get(1)?,
+                email:       row.get(2)?,
+              })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+          let mut paper = paper;
+          paper.authors = authors;
+          papers.push(paper);
+        }
+
+        // Sort the papers according to the ordering criteria
+        if let Some(order_field) = &self.order_by {
+          papers.sort_by(|a, b| {
+            let cmp = match order_field {
+              OrderField::Title => a.title.cmp(&b.title),
+              OrderField::PublicationDate => a.publication_date.cmp(&b.publication_date),
+              OrderField::Source => (a.source.to_string(), &a.source_identifier)
+                .cmp(&(b.source.to_string(), &b.source_identifier)),
+            };
+            if self.descending {
+              cmp.reverse()
+            } else {
+              cmp
+            }
+          });
+        }
+
+        Ok(papers)
+      })
+      .await?;
     Ok(papers)
   }
 }
