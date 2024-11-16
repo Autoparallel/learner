@@ -55,20 +55,20 @@ impl Database {
     let conn = Connection::open(path.as_ref()).await?;
 
     // Initialize schema
-    conn.call(|conn| {
-      Ok(
-        conn.execute_batch(include_str!(concat!(
+    conn
+      .call(|conn| {
+        Ok(conn.execute_batch(include_str!(concat!(
           env!("CARGO_MANIFEST_DIR"),
           "/migrations/init.sql"
-        )))?,
-      )
-    });
+        )))?)
+      })
+      .await?;
 
     let db = Self { conn };
 
     // Check if storage path is set, if not, set default
     if db.get_storage_path().await.is_err() {
-      db.set_storage_path(Self::default_storage_path())?;
+      db.set_storage_path(Self::default_storage_path()).await?;
     }
 
     Ok(db)
@@ -91,21 +91,23 @@ impl Database {
   }
 
   /// Set the storage path for document files
-  pub fn set_storage_path(&self, path: impl AsRef<Path>) -> Result<()> {
+  pub async fn set_storage_path(&self, path: impl AsRef<Path>) -> Result<()> {
     let path_str = path.as_ref().to_string_lossy().to_string();
 
     // Create the directory if it doesn't exist
     std::fs::create_dir_all(path.as_ref())?;
 
-    self.conn.call(move |conn| {
-      Ok(
-        conn
-          .execute("INSERT OR REPLACE INTO config (key, value) VALUES ('storage_path', ?1)", [
-            path_str,
-          ])?,
-      )
-    });
-
+    self
+      .conn
+      .call(move |conn| {
+        Ok(
+          conn
+            .execute("INSERT OR REPLACE INTO config (key, value) VALUES ('storage_path', ?1)", [
+              path_str,
+            ])?,
+        )
+      })
+      .await?;
     Ok(())
   }
 

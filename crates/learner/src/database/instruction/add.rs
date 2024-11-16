@@ -1,30 +1,40 @@
+//! Database instruction for adding papers and documents.
+//!
+//! This module provides functionality to add papers, their metadata, and associated
+//! documents to the database, handling both individual papers and batch operations.
+
+use std::{borrow::Cow, collections::HashSet};
+
+use futures::future::try_join_all;
 use query::Query;
+use tokio_rusqlite::ToSql;
 
 use super::*;
-
-/// What we're trying to add
-pub enum Addition {
+/// Represents different types of additions to the database.
+#[derive(Debug)]
+pub enum Addition<'a> {
   /// Add just the paper metadata
-  Paper(Paper),
+  Paper(&'a Paper),
   /// Add both paper and its document
-  Complete(Paper),
+  Complete(&'a Paper),
   /// Add documents for papers matching a query
-  Documents(Query),
+  Documents(Query<'a>),
 }
 
-pub struct Add {
-  addition: Addition,
+/// Database instruction for adding papers and documents.
+pub struct Add<'a> {
+  addition: Addition<'a>,
 }
 
-impl Add {
+impl<'a> Add<'a> {
   /// Add a new paper to the database
-  pub fn paper(paper: Paper) -> Self { Self { addition: Addition::Paper(paper) } }
+  pub fn paper(paper: &'a Paper) -> Self { Self { addition: Addition::Paper(paper) } }
 
   /// Add a new paper along with its document
-  pub fn complete(paper: Paper) -> Self { Self { addition: Addition::Complete(paper) } }
+  pub fn complete(paper: &'a Paper) -> Self { Self { addition: Addition::Complete(paper) } }
 
   /// Add documents for papers matching the query
-  pub fn documents(query: Query) -> Self { Self { addition: Addition::Documents(query) } }
+  pub fn documents(query: Query<'a>) -> Self { Self { addition: Addition::Documents(query) } }
 
   /// Chain a document addition to a paper addition
   pub fn with_document(self) -> Self {
@@ -34,134 +44,221 @@ impl Add {
     }
   }
 
-  /// Helper to check for existing paper
-  async fn check_existing_paper(db: &mut Database, paper: &Paper) -> Result<Paper> {
-    Query::by_source(paper.source.clone(), &paper.source_identifier)
-      .execute(db)
-      .await?
-      .into_iter()
-      .next()
-      .ok_or(LearnerError::DatabasePaperNotFound)
+  // ... SQL building helper methods remain the same ...
+  fn build_paper_sql(paper: &Paper) -> (String, Vec<Box<dyn ToSql + Send>>) {
+    (
+      "INSERT INTO papers (
+                title, abstract_text, publication_date,
+                source, source_identifier, pdf_url, doi
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        .to_string(),
+      vec![
+        Box::new(paper.title.clone()),
+        Box::new(paper.abstract_text.clone()),
+        Box::new(paper.publication_date.to_rfc3339()),
+        Box::new(paper.source.to_string()),
+        Box::new(paper.source_identifier.clone()),
+        Box::new(paper.pdf_url.clone()),
+        Box::new(paper.doi.clone()),
+      ],
+    )
   }
 
-  /// Helper to check for existing document
-  fn check_existing_document(db: &mut Database, paper: &Paper) -> Result<bool> {
-    let tx = db.conn.transaction()?;
-    let res = tx
-      .prepare_cached(
-        "SELECT EXISTS(
-              SELECT 1 FROM files f
-              JOIN papers p ON p.id = f.paper_id
-              WHERE p.source = ? 
-              AND p.source_identifier = ? 
-              AND f.download_status = 'Success'
-          )",
-      )?
-      .query_row(params![paper.source.to_string(), paper.source_identifier], |row| row.get(0))?;
-    Ok(res)
+  fn build_author_sql(author: &Author, paper: &Paper) -> (String, Vec<Box<dyn ToSql + Send>>) {
+    (
+      "INSERT INTO authors (paper_id, name, affiliation, email)
+             SELECT id, ?, ?, ?
+             FROM papers
+             WHERE source = ? AND source_identifier = ?"
+        .to_string(),
+      vec![
+        Box::new(author.name.clone()),
+        Box::new(author.affiliation.clone()),
+        Box::new(author.email.clone()),
+        Box::new(paper.source.to_string()),
+        Box::new(paper.source_identifier.clone()),
+      ],
+    )
   }
 
-  /// Helper to store document for a paper
-  async fn store_document(db: &mut Database, paper: &Paper) -> Result<()> {
-    let storage_path = db.get_storage_path()?;
-    let filename = paper.download_pdf(&storage_path).await?;
-
-    let tx = db.conn.transaction()?;
-    tx.execute(
+  fn build_document_sql(
+    paper: &Paper,
+    storage_path: &Path,
+    filename: &Path,
+  ) -> (String, Vec<Box<dyn ToSql + Send>>) {
+    (
       "INSERT INTO files (paper_id, path, filename, download_status)
              SELECT p.id, ?, ?, 'Success'
              FROM papers p
-             WHERE p.source = ? AND p.source_identifier = ?",
-      params![
-        storage_path.to_string_lossy(),
-        filename.to_string_lossy(),
-        paper.source.to_string(),
-        paper.source_identifier,
+             WHERE p.source = ? AND p.source_identifier = ?"
+        .to_string(),
+      vec![
+        Box::new(storage_path.to_string_lossy().to_string()),
+        Box::new(filename.to_string_lossy().to_string()),
+        Box::new(paper.source.to_string()),
+        Box::new(paper.source_identifier.clone()),
       ],
-    )?;
-    tx.commit()?;
+    )
+  }
 
-    Ok(())
+  fn build_existing_docs_sql(papers: &[&Paper]) -> (String, Vec<Box<dyn ToSql + Send>>) {
+    let mut params: Vec<Box<dyn ToSql + Send>> = Vec::new();
+    let mut param_placeholders = Vec::new();
+
+    for paper in papers {
+      params.push(Box::new(paper.source.to_string()));
+      params.push(Box::new(paper.source_identifier.clone()));
+      param_placeholders.push("(? = p.source AND ? = p.source_identifier)");
+    }
+
+    (
+      format!(
+        "SELECT p.source, p.source_identifier
+                 FROM files f
+                 JOIN papers p ON p.id = f.paper_id
+                 WHERE f.download_status = 'Success'
+                 AND ({})",
+        param_placeholders.join(" OR ")
+      ),
+      params,
+    )
   }
 }
 
-#[async_trait::async_trait]
-impl DatabaseInstruction for Add {
+#[async_trait]
+impl<'a> DatabaseInstruction for Add<'a> {
   type Output = Vec<Paper>;
 
-  // Return affected papers
-
   async fn execute(&self, db: &mut Database) -> Result<Self::Output> {
-    let storage_path = db.get_storage_path()?;
-
     match &self.addition {
       Addition::Paper(paper) => {
         // Check for existing paper
-        if let Err(LearnerError::DatabasePaperNotFound) =
-          Self::check_existing_paper(db, paper).await
+        if Query::by_source(paper.source.clone(), &paper.source_identifier)
+          .execute(db)
+          .await?
+          .into_iter()
+          .next()
+          .is_some()
         {
-        } else {
           return Err(LearnerError::DatabaseDuplicatePaper(paper.title.clone()));
         }
 
-        // Add the paper
-        let tx = db.conn.transaction()?;
-        tx.execute(
-          "INSERT INTO papers (
-                        title, abstract_text, publication_date,
-                        source, source_identifier, pdf_url, doi
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          params![
-            paper.title,
-            paper.abstract_text,
-            paper.publication_date.to_rfc3339(),
-            paper.source.to_string(),
-            paper.source_identifier,
-            paper.pdf_url,
-            paper.doi,
-          ],
-        )?;
+        let (paper_sql, paper_params) = Self::build_paper_sql(paper);
+        let author_statements: Vec<_> =
+          paper.authors.iter().map(|author| Self::build_author_sql(author, paper)).collect();
 
-        // Add authors
-        for author in &paper.authors {
-          tx.execute(
-            "INSERT INTO authors (paper_id, name, affiliation, email)
-                         SELECT id, ?, ?, ?
-                         FROM papers
-                         WHERE source = ? AND source_identifier = ?",
-            params![
-              author.name,
-              author.affiliation,
-              author.email,
-              paper.source.to_string(),
-              paper.source_identifier,
-            ],
-          )?;
-        }
-        tx.commit()?;
+        db.conn
+          .call(move |conn| {
+            let tx = conn.transaction()?;
+            tx.execute(&paper_sql, params_from_iter(paper_params))?;
 
-        Ok(vec![paper.clone()])
+            for (author_sql, author_params) in author_statements {
+              tx.execute(&author_sql, params_from_iter(author_params))?;
+            }
+
+            tx.commit()?;
+            Ok(())
+          })
+          .await?;
+
+        Ok(vec![(*paper).clone()])
       },
 
       Addition::Complete(paper) => {
         // Add paper first
-        Add::paper(paper.clone()).execute(db).await?;
+        Add::paper(paper).execute(db).await?;
 
-        // Then add document
-        Self::store_document(db, paper).await?;
-        Ok(vec![paper.clone()])
+        // Add document
+        let storage_path = db.get_storage_path().await?;
+        let filename = paper.download_pdf(&storage_path).await?;
+
+        let (doc_sql, doc_params) = Self::build_document_sql(paper, &storage_path, &filename);
+
+        db.conn
+          .call(move |conn| {
+            let tx = conn.transaction()?;
+            tx.execute(&doc_sql, params_from_iter(doc_params))?;
+            tx.commit()?;
+            Ok(())
+          })
+          .await?;
+
+        Ok(vec![(*paper).clone()])
       },
 
       Addition::Documents(query) => {
-        let mut added = Vec::new();
         let papers = query.execute(db).await?;
+        if papers.is_empty() {
+          return Ok(Vec::new());
+        }
 
-        for paper in papers {
-          if !Self::check_existing_document(db, &paper)? {
-            match Self::store_document(db, &paper).await {
-              Ok(()) => added.push(paper),
-              Err(e) => eprintln!("Failed to store document for {}: {}", paper.title, e),
-            }
+        let storage_path = db.get_storage_path().await?;
+        let mut added = Vec::new();
+
+        // Process papers in batches
+        for chunk in papers.chunks(10) {
+          // Check which papers already have documents
+          let paper_refs: Vec<_> = chunk.iter().collect();
+          let (check_sql, check_params) = Self::build_existing_docs_sql(&paper_refs);
+
+          let existing_docs: HashSet<(String, String)> = db
+            .conn
+            .call(move |conn| {
+              let mut docs = HashSet::new();
+              let mut stmt = conn.prepare_cached(&check_sql)?;
+              let mut rows = stmt.query(params_from_iter(check_params))?;
+
+              while let Some(row) = rows.next()? {
+                docs.insert((row.get::<_, String>(0)?, row.get::<_, String>(1)?));
+              }
+              Ok(docs)
+            })
+            .await?;
+
+          // Create future for each paper that needs downloading
+          let download_futures: Vec<_> = chunk
+            .iter()
+            .filter(|paper| {
+              let key = (paper.source.to_string(), paper.source_identifier.clone());
+              !existing_docs.contains(&key)
+            })
+            .map(|paper| {
+              let paper = paper.clone();
+              let storage_path = storage_path.clone();
+              async move { paper.download_pdf(&storage_path).await.map(|f| (paper, f)) }
+            })
+            .collect();
+
+          if download_futures.is_empty() {
+            continue;
+          }
+
+          // Download PDFs concurrently and collect results
+          let results = try_join_all(download_futures).await?;
+
+          // Prepare batch insert for successful downloads
+          let mut insert_sqls = Vec::new();
+          let mut insert_params = Vec::new();
+
+          for (paper, filename) in results {
+            let (sql, params) = Self::build_document_sql(&paper, &storage_path, &filename);
+            insert_sqls.push(sql);
+            insert_params.extend(params);
+            added.push(paper);
+          }
+
+          if !insert_sqls.is_empty() {
+            // Execute batch insert
+            db.conn
+              .call(move |conn| {
+                let tx = conn.transaction()?;
+                for (sql, params) in insert_sqls.iter().zip(insert_params.chunks(4)) {
+                  tx.execute(sql, params_from_iter(params))?;
+                }
+                tx.commit()?;
+                Ok(())
+              })
+              .await?;
           }
         }
 

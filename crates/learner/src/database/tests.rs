@@ -1,17 +1,17 @@
 use super::*;
 
 /// Helper function to set up a test database
-fn setup_test_db() -> (Database, PathBuf, tempfile::TempDir) {
+async fn setup_test_db() -> (Database, PathBuf, tempfile::TempDir) {
   let dir = tempdir().unwrap();
   let path = dir.path().join("test.db");
-  let db = Database::open(&path).unwrap();
+  let db = Database::open(&path).await.unwrap();
   (db, path, dir)
 }
 
 #[traced_test]
-#[test]
-fn test_database_creation() {
-  let (_db, path, _dir) = setup_test_db();
+#[tokio::test]
+async fn test_database_creation() {
+  let (_db, path, _dir) = setup_test_db().await;
 
   // Check that file exists
   assert!(path.exists());
@@ -47,40 +47,36 @@ fn test_default_storage_path() {
     .starts_with(dirs::document_dir().unwrap_or_else(|| PathBuf::from("."))));
 }
 
-#[test]
-fn test_new_db_uses_default_storage() {
-  let (db, _path, _dir) = setup_test_db();
+#[tokio::test]
+async fn test_new_db_uses_default_storage() {
+  let (db, _path, _dir) = setup_test_db().await;
 
-  let storage_path = db.get_storage_path().expect("Storage path should be set");
+  let storage_path = db.get_storage_path().await.expect("Storage path should be set");
   assert_eq!(storage_path, Database::default_storage_path());
 }
 
-#[test]
-fn test_storage_path_persistence() -> Result<()> {
-  let (db, db_path, _dir) = setup_test_db();
+#[tokio::test]
+async fn test_storage_path_persistence() {
+  let (db, db_path, _dir) = setup_test_db().await;
 
   // Set custom storage path
   let custom_path = PathBuf::from("/tmp/custom/storage");
-  db.set_storage_path(&custom_path)?;
+  db.set_storage_path(&custom_path).await.unwrap();
 
   // Reopen database and check path
   drop(db);
-  let db = Database::open(db_path)?;
-  let storage_path = db.get_storage_path().expect("Storage path should be set");
+  let db = Database::open(db_path).await.unwrap();
+  let storage_path = db.get_storage_path().await.expect("Storage path should be set");
   assert_eq!(storage_path, custom_path);
-
-  Ok(())
 }
 
-#[test]
-fn test_storage_path_creates_directory() -> Result<()> {
-  let (db, _path, dir) = setup_test_db();
+#[tokio::test]
+async fn test_storage_path_creates_directory() {
+  let (db, _path, dir) = setup_test_db().await;
 
   let custom_path = dir.path().join("custom_storage");
-  db.set_storage_path(&custom_path)?;
+  db.set_storage_path(&custom_path).await.unwrap();
 
   assert!(custom_path.exists());
   assert!(custom_path.is_dir());
-
-  Ok(())
 }
