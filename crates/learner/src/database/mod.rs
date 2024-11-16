@@ -1,10 +1,8 @@
-#![allow(missing_docs, clippy::missing_docs_in_private_items)]
-
 use tokio_rusqlite::Connection;
 
 use super::*;
 
-pub mod instruction;
+mod instruction;
 // pub mod models;
 #[cfg(test)] mod tests;
 

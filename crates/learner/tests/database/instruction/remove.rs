@@ -1,16 +1,4 @@
-use chrono::{TimeZone, Utc};
-use learner::{
-  database::{
-    add::Add,
-    query::{OrderField, Query},
-    remove::*,
-    *,
-  },
-  paper::{Author, Paper, Source},
-};
-
-use super::setup_test_db;
-use crate::{create_second_test_paper, create_test_paper, traced_test, TestResult};
+use super::*;
 
 /// Basic removal functionality tests
 mod basic_operations {
@@ -164,6 +152,8 @@ mod dry_run {
 
 /// Query-based removal tests
 mod query_based_removal {
+  use learner::database::query::OrderField;
+
   use super::*;
 
   #[tokio::test]

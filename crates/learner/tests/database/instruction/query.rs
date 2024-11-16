@@ -1,15 +1,6 @@
 use chrono::Datelike;
-use learner::{
-  database::{
-    add::Add,
-    query::{OrderField, Query},
-    *,
-  },
-  paper::{Author, Source},
-};
 
-use super::setup_test_db;
-use crate::{create_second_test_paper, create_test_paper, traced_test, TestResult};
+use super::*;
 
 /// Basic paper search functionality
 mod paper_search {

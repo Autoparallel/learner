@@ -235,30 +235,6 @@ impl Paper {
     let formatted_title = format::format_title(&self.title, Some(50));
     PathBuf::from(format!("{}.pdf", formatted_title))
   }
-
-  // / Save the paper to a database.
-  // /
-  // / # Arguments
-  // /
-  // / * `db` - Reference to an open database connection
-  // /
-  // / # Returns
-  // /
-  // / Returns the database ID of the saved paper on success.
-  // /
-  // / # Examples
-  // /
-  // / ```no_run
-  // / # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  // / let paper = learner::paper::Paper::new("2301.07041").await?;
-  // / let db = learner::database::Database::open("papers.db").await?;
-  // / let id = paper.save(&db).await?;
-  // / println!("Saved paper with ID: {}", id);
-  // / # Ok(())
-  // / # }
-  // / ```
-  // TODO (autoparallel): Remove this in favor of a single API that handles adding with db
-  pub async fn save(&self, db: &Database) -> Result<i64> { db.save_paper(self).await }
 }
 
 // Make Paper hashable for ID generation
