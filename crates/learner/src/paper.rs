@@ -211,22 +211,24 @@ impl Paper {
 
   // TODO: UPDATE DOC HERE ABOUT HOW THIS RETURNS THE FILENAME
   pub async fn download_pdf(&self, dir: &PathBuf) -> Result<PathBuf> {
-    // unimplemented!("Work in progress -- needs integrated with `Database`");
     let Some(pdf_url) = &self.pdf_url else {
       return Err(LearnerError::ApiError("No PDF URL available".into()));
     };
 
     let response = reqwest::get(pdf_url).await?;
-    trace!("{} pdf_url response: {response:?}", self.source);
-    let bytes = response.bytes().await?;
 
-    // TODO (autoparallel): uses a fixed max output filename length, should make this configurable
-    // in the future.
-
-    let path = dir.join(self.filename());
-    debug!("Writing PDF to path: {path:?}");
-    std::fs::write(path, bytes)?;
-    Ok(self.filename())
+    // Check the status code of the response
+    if response.status().is_success() {
+      let bytes = response.bytes().await?;
+      let path = dir.join(self.filename());
+      debug!("Writing PDF to path: {path:?}");
+      std::fs::write(path, bytes)?;
+      Ok(self.filename())
+    } else {
+      // Handle non-successful status codes
+      trace!("{} pdf_url response: {response:?}", self.source);
+      Err(LearnerError::ApiError(format!("Failed to download PDF: {}", response.status())))
+    }
   }
 
   pub fn filename(&self) -> PathBuf {
@@ -353,59 +355,54 @@ mod tests {
 
   #[traced_test]
   #[tokio::test]
-  async fn test_iacr_paper_from_id() -> anyhow::Result<()> {
-    let paper = Paper::new("2016/260").await?;
+  async fn test_iacr_paper_from_id() {
+    let paper = Paper::new("2016/260").await.unwrap();
     assert!(!paper.title.is_empty());
     assert!(!paper.authors.is_empty());
     assert_eq!(paper.source, Source::IACR);
-    Ok(())
   }
 
   #[traced_test]
   #[tokio::test]
-  async fn test_iacr_paper_from_url() -> anyhow::Result<()> {
-    let paper = Paper::new("https://eprint.iacr.org/2016/260").await?;
+  async fn test_iacr_paper_from_url() {
+    let paper = Paper::new("https://eprint.iacr.org/2016/260").await.unwrap();
     assert!(!paper.title.is_empty());
     assert!(!paper.authors.is_empty());
     assert_eq!(paper.source, Source::IACR);
-    Ok(())
   }
 
   #[traced_test]
   #[tokio::test]
-  async fn test_doi_paper_from_id() -> anyhow::Result<()> {
-    let paper = Paper::new("10.1145/1327452.1327492").await?;
+  async fn test_doi_paper_from_id() {
+    let paper = Paper::new("10.1145/1327452.1327492").await.unwrap();
     assert!(!paper.title.is_empty());
     assert!(!paper.authors.is_empty());
     assert_eq!(paper.source, Source::DOI);
-    Ok(())
   }
 
   #[traced_test]
   #[tokio::test]
-  async fn test_doi_paper_from_url() -> anyhow::Result<()> {
-    let paper = Paper::new("https://doi.org/10.1145/1327452.1327492").await?;
+  async fn test_doi_paper_from_url() {
+    let paper = Paper::new("https://doi.org/10.1145/1327452.1327492").await.unwrap();
     assert!(!paper.title.is_empty());
     assert!(!paper.authors.is_empty());
     assert_eq!(paper.source, Source::DOI);
-    Ok(())
   }
 
   #[traced_test]
   #[tokio::test]
-  async fn test_arxiv_pdf_from_paper() -> anyhow::Result<()> {
+  async fn test_arxiv_pdf_from_paper() {
     let paper = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
     let dir = tempdir().unwrap();
     paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
     let formatted_title = format::format_title("Verifiable Fully Homomorphic Encryption", Some(50));
     let path = dir.into_path().join(format!("{}.pdf", formatted_title));
     assert!(path.exists());
-    Ok(())
   }
 
   #[traced_test]
   #[tokio::test]
-  async fn test_iacr_pdf_from_paper() -> anyhow::Result<()> {
+  async fn test_iacr_pdf_from_paper() {
     let paper = Paper::new("https://eprint.iacr.org/2016/260").await.unwrap();
     let dir = tempdir().unwrap();
     paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
@@ -413,7 +410,6 @@ mod tests {
       format::format_title("On the Size of Pairing-based Non-interactive Arguments", Some(50));
     let path = dir.into_path().join(format!("{}.pdf", formatted_title));
     assert!(path.exists());
-    Ok(())
   }
 
   // TODO (autoparallel): This technically passes, but it is not actually getting a PDF from this
@@ -421,21 +417,30 @@ mod tests {
   #[ignore]
   #[traced_test]
   #[tokio::test]
-  async fn test_doi_pdf_from_paper() -> anyhow::Result<()> {
+  async fn test_doi_pdf_from_paper() {
     let paper = Paper::new("https://doi.org/10.1145/1327452.1327492").await.unwrap();
     dbg!(&paper);
     let dir = tempdir().unwrap();
     paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
-    let formatted_title =
-      format::format_title("MapReduce: simplified data processing on large clusters", Some(50));
-    let path = dir.into_path().join(format!("{}.pdf", formatted_title));
+    let path = dir.into_path().join(paper.filename());
     assert!(path.exists());
-    Ok(())
+  }
+
+  #[traced_test]
+  #[tokio::test]
+  // TODO: need to test that a 404 on download fails specifically, also need to test creating a
+  // paper from a bad link fails
+  async fn test_missing_download_link() {
+    let paper = Paper::new("https://arxiv.org/abs/2401.00000").await.unwrap();
+    let dir = tempdir().unwrap();
+    paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
+    let path = dir.into_path().join(paper.filename());
+    assert!(path.exists());
   }
 
   //  TODO (autoparallel): Convenient entrypoint to try seeing if the PDF comes out correct. What I
   // have tried now is using a `reqwest` client with ```
-  // let _ = client.get("https://dl.acm.org/").send().await?;
+  // let _ = client.get("https://dl.acm.org/").send().await.unwrap();
   //
   // let response = client
   //   .get(pdf_url)
