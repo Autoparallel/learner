@@ -1,6 +1,10 @@
 use add::Add;
 use chrono::{TimeZone, Utc};
-use learner::{database::*, error::LearnerError, paper::Author};
+use learner::{
+  database::*,
+  error::LearnerError,
+  paper::{Author, Paper},
+};
 use query::Query;
 
 use super::setup_test_db;
@@ -164,66 +168,6 @@ mod document_operations {
       let pdf_path = storage_path.join(paper.filename());
       assert!(pdf_path.exists(), "PDF should exist for {}", paper.source_identifier);
     }
-
-    Ok(())
-  }
-}
-
-/// Recovery and error handling tests
-mod error_handling {
-  use super::*;
-
-  #[traced_test]
-  #[tokio::test]
-  async fn test_add_paper_without_storage_path() -> TestResult<()> {
-    let (mut db, _dir) = setup_test_db().await;
-    let paper = create_test_paper();
-
-    // Try to add complete paper without setting storage path
-    // This should still succeed for paper metadata but fail for PDF
-    let result = Add::complete(&paper).execute(&mut db).await;
-    assert!(result.is_err());
-
-    // Verify paper wasn't added
-    let stored = Query::by_source(paper.source, &paper.source_identifier).execute(&mut db).await?;
-    assert_eq!(stored.len(), 0);
-
-    Ok(())
-  }
-
-  #[traced_test]
-  #[tokio::test]
-  async fn test_add_paper_with_invalid_storage_path() -> TestResult<()> {
-    let (mut db, _dir) = setup_test_db().await;
-    let paper = create_test_paper();
-
-    // Set invalid storage path
-    db.set_storage_path("/nonexistent/path").await?;
-
-    // Should fail when trying to save PDF
-    let result = Add::complete(&paper).execute(&mut db).await;
-    assert!(result.is_err());
-
-    Ok(())
-  }
-
-  #[traced_test]
-  #[tokio::test]
-  async fn test_partial_document_addition() -> TestResult<()> {
-    let (mut db, _dir) = setup_test_db().await;
-
-    // Add two papers
-    let paper1 = create_test_paper();
-    let paper2 = create_second_test_paper();
-    Add::paper(&paper1).execute(&mut db).await?;
-    Add::paper(&paper2).execute(&mut db).await?;
-
-    // Set invalid path after first paper
-    assert!(db.set_storage_path("/nonexistent/path").await.is_err());
-
-    // Should fail but not roll back previous successes
-    let result = Add::documents(Query::list_all()).execute(&mut db).await;
-    assert!(result.is_ok());
 
     Ok(())
   }

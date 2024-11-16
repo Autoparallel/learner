@@ -47,6 +47,7 @@ fn test_default_storage_path() {
     .starts_with(dirs::document_dir().unwrap_or_else(|| PathBuf::from("."))));
 }
 
+#[traced_test]
 #[tokio::test]
 async fn test_new_db_uses_default_storage() {
   let (db, _path, _dir) = setup_test_db().await;
@@ -55,6 +56,7 @@ async fn test_new_db_uses_default_storage() {
   assert_eq!(storage_path, Database::default_storage_path());
 }
 
+#[traced_test]
 #[tokio::test]
 async fn test_storage_path_persistence() {
   let (db, db_path, _dir) = setup_test_db().await;
@@ -70,6 +72,7 @@ async fn test_storage_path_persistence() {
   assert_eq!(storage_path, custom_path);
 }
 
+#[traced_test]
 #[tokio::test]
 async fn test_storage_path_creates_directory() {
   let (db, _path, dir) = setup_test_db().await;
@@ -79,4 +82,61 @@ async fn test_storage_path_creates_directory() {
 
   assert!(custom_path.exists());
   assert!(custom_path.is_dir());
+}
+
+#[traced_test]
+#[tokio::test]
+async fn test_storage_path_valid() -> Result<()> {
+  let (db, _path, dir) = setup_test_db().await;
+
+  // Create an absolute path without requiring existence
+  let test_path = dir.path().join("storage");
+
+  // Set the storage path (this will create the directory)
+  db.set_storage_path(&test_path).await?;
+
+  // Get and verify the stored path
+  let stored_path = db.get_storage_path().await?;
+  assert_eq!(stored_path, test_path);
+  assert!(test_path.exists());
+
+  // Verify we can write to the directory
+  let test_file = test_path.join("test.txt");
+  std::fs::write(&test_file, b"test")?;
+  assert!(test_file.exists());
+
+  Ok(())
+}
+
+#[traced_test]
+#[tokio::test]
+async fn test_storage_path_relative() {
+  let (db, _path, _dir) = setup_test_db().await;
+  let result = db.set_storage_path("relative/path").await;
+
+  assert!(matches!(
+      result,
+      Err(LearnerError::Path(e)) if e.kind() == std::io::ErrorKind::InvalidInput
+  ));
+}
+
+#[cfg(unix)]
+#[traced_test]
+#[tokio::test]
+async fn test_storage_path_readonly() -> Result<()> {
+  use std::os::unix::fs::PermissionsExt;
+
+  let (db, _path, dir) = setup_test_db().await;
+  let test_path = dir.path().join("readonly");
+  std::fs::create_dir(&test_path)?;
+
+  // Make directory read-only
+  std::fs::set_permissions(&test_path, std::fs::Permissions::from_mode(0o444))?;
+
+  let result = db.set_storage_path(&test_path).await;
+  assert!(matches!(
+      result,
+      Err(LearnerError::Path(e)) if e.kind() == std::io::ErrorKind::PermissionDenied
+  ));
+  Ok(())
 }

@@ -90,12 +90,80 @@ impl Database {
     )
   }
 
-  /// Set the storage path for document files
+  /// Sets the storage path for document files, validating that the path is usable.
+  ///
+  /// This function performs several checks to ensure the path is valid for storing files:
+  /// - Verifies the path exists or can be created
+  /// - Checks if the filesystem is writable
+  /// - Validates sufficient permissions
+  /// - Ensures the path is absolute
+  ///
+  /// # Arguments
+  ///
+  /// * `path` - The path where document files should be stored
+  ///
+  /// # Returns
+  ///
+  /// Returns a `Result` containing:
+  /// - `Ok(())` if the path is valid and has been set
+  /// - `Err(LearnerError)` if the path is invalid or cannot be used
+  ///
+  /// # Errors
+  ///
+  /// This function will return an error if:
+  /// - The path cannot be created
+  /// - The filesystem is read-only
+  /// - Insufficient permissions exist
+  /// - The path is not absolute
   pub async fn set_storage_path(&self, path: impl AsRef<Path>) -> Result<()> {
-    let path_str = path.as_ref().to_string_lossy().to_string();
+    let original_path = self.get_storage_path().await?;
+    let path = path.as_ref();
 
-    // Create the directory if it doesn't exist
-    std::fs::create_dir_all(path.as_ref())?;
+    // Ensure path is absolute
+    if !path.is_absolute() {
+      return Err(LearnerError::Path(std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        "Storage path must be absolute",
+      )));
+    }
+
+    // Create a test file to verify write permissions
+    let test_file = path.join(".learner_write_test");
+
+    // First try to create the directory structure
+    match std::fs::create_dir_all(path) {
+      Ok(_) => {
+        // Test write permissions by creating and removing a file
+        match std::fs::write(&test_file, b"test") {
+          Ok(_) => {
+            // Clean up test file
+            let _ = std::fs::remove_file(&test_file);
+          },
+          Err(e) => {
+            return Err(match e.kind() {
+              std::io::ErrorKind::PermissionDenied => LearnerError::Path(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "Insufficient permissions to write to storage directory",
+              )),
+              std::io::ErrorKind::ReadOnlyFilesystem => LearnerError::Path(std::io::Error::new(
+                std::io::ErrorKind::ReadOnlyFilesystem,
+                "Storage location is on a read-only filesystem",
+              )),
+              _ => LearnerError::Path(e),
+            });
+          },
+        }
+      },
+      Err(e) => {
+        return Err(LearnerError::Path(std::io::Error::new(
+          e.kind(),
+          format!("Failed to create storage directory: {}", e),
+        )));
+      },
+    }
+
+    // If we get here, the path is valid and writable
+    let path_str = path.to_string_lossy().to_string();
 
     self
       .conn
@@ -108,6 +176,11 @@ impl Database {
         )
       })
       .await?;
+    warn!(
+      "Original storage path was {:?}, set a new path to {:?}. Please be careful to check that \
+       your documents have been moved or that you intended to do this operation!",
+      original_path, path
+    );
     Ok(())
   }
 
