@@ -56,7 +56,7 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
             },
           };
 
-          match paper.download_pdf(pdf_dir).await {
+          match paper.download_pdf(&pdf_dir).await {
             Ok(_) => {
               println!("{} PDF downloaded successfully!", style(SUCCESS).green());
             },
@@ -108,7 +108,7 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
 
             if should_redownload {
               println!("{} Downloading fresh copy of PDF...", style(LOOKING_GLASS).cyan());
-              match paper.download_pdf(pdf_dir).await {
+              match paper.download_pdf(&pdf_dir).await {
                 Ok(_) => println!("{} PDF downloaded successfully!", style(SUCCESS).green()),
                 Err(e) => println!(
                   "{} Failed to download PDF: {}",
@@ -129,7 +129,7 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
 
             if should_download {
               println!("{} Downloading PDF...", style(LOOKING_GLASS).cyan());
-              match paper.download_pdf(pdf_dir).await {
+              match paper.download_pdf(&pdf_dir).await {
                 Ok(_) => println!("{} PDF downloaded successfully!", style(SUCCESS).green()),
                 Err(e) => println!(
                   "{} Failed to download PDF: {}",

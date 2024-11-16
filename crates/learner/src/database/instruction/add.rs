@@ -123,14 +123,14 @@ impl<'a> Add<'a> {
 }
 
 #[async_trait]
-impl<'a> DatabaseInstruction for Add<'a> {
+impl DatabaseInstruction for Add<'_> {
   type Output = Vec<Paper>;
 
   async fn execute(&self, db: &mut Database) -> Result<Self::Output> {
     match &self.addition {
       Addition::Paper(paper) => {
         // Check for existing paper
-        if Query::by_source(paper.source.clone(), &paper.source_identifier)
+        if Query::by_source(paper.source, &paper.source_identifier)
           .execute(db)
           .await?
           .into_iter()
@@ -163,7 +163,12 @@ impl<'a> DatabaseInstruction for Add<'a> {
 
       Addition::Complete(paper) => {
         // Add paper first
-        Add::paper(paper).execute(db).await?;
+        if let Err(LearnerError::DatabaseDuplicatePaper(_)) = Add::paper(paper).execute(db).await {
+          warn!(
+            "Tried to add complete paper when paper existed in database already, attempting to \
+             add only the document!"
+          )
+        };
 
         // Add document
         let storage_path = db.get_storage_path().await?;

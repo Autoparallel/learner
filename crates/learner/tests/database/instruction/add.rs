@@ -119,6 +119,10 @@ mod document_operations {
     let pdf_path = storage_path.join(paper.filename());
     assert!(pdf_path.exists());
 
+    assert!(logs_contain(
+      "WARN test_add_paper_then_document: learner::database::instruction::add: Tried to add \
+       complete paper when paper existed in database already, attempting to add only the document!"
+    ));
     Ok(())
   }
 

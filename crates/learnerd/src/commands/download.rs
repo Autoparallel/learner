@@ -79,7 +79,7 @@ pub async fn download(cli: Cli, source: Source, identifier: String) -> Result<()
       println!("{} Downloading PDF...", style(LOOKING_GLASS).cyan());
     }
 
-    match paper.download_pdf(pdf_dir.clone()).await {
+    match paper.download_pdf(&pdf_dir.clone()).await {
       Ok(_) => {
         println!("{} PDF downloaded successfully!", style(SUCCESS).green());
         println!("   {} Saved to: {}", style("📄").cyan(), style(&pdf_path.display()).yellow());

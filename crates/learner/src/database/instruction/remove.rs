@@ -56,7 +56,7 @@ impl<'a> Remove<'a> {
 }
 
 #[async_trait]
-impl<'a> DatabaseInstruction for Remove<'a> {
+impl DatabaseInstruction for Remove<'_> {
   type Output = Vec<Paper>;
 
   async fn execute(&self, db: &mut Database) -> Result<Self::Output> {
