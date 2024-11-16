@@ -60,6 +60,13 @@ impl<'a> Query<'a> {
   /// Creates a full-text search query
   pub fn text(query: &'a str) -> Self { Self::new(QueryCriteria::Text(query)) }
 
+  pub fn by_paper(paper: &'a Paper) -> Self {
+    Self::new(QueryCriteria::SourceId {
+      source:     paper.source,
+      identifier: &paper.source_identifier,
+    })
+  }
+
   /// Creates a query to find a paper by its source and identifier
   pub fn by_source(source: Source, identifier: &'a str) -> Self {
     Self::new(QueryCriteria::SourceId { source, identifier })

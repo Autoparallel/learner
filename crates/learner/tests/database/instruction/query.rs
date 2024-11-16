@@ -11,6 +11,24 @@ use learner::{
 use super::setup_test_db;
 use crate::{create_second_test_paper, create_test_paper, traced_test, TestResult};
 
+/// Basic paper search functionality
+mod paper_search {
+  use super::*;
+
+  #[tokio::test]
+  #[traced_test]
+  async fn test_basic_paper_search() -> TestResult<()> {
+    let (mut db, _dir) = setup_test_db().await;
+    let paper = create_test_paper();
+    Add::paper(&paper).execute(&mut db).await?;
+
+    let results = Query::by_paper(&paper).execute(&mut db).await?;
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].title, "Test Paper");
+    Ok(())
+  }
+}
+
 /// Basic text search functionality
 mod text_search {
   use super::*;
