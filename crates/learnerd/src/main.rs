@@ -38,9 +38,10 @@ use clap::{builder::ArgAction, Parser, Subcommand};
 use console::{style, Emoji};
 use error::LearnerdError;
 use learner::{
-  database_old::Database,
+  database::Database,
   error::LearnerError,
   paper::{Paper, Source},
+  prelude::*,
 };
 use tracing::{debug, trace};
 use tracing_subscriber::EnvFilter;

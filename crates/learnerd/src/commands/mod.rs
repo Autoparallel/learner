@@ -62,14 +62,10 @@ pub mod init;
 pub mod remove;
 pub mod search;
 
-pub use add::add;
-pub use clean::clean;
-pub use daemon::daemon;
-pub use download::download;
-pub use get::get;
-pub use init::init;
-pub use remove::remove;
-pub use search::search;
+pub use self::{
+  add::add, clean::clean, daemon::daemon, download::download, get::get, init::init, remove::remove,
+  search::search,
+};
 
 /// Available commands for the CLI
 #[derive(Subcommand, Clone)]
