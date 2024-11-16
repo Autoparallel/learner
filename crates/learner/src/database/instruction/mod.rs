@@ -4,10 +4,10 @@ pub mod add;
 pub mod query;
 pub mod remove;
 
-use std::borrow::Cow;
-
 use async_trait::async_trait;
-use rusqlite::{params, params_from_iter, ToSql};
+use rusqlite::{params_from_iter, ToSql};
+
+use self::query::Query;
 
 /// Trait for database operations that can be executed against the paper database.
 ///

@@ -86,7 +86,7 @@ impl<'a> Query<'a> {
     self
   }
 
-  fn build_criteria_sql(&self) -> (String, Vec<Box<dyn ToSql + Send>>) {
+  fn build_criteria_sql(&self) -> (String, Vec<impl ToSql>) {
     match &self.criteria {
       QueryCriteria::Text(query) => (
         "SELECT p.id
@@ -95,13 +95,13 @@ impl<'a> Query<'a> {
                  WHERE papers_fts MATCH ?1 || '*'
                  ORDER BY rank"
           .into(),
-        vec![Box::new((*query).to_string())],
+        vec![(*query).to_string()],
       ),
       QueryCriteria::SourceId { source, identifier } => (
         "SELECT id FROM papers 
                  WHERE source = ?1 AND source_identifier = ?2"
           .into(),
-        vec![Box::new(source.to_string()), Box::new((*identifier).to_string())],
+        vec![source.to_string(), (*identifier).to_string()],
       ),
       QueryCriteria::Author(name) => (
         "SELECT DISTINCT p.id
@@ -109,14 +109,14 @@ impl<'a> Query<'a> {
                  JOIN authors a ON p.id = a.paper_id
                  WHERE a.name LIKE ?1"
           .into(),
-        vec![Box::new(format!("%{}%", name))],
+        vec![format!("%{}%", name)],
       ),
       QueryCriteria::All => ("SELECT id FROM papers".into(), Vec::new()),
       QueryCriteria::BeforeDate(date) => (
         "SELECT id FROM papers 
                  WHERE publication_date < ?1"
           .into(),
-        vec![Box::new(date.to_rfc3339())],
+        vec![date.to_rfc3339()],
       ),
     }
   }
@@ -137,7 +137,7 @@ impl<'a> Query<'a> {
 }
 
 #[async_trait]
-impl<'a> DatabaseInstruction for Query<'a> {
+impl DatabaseInstruction for Query<'_> {
   type Output = Vec<Paper>;
 
   async fn execute(&self, db: &mut Database) -> Result<Self::Output> {

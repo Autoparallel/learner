@@ -89,7 +89,7 @@ pub struct Author {
 ///
 /// This enum represents the supported academic paper sources, each with its own
 /// identifier format and access patterns.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Source {
   /// Papers from arxiv.org, using either new-style (2301.07041) or
   /// old-style (math.AG/0601001) identifiers

@@ -3,11 +3,9 @@
 //! This module provides functionality to add papers, their metadata, and associated
 //! documents to the database, handling both individual papers and batch operations.
 
-use std::{borrow::Cow, collections::HashSet};
+use std::collections::HashSet;
 
 use futures::future::try_join_all;
-use query::Query;
-use tokio_rusqlite::ToSql;
 
 use super::*;
 /// Represents different types of additions to the database.
@@ -44,39 +42,38 @@ impl<'a> Add<'a> {
     }
   }
 
-  // ... SQL building helper methods remain the same ...
-  fn build_paper_sql(paper: &Paper) -> (String, Vec<Box<dyn ToSql + Send>>) {
+  fn build_paper_sql(paper: &Paper) -> (String, Vec<Option<String>>) {
     (
       "INSERT INTO papers (
-                title, abstract_text, publication_date,
-                source, source_identifier, pdf_url, doi
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            title, abstract_text, publication_date,
+            source, source_identifier, pdf_url, doi
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)"
         .to_string(),
       vec![
-        Box::new(paper.title.clone()),
-        Box::new(paper.abstract_text.clone()),
-        Box::new(paper.publication_date.to_rfc3339()),
-        Box::new(paper.source.to_string()),
-        Box::new(paper.source_identifier.clone()),
-        Box::new(paper.pdf_url.clone()),
-        Box::new(paper.doi.clone()),
+        Some(paper.title.clone()),
+        Some(paper.abstract_text.clone()),
+        Some(paper.publication_date.to_rfc3339()),
+        Some(paper.source.to_string()),
+        Some(paper.source_identifier.clone()),
+        paper.pdf_url.clone(),
+        paper.doi.clone(),
       ],
     )
   }
 
-  fn build_author_sql(author: &Author, paper: &Paper) -> (String, Vec<Box<dyn ToSql + Send>>) {
+  fn build_author_sql(author: &Author, paper: &Paper) -> (String, Vec<Option<String>>) {
     (
       "INSERT INTO authors (paper_id, name, affiliation, email)
-             SELECT id, ?, ?, ?
-             FROM papers
-             WHERE source = ? AND source_identifier = ?"
+         SELECT id, ?, ?, ?
+         FROM papers
+         WHERE source = ? AND source_identifier = ?"
         .to_string(),
       vec![
-        Box::new(author.name.clone()),
-        Box::new(author.affiliation.clone()),
-        Box::new(author.email.clone()),
-        Box::new(paper.source.to_string()),
-        Box::new(paper.source_identifier.clone()),
+        Some(author.name.clone()),
+        author.affiliation.clone(),
+        author.email.clone(),
+        Some(paper.source.to_string()),
+        Some(paper.source_identifier.clone()),
       ],
     )
   }
@@ -85,39 +82,39 @@ impl<'a> Add<'a> {
     paper: &Paper,
     storage_path: &Path,
     filename: &Path,
-  ) -> (String, Vec<Box<dyn ToSql + Send>>) {
+  ) -> (String, Vec<Option<String>>) {
     (
       "INSERT INTO files (paper_id, path, filename, download_status)
-             SELECT p.id, ?, ?, 'Success'
-             FROM papers p
-             WHERE p.source = ? AND p.source_identifier = ?"
+         SELECT p.id, ?, ?, 'Success'
+         FROM papers p
+         WHERE p.source = ? AND p.source_identifier = ?"
         .to_string(),
       vec![
-        Box::new(storage_path.to_string_lossy().to_string()),
-        Box::new(filename.to_string_lossy().to_string()),
-        Box::new(paper.source.to_string()),
-        Box::new(paper.source_identifier.clone()),
+        Some(storage_path.to_string_lossy().to_string()),
+        Some(filename.to_string_lossy().to_string()),
+        Some(paper.source.to_string()),
+        Some(paper.source_identifier.clone()),
       ],
     )
   }
 
-  fn build_existing_docs_sql(papers: &[&Paper]) -> (String, Vec<Box<dyn ToSql + Send>>) {
-    let mut params: Vec<Box<dyn ToSql + Send>> = Vec::new();
+  fn build_existing_docs_sql(papers: &[&Paper]) -> (String, Vec<Option<String>>) {
+    let mut params = Vec::new();
     let mut param_placeholders = Vec::new();
 
     for paper in papers {
-      params.push(Box::new(paper.source.to_string()));
-      params.push(Box::new(paper.source_identifier.clone()));
+      params.push(Some(paper.source.to_string()));
+      params.push(Some(paper.source_identifier.clone()));
       param_placeholders.push("(? = p.source AND ? = p.source_identifier)");
     }
 
     (
       format!(
         "SELECT p.source, p.source_identifier
-                 FROM files f
-                 JOIN papers p ON p.id = f.paper_id
-                 WHERE f.download_status = 'Success'
-                 AND ({})",
+             FROM files f
+             JOIN papers p ON p.id = f.paper_id
+             WHERE f.download_status = 'Success'
+             AND ({})",
         param_placeholders.join(" OR ")
       ),
       params,
