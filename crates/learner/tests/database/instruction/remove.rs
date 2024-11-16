@@ -6,7 +6,7 @@ use learner::{
     remove::*,
     *,
   },
-  paper::{Author, Source},
+  paper::{Author, Paper, Source},
 };
 
 use super::setup_test_db;
@@ -14,6 +14,7 @@ use crate::{create_second_test_paper, create_test_paper, traced_test, TestResult
 
 /// Basic removal functionality tests
 mod basic_operations {
+
   use super::*;
 
   #[tokio::test]
@@ -68,7 +69,7 @@ mod basic_operations {
   async fn test_remove_complete_paper() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
-    let paper = create_test_paper();
+    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
     // Add paper with document
     Add::complete(&paper).execute(&mut db).await?;
 
@@ -144,7 +145,7 @@ mod dry_run {
   async fn test_dry_run_with_complete_paper() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
-    let paper = create_test_paper();
+    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
     Add::complete(&paper).execute(&mut db).await?;
 
     let would_remove =
@@ -349,7 +350,7 @@ mod recovery {
     let (mut db, _dir) = setup_test_db().await;
 
     // Add paper without document
-    let paper = create_test_paper();
+    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
     Add::paper(&paper).execute(&mut db).await?;
 
     // Remove it

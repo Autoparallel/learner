@@ -116,7 +116,7 @@ impl Database {
   /// - Insufficient permissions exist
   /// - The path is not absolute
   pub async fn set_storage_path(&self, path: impl AsRef<Path>) -> Result<()> {
-    let original_path = self.get_storage_path().await?;
+    let original_path_result = self.get_storage_path().await;
     let path = path.as_ref();
 
     // Ensure path is absolute
@@ -176,11 +176,15 @@ impl Database {
         )
       })
       .await?;
-    warn!(
-      "Original storage path was {:?}, set a new path to {:?}. Please be careful to check that \
-       your documents have been moved or that you intended to do this operation!",
-      original_path, path
-    );
+
+    if let Ok(original_path) = original_path_result {
+      warn!(
+        "Original storage path was {:?}, set a new path to {:?}. Please be careful to check that \
+         your documents have been moved or that you intended to do this operation!",
+        original_path, path
+      );
+    }
+
     Ok(())
   }
 

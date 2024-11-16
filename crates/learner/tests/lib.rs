@@ -66,11 +66,9 @@ fn create_second_test_paper() -> Paper {
   }
 }
 
-// TODO: This should probably be removed, just an entrypoint
 #[tokio::test]
 #[traced_test]
-async fn test_download_test_paper() {
+async fn test_download_test_paper_is_404() {
   let paper = create_test_paper();
-  paper.download_pdf(&PathBuf::from_str(".").unwrap()).await;
-  todo!("SHOULD FAIL, WE GET A 404 FROM ARXIV!!!")
+  assert!(paper.download_pdf(&PathBuf::from_str(".").unwrap()).await.is_err());
 }

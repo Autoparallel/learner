@@ -428,14 +428,8 @@ mod tests {
 
   #[traced_test]
   #[tokio::test]
-  // TODO: need to test that a 404 on download fails specifically, also need to test creating a
-  // paper from a bad link fails
-  async fn test_missing_download_link() {
-    let paper = Paper::new("https://arxiv.org/abs/2401.00000").await.unwrap();
-    let dir = tempdir().unwrap();
-    paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
-    let path = dir.into_path().join(paper.filename());
-    assert!(path.exists());
+  async fn test_broken_api_link() {
+    assert!(Paper::new("https://arxiv.org/abs/2401.00000").await.is_err());
   }
 
   //  TODO (autoparallel): Convenient entrypoint to try seeing if the PDF comes out correct. What I

@@ -88,7 +88,7 @@ mod document_operations {
   #[tokio::test]
   async fn test_add_complete_paper() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
-    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
+    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
 
     let papers = Add::complete(&paper).execute(&mut db).await?;
     assert_eq!(papers.len(), 1);
@@ -109,7 +109,7 @@ mod document_operations {
   #[tokio::test]
   async fn test_add_paper_then_document() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
-    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
+    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
 
     // First add paper only
     Add::paper(&paper).execute(&mut db).await?;
@@ -134,7 +134,7 @@ mod document_operations {
   #[tokio::test]
   async fn test_chain_document_addition() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
-    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
+    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
 
     let papers = Add::paper(&paper).with_document().execute(&mut db).await?;
     assert_eq!(papers.len(), 1);
@@ -153,7 +153,7 @@ mod document_operations {
     let (mut db, _dir) = setup_test_db().await;
 
     // Add multiple papers without documents
-    let paper1 = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
+    let paper1 = Paper::new("https://arxiv.org/abs/2301.07041").await?;
     let paper2 = Paper::new("https://eprint.iacr.org/2016/260").await?;
     Add::paper(&paper1).execute(&mut db).await?;
     Add::paper(&paper2).execute(&mut db).await?;
