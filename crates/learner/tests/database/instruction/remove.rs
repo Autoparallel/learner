@@ -17,12 +17,11 @@ mod basic_operations {
   use super::*;
 
   #[tokio::test]
+  #[traced_test]
   async fn test_remove_existing_paper() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
     let paper = create_test_paper();
-    // let source = paper.source.clone();
-    // let id = paper.source_identifier.clone();
     Add::paper(&paper).execute(&mut db).await?;
 
     let removed_papers =
@@ -39,6 +38,7 @@ mod basic_operations {
   }
 
   #[tokio::test]
+  #[traced_test]
   async fn test_remove_nonexistent_paper() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
@@ -49,6 +49,7 @@ mod basic_operations {
   }
 
   #[tokio::test]
+  #[traced_test]
   async fn test_remove_cascades_to_authors() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
@@ -56,10 +57,6 @@ mod basic_operations {
     Add::paper(&paper).execute(&mut db).await?;
 
     Remove::from_query(Query::text("test")).execute(&mut db).await?;
-
-    // let count: i64 =
-    //   db.conn.prepare("SELECT COUNT(*) FROM authors").await?.query_row([], |row|
-    // row.get(0)).await?;
     let authors = Query::by_author("").execute(&mut db).await?;
 
     assert_eq!(authors.len(), 0);
@@ -72,6 +69,7 @@ mod dry_run {
   use super::*;
 
   #[tokio::test]
+  #[traced_test]
   async fn test_dry_run_basic() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
@@ -91,6 +89,7 @@ mod dry_run {
   }
 
   #[tokio::test]
+  #[traced_test]
   async fn test_dry_run_returns_complete_paper() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
@@ -127,6 +126,7 @@ mod query_based_removal {
   use super::*;
 
   #[tokio::test]
+  #[traced_test]
   async fn test_remove_by_text_search() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
@@ -141,6 +141,7 @@ mod query_based_removal {
   }
 
   #[tokio::test]
+  #[traced_test]
   async fn test_remove_by_author() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
@@ -155,6 +156,7 @@ mod query_based_removal {
   }
 
   #[tokio::test]
+  #[traced_test]
   async fn test_remove_with_ordering() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
@@ -174,6 +176,7 @@ mod query_based_removal {
   }
 
   #[tokio::test]
+  #[traced_test]
   async fn test_remove_by_date_range() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
@@ -199,6 +202,7 @@ mod recovery {
   use super::*;
 
   #[tokio::test]
+  #[traced_test]
   async fn test_remove_papers_can_be_readded() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
@@ -217,6 +221,7 @@ mod recovery {
   }
 
   #[tokio::test]
+  #[traced_test]
   async fn test_bulk_remove_and_readd() -> TestResult<()> {
     let (mut db, _dir) = setup_test_db().await;
 
