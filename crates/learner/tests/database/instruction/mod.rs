@@ -9,5 +9,6 @@ async fn setup_test_db() -> (Database, TempDir) {
   let dir = tempdir().unwrap();
   let db_path = dir.path().join("test.db");
   let db = Database::open(&db_path).await.unwrap();
+  db.set_storage_path(dir.path()).await.unwrap();
   (db, dir)
 }

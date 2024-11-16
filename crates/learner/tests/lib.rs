@@ -1,4 +1,4 @@
-use std::{error::Error, path::PathBuf};
+use std::{error::Error, path::PathBuf, str::FromStr};
 
 use learner::{
   database_old::Database,
@@ -64,4 +64,13 @@ fn create_second_test_paper() -> Paper {
       Author { name: "Bob Researcher".to_string(), affiliation: None, email: None },
     ],
   }
+}
+
+// TODO: This should probably be removed, just an entrypoint
+#[tokio::test]
+#[traced_test]
+async fn test_download_test_paper() {
+  let paper = create_test_paper();
+  paper.download_pdf(&PathBuf::from_str(".").unwrap()).await;
+  todo!("SHOULD FAIL, WE GET A 404 FROM ARXIV!!!")
 }

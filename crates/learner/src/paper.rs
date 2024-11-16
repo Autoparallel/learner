@@ -222,12 +222,16 @@ impl Paper {
 
     // TODO (autoparallel): uses a fixed max output filename length, should make this configurable
     // in the future.
-    let formatted_title = format::format_title(&self.title, Some(50));
-    let filename = PathBuf::from(format!("{}.pdf", formatted_title));
-    let path = dir.join(&filename);
+
+    let path = dir.join(self.filename());
     debug!("Writing PDF to path: {path:?}");
     std::fs::write(path, bytes)?;
-    Ok(filename)
+    Ok(self.filename())
+  }
+
+  pub fn filename(&self) -> PathBuf {
+    let formatted_title = format::format_title(&self.title, Some(50));
+    PathBuf::from(format!("{}.pdf", formatted_title))
   }
 
   // / Save the paper to a database.
