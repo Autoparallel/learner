@@ -41,3 +41,9 @@ pub use doi::DOIClient;
 pub use iacr::IACRClient;
 
 use super::*;
+
+pub trait PaperRetriever {
+  const HOST: &str;
+  fn retrieve_paper(&self, identifier: &str) -> Result<Paper>;
+  fn extract_identifier(&self, input: &str) -> Result<&str>;
+}

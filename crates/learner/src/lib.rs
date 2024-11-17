@@ -74,6 +74,7 @@ use std::{
   str::FromStr,
 };
 
+use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
 use paper::{Author, Paper, Source};
@@ -84,8 +85,9 @@ use tracing::{debug, trace, warn};
 #[cfg(test)]
 use {tempfile::tempdir, tracing_test::traced_test};
 
-pub mod clients;
+pub mod client;
 pub mod database;
+pub mod retriever;
 
 pub mod error;
 pub mod format;
@@ -93,7 +95,7 @@ pub mod llm;
 pub mod paper;
 pub mod pdf;
 
-use crate::{clients::*, error::*};
+use crate::{client::*, error::*};
 
 /// Common traits and types for ergonomic imports.
 ///

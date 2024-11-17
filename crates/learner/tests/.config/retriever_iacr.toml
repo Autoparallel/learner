@@ -1,0 +1,20 @@
+name              = "iacr"
+base_url          = "https://eprint.iacr.org"
+source            = "iacr"
+pattern           = "(?:^|eprint\\.iacr\\.org/)(\\d{4}/\\d+)(?:\\.pdf)?$"
+endpoint_template = "https://eprint.iacr.org/oai?verb=GetRecord&identifier=oai:eprint.iacr.org:{identifier}&metadataPrefix=oai_dc"
+
+[response_format]
+type             = "xml"
+strip_namespaces = true
+
+[response_format.fields]
+title            = "GetRecord/record/metadata/dc/title"
+authors          = "GetRecord/record/metadata/dc/creator"
+abstract_text    = "GetRecord/record/metadata/dc/description"
+publication_date = "GetRecord/record/metadata/dc/date"
+pdf_url          = "GetRecord/record/metadata/dc/identifier"
+
+[headers]
+User-Agent = "learner/0.7.0 (https://github.com/yourusername/learner)"
+Accept     = "application/xml"

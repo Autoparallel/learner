@@ -1,0 +1,29 @@
+name              = "arxiv"
+base_url          = "http://export.arxiv.org"
+source            = "arxiv"
+pattern           = "(?:^|arxiv\\.org/(?:abs|pdf)/)(\\d{4}\\.\\d{4,5}|[a-zA-Z-]+/\\d{7})(?:\\.pdf)?$"
+endpoint_template = "http://export.arxiv.org/api/query?id_list={identifier}&max_results=1"
+
+[response_format]
+type             = "xml"
+strip_namespaces = true
+
+[response_format.field_maps.title]
+paths = ["entry/title"]
+
+[response_format.field_maps.abstract]
+paths = ["entry/summary"]
+
+[response_format.field_maps.authors]
+paths = ["entry/author/name"]
+
+[response_format.field_maps.publication_date]
+paths = ["entry/published"]
+
+[response_format.field_maps.pdf_url]
+paths     = ["entry/id"]
+transform = { type = "replace", pattern = "/abs/", replacement = "/pdf/" }
+
+[headers]
+User-Agent = "learner/0.7.0 (https://github.com/yourusername/learner)"
+Accept     = "application/xml"

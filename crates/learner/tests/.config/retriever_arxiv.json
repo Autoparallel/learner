@@ -1,0 +1,48 @@
+{
+    "name": "arxiv",
+    "base_url": "http://export.arxiv.org",
+    "source": "arxiv",
+    "pattern": "(?:^|https?://arxiv\\.org/(?:abs|pdf)/)(\\d{4}\\.\\d{4,5}|[a-zA-Z]+\\.[A-Z]{2}/\\d{7})(?:\\.pdf)?$",
+    "endpoint_template": "http://export.arxiv.org/api/query?id_list={identifier}&max_results=1",
+    "response_format": {
+        "type": "xml",
+        "strip_namespaces": true,
+        "paths": {},
+        "field_maps": {
+            "title": {
+                "paths": [
+                    "feed/entry/title"
+                ]
+            },
+            "abstract": {
+                "paths": [
+                    "feed/entry/summary"
+                ]
+            },
+            "authors": {
+                "paths": [
+                    "feed/entry/author/name"
+                ]
+            },
+            "publication_date": {
+                "paths": [
+                    "feed/entry/published"
+                ]
+            },
+            "pdf_url": {
+                "paths": [
+                    "feed/entry/id"
+                ],
+                "transform": {
+                    "type": "Replace",
+                    "pattern": "/abs/",
+                    "replacement": "/pdf/"
+                }
+            }
+        }
+    },
+    "headers": {
+        "User-Agent": "learner/0.7.0 (https://github.com/yourusername/learner)",
+        "Accept": "application/xml"
+    }
+}
