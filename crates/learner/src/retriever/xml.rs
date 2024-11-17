@@ -5,8 +5,6 @@ use serde::Deserialize;
 
 use super::*;
 
-// TODO (autoparallel): I don't think the `paths` field is ever needed.
-
 // TODO (autoparallel): We should deserialize into a regex for the transforms and likely make it
 // static too so it isn't rebuilt every time
 
@@ -16,8 +14,6 @@ pub struct XmlConfig {
   /// Whether to strip namespaces from response
   #[serde(default)]
   pub strip_namespaces: bool,
-  /// Paths to extract text content from
-  pub paths:            HashMap<String, String>,
   /// How to construct fields from extracted content
   pub field_maps:       HashMap<String, FieldMap>,
 }

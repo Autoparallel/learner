@@ -43,6 +43,7 @@ reqwest = { version = "0.12", features = [
 rusqlite = { version = "0.32", features = ["bundled", "functions", "chrono"] }
 serde_json = { version = "1.0" }
 tokio-rusqlite = { version = "0.6" }
+toml = { version = "0.8" }
 
 ## TUI dependencies
 crossterm = { version = "0.28" }

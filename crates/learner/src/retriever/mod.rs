@@ -141,13 +141,12 @@ mod tests {
 
   use super::*;
 
-  const RETRIEVER_ARXIV_JSON: &str = "tests/.config/retriever_arxiv.json";
-
   #[test]
   fn test_arxiv_config_deserialization() {
-    let config_str = fs::read_to_string(RETRIEVER_ARXIV_JSON).expect("Failed to read config file");
+    let config_str =
+      fs::read_to_string("tests/.config/retriever_arxiv.toml").expect("Failed to read config file");
 
-    let retriever: Retriever = serde_json::from_str(&config_str).expect("Failed to parse config");
+    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Verify basic fields
     assert_eq!(retriever.name, "arxiv");
@@ -199,21 +198,17 @@ mod tests {
     }
 
     // Verify headers
-    assert_eq!(
-      retriever.headers.get("User-Agent").unwrap(),
-      "learner/0.7.0 (https://github.com/yourusername/learner)"
-    );
     assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
   }
 
   #[tokio::test]
   async fn test_arxiv_retriever_integration() {
-    let config_str = fs::read_to_string(RETRIEVER_ARXIV_JSON).expect(
+    let config_str = fs::read_to_string("tests/.config/retriever_arxiv.toml").expect(
       "Failed to read config
   file",
     );
 
-    let retriever: Retriever = serde_json::from_str(&config_str).expect("Failed to parse config");
+    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Test with a real arXiv paper
     let paper = retriever.retrieve_paper("2301.07041").await.unwrap();
@@ -229,9 +224,9 @@ mod tests {
   #[test]
   fn test_iacr_config_deserialization() {
     let config_str =
-      fs::read_to_string("tests/.config/retriever_iacr.json").expect("Failed to read config file");
+      fs::read_to_string("tests/.config/retriever_iacr.toml").expect("Failed to read config file");
 
-    let retriever: Retriever = serde_json::from_str(&config_str).expect("Failed to parse config");
+    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Verify basic fields
     assert_eq!(retriever.name, "iacr");
@@ -291,19 +286,15 @@ mod tests {
     }
 
     // Verify headers
-    assert_eq!(
-      retriever.headers.get("User-Agent").unwrap(),
-      "learner/0.7.0 (https://github.com/yourusername/learner)"
-    );
     assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
   }
 
   #[tokio::test]
   async fn test_iacr_retriever_integration() {
     let config_str =
-      fs::read_to_string("tests/.config/retriever_iacr.json").expect("Failed to read config file");
+      fs::read_to_string("tests/.config/retriever_iacr.toml").expect("Failed to read config file");
 
-    let retriever: Retriever = serde_json::from_str(&config_str).expect("Failed to parse config");
+    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Test with a real IACR paper
     let paper = retriever.retrieve_paper("2016/260").await.unwrap();
@@ -319,9 +310,9 @@ mod tests {
   #[test]
   fn test_doi_config_deserialization() {
     let config_str =
-      fs::read_to_string("tests/.config/retriever_doi.json").expect("Failed to read config file");
+      fs::read_to_string("tests/.config/retriever_doi.toml").expect("Failed to read config file");
 
-    let retriever: Retriever = serde_json::from_str(&config_str).expect("Failed to parse config");
+    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Verify basic fields
     assert_eq!(retriever.name, "doi");
@@ -372,45 +363,21 @@ mod tests {
   }
 
   #[tokio::test]
-  #[traced_test]
   async fn test_doi_retriever_integration() {
     let config_str =
-      fs::read_to_string("tests/.config/retriever_doi.json").expect("Failed to read config file");
+      fs::read_to_string("tests/.config/retriever_doi.toml").expect("Failed to read config file");
 
-    let retriever: Retriever = serde_json::from_str(&config_str).expect("Failed to parse config");
+    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Test with a real DOI paper
     let paper = retriever.retrieve_paper("10.1145/1327452.1327492").await.unwrap();
-    dbg!(&paper);
 
-    let PaperNew {
-      title,
-      authors,
-      abstract_text,
-      publication_date,
-      source,
-      source_identifier,
-      pdf_url,
-      doi,
-    } = paper;
-    let paper = Paper {
-      title,
-      authors,
-      abstract_text,
-      publication_date,
-      source: Source::DOI,
-      source_identifier,
-      pdf_url,
-      doi,
-    };
-    paper.download_pdf(Path::new(".")).await;
-
-    // assert!(!paper.title.is_empty());
-    // assert!(!paper.authors.is_empty());
-    // assert!(!paper.abstract_text.is_empty());
-    // assert!(paper.pdf_url.is_some());
-    // assert_eq!(paper.source, "doi");
-    // assert_eq!(paper.source_identifier, "10.1145/1327452.1327492");
-    // assert!(paper.doi.is_some());
+    assert!(!paper.title.is_empty());
+    assert!(!paper.authors.is_empty());
+    assert!(!paper.abstract_text.is_empty());
+    assert!(paper.pdf_url.is_some());
+    assert_eq!(paper.source, "doi");
+    assert_eq!(paper.source_identifier, "10.1145/1327452.1327492");
+    assert!(paper.doi.is_some());
   }
 }

@@ -1,0 +1,34 @@
+base_url          = "https://api.crossref.org/works"
+endpoint_template = "https://api.crossref.org/works/{identifier}"
+name              = "doi"
+pattern           = "(?:^|https?://doi\\.org/)(10\\.\\d{4,9}/[-._;()/:\\w]+)$"
+source            = "doi"
+
+[response_format]
+type = "json"
+
+[response_format.field_maps.title]
+paths = ["message/title"]
+
+[response_format.field_maps.abstract]
+paths = ["message/abstract"]
+
+[response_format.field_maps.abstract.transform]
+pattern     = "<[^>]+>"
+replacement = ""
+type        = "Replace"
+
+[response_format.field_maps.authors]
+paths = ["message/author"]
+
+[response_format.field_maps.publication_date]
+paths = ["message/created/date-time"]
+
+[response_format.field_maps.pdf_url]
+paths = ["message/link/0/URL"]
+
+[response_format.field_maps.doi]
+paths = ["message/DOI"]
+
+[headers]
+Accept = "application/json"
