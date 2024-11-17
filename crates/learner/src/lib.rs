@@ -136,5 +136,7 @@ use crate::{client::*, error::*};
 /// - Builder pattern traits
 /// - Conversion traits
 pub mod prelude {
-  pub use crate::{database::DatabaseInstruction, error::LearnerError};
+  pub use crate::{
+    database::DatabaseInstruction, error::LearnerError, retriever::ResponseProcessor,
+  };
 }

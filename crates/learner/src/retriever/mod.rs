@@ -2,7 +2,11 @@ use std::collections::HashMap;
 
 use super::*;
 
+mod json;
 mod xml;
+
+// TODO: not sure of public re-export here.
+pub use json::*;
 pub use xml::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,6 +41,9 @@ pub enum ResponseFormat {
   /// XML responses
   #[serde(rename = "xml")]
   Xml(XmlConfig),
+  /// JSON responses
+  #[serde(rename = "json")]
+  Json(JsonConfig),
 }
 
 /// A paper retriever configuration and implementation
@@ -98,8 +105,15 @@ impl Retriever {
 
     trace!("{} response: {}", self.name, String::from_utf8_lossy(&data));
 
+    // TODO (autoparallel): This could be simplified just slightly
     match &self.response_format {
       ResponseFormat::Xml(config) => {
+        let mut paper = config.process_response(&data).await?;
+        paper.source = self.source.clone();
+        paper.source_identifier = identifier.to_string();
+        Ok(paper)
+      },
+      ResponseFormat::Json(config) => {
         let mut paper = config.process_response(&data).await?;
         paper.source = self.source.clone();
         paper.source_identifier = identifier.to_string();
@@ -144,32 +158,32 @@ mod tests {
     assert_eq!(retriever.extract_identifier("math.AG/0601001").unwrap(), "math.AG/0601001");
 
     // Verify response format
-    match &retriever.response_format {
-      ResponseFormat::Xml(config) => {
-        assert!(config.strip_namespaces);
 
-        // Verify field mappings
-        let field_maps = &config.field_maps;
-        assert!(field_maps.contains_key("title"));
-        assert!(field_maps.contains_key("abstract"));
-        assert!(field_maps.contains_key("authors"));
-        assert!(field_maps.contains_key("publication_date"));
-        assert!(field_maps.contains_key("pdf_url"));
+    if let ResponseFormat::Xml(config) = &retriever.response_format {
+      assert!(config.strip_namespaces);
 
-        // Verify PDF transform
-        if let Some(map) = field_maps.get("pdf_url") {
-          assert!(map.paths.contains(&"entry/id".to_string()));
-          match &map.transform {
-            Some(Transform::Replace { pattern, replacement }) => {
-              assert_eq!(pattern, "/abs/");
-              assert_eq!(replacement, "/pdf/");
-            },
-            _ => panic!("Expected Replace transform for pdf_url"),
-          }
-        } else {
-          panic!("Missing pdf_url field map");
+      // Verify field mappings
+      let field_maps = &config.field_maps;
+      assert!(field_maps.contains_key("title"));
+      assert!(field_maps.contains_key("abstract"));
+      assert!(field_maps.contains_key("authors"));
+      assert!(field_maps.contains_key("publication_date"));
+      assert!(field_maps.contains_key("pdf_url"));
+
+      // Verify PDF transform
+      if let Some(map) = field_maps.get("pdf_url") {
+        match &map.transform {
+          Some(Transform::Replace { pattern, replacement }) => {
+            assert_eq!(pattern, "/abs/");
+            assert_eq!(replacement, "/pdf/");
+          },
+          _ => panic!("Expected Replace transform for pdf_url"),
         }
-      },
+      } else {
+        panic!("Missing pdf_url field map");
+      }
+    } else {
+      panic!("Expected an XML configuration, but did not get one.")
     }
 
     // Verify headers
@@ -181,7 +195,6 @@ mod tests {
   }
 
   #[tokio::test]
-  #[traced_test]
   async fn test_arxiv_retriever_integration() {
     let config_str = fs::read_to_string(RETRIEVER_ARXIV_JSON).expect(
       "Failed to read config
@@ -193,7 +206,6 @@ mod tests {
     // Test with a real arXiv paper
     let paper = retriever.retrieve_paper("2301.07041").await.unwrap();
 
-    dbg!(&paper);
     assert!(!paper.title.is_empty());
     assert!(!paper.authors.is_empty());
     assert!(!paper.abstract_text.is_empty());
@@ -245,25 +257,25 @@ mod tests {
     );
 
     // Verify response format
-    match &retriever.response_format {
-      ResponseFormat::Xml(config) => {
-        assert!(config.strip_namespaces);
+    if let ResponseFormat::Xml(config) = &retriever.response_format {
+      assert!(config.strip_namespaces);
 
-        // Verify field mappings
-        let field_maps = &config.field_maps;
-        assert!(field_maps.contains_key("title"));
-        assert!(field_maps.contains_key("abstract"));
-        assert!(field_maps.contains_key("authors"));
-        assert!(field_maps.contains_key("publication_date"));
-        assert!(field_maps.contains_key("pdf_url"));
+      // Verify field mappings
+      let field_maps = &config.field_maps;
+      assert!(field_maps.contains_key("title"));
+      assert!(field_maps.contains_key("abstract"));
+      assert!(field_maps.contains_key("authors"));
+      assert!(field_maps.contains_key("publication_date"));
+      assert!(field_maps.contains_key("pdf_url"));
 
-        // Verify OAI-PMH paths
-        if let Some(map) = field_maps.get("title") {
-          assert!(map.paths.contains(&"OAI-PMH/GetRecord/record/metadata/dc/title".to_string()));
-        } else {
-          panic!("Missing title field map");
-        }
-      },
+      // Verify OAI-PMH paths
+      if let Some(map) = field_maps.get("title") {
+        assert!(map.paths.contains(&"OAI-PMH/GetRecord/record/metadata/dc/title".to_string()));
+      } else {
+        panic!("Missing title field map");
+      }
+    } else {
+      panic!("Expected an XML configuration, but did not get one.")
     }
 
     // Verify headers
@@ -283,7 +295,6 @@ mod tests {
 
     // Test with a real IACR paper
     let paper = retriever.retrieve_paper("2016/260").await.unwrap();
-    dbg!(&paper);
 
     assert!(!paper.title.is_empty());
     assert!(!paper.authors.is_empty());
@@ -291,5 +302,80 @@ mod tests {
     assert!(paper.pdf_url.is_some());
     assert_eq!(paper.source, "iacr");
     assert_eq!(paper.source_identifier, "2016/260");
+  }
+
+  #[test]
+  fn test_doi_config_deserialization() {
+    let config_str =
+      fs::read_to_string("tests/.config/retriever_doi.json").expect("Failed to read config file");
+
+    let retriever: Retriever = serde_json::from_str(&config_str).expect("Failed to parse config");
+
+    // Verify basic fields
+    assert_eq!(retriever.name, "doi");
+    assert_eq!(retriever.base_url, "https://api.crossref.org/works");
+    assert_eq!(retriever.source, "doi");
+
+    // Test pattern matching
+    let test_cases = [
+      ("10.1145/1327452.1327492", true),
+      ("https://doi.org/10.1145/1327452.1327492", true),
+      ("invalid-doi", false),
+      ("https://wrong.url/10.1145/1327452.1327492", false),
+    ];
+
+    for (input, expected) in test_cases {
+      assert_eq!(
+        retriever.pattern.is_match(input),
+        expected,
+        "Pattern match failed for input: {}",
+        input
+      );
+    }
+
+    // Test identifier extraction
+    assert_eq!(
+      retriever.extract_identifier("10.1145/1327452.1327492").unwrap(),
+      "10.1145/1327452.1327492"
+    );
+    assert_eq!(
+      retriever.extract_identifier("https://doi.org/10.1145/1327452.1327492").unwrap(),
+      "10.1145/1327452.1327492"
+    );
+
+    // Verify response format
+    match &retriever.response_format {
+      ResponseFormat::Json(config) => {
+        // Verify field mappings
+        let field_maps = &config.field_maps;
+        assert!(field_maps.contains_key("title"));
+        assert!(field_maps.contains_key("abstract"));
+        assert!(field_maps.contains_key("authors"));
+        assert!(field_maps.contains_key("publication_date"));
+        assert!(field_maps.contains_key("pdf_url"));
+        assert!(field_maps.contains_key("doi"));
+      },
+      _ => panic!("Expected JSON response format"),
+    }
+  }
+
+  #[tokio::test]
+  #[traced_test]
+  async fn test_doi_retriever_integration() {
+    let config_str =
+      fs::read_to_string("tests/.config/retriever_doi.json").expect("Failed to read config file");
+
+    let retriever: Retriever = serde_json::from_str(&config_str).expect("Failed to parse config");
+
+    // Test with a real DOI paper
+    let paper = retriever.retrieve_paper("10.1145/1327452.1327492").await.unwrap();
+
+    assert!(!paper.title.is_empty());
+    assert!(!paper.authors.is_empty());
+    assert!(!paper.abstract_text.is_empty());
+    assert!(paper.pdf_url.is_some());
+    assert_eq!(paper.source, "doi");
+    assert_eq!(paper.source_identifier, "10.1145/1327452.1327492");
+    assert!(paper.doi.is_some());
   }
 }

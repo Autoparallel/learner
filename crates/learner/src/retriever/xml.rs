@@ -5,6 +5,11 @@ use serde::Deserialize;
 
 use super::*;
 
+// TODO (autoparallel): I don't think the `paths` field is ever needed.
+
+// TODO (autoparallel): We should deserialize into a regex for the transforms and likely make it
+// static too so it isn't rebuilt every time
+
 /// Configuration for XML response processing
 #[derive(Debug, Clone, Deserialize)]
 pub struct XmlConfig {
