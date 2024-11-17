@@ -16,7 +16,7 @@ mod basic_operations {
     assert_eq!(papers[0].title, paper.title);
 
     // Verify paper exists in database
-    let stored = Query::by_source(paper.source, &paper.source_identifier).execute(&mut db).await?;
+    let stored = Query::by_source(&paper.source, &paper.source_identifier).execute(&mut db).await?;
     assert_eq!(stored.len(), 1);
     assert_eq!(stored[0].title, paper.title);
 
@@ -84,7 +84,7 @@ mod document_operations {
     assert_eq!(papers.len(), 1);
 
     // Verify both paper and document were added
-    let stored = Query::by_source(paper.source, &paper.source_identifier).execute(&mut db).await?;
+    let stored = Query::by_source(&paper.source, &paper.source_identifier).execute(&mut db).await?;
     assert_eq!(stored.len(), 1);
 
     // Verify PDF exists in storage location

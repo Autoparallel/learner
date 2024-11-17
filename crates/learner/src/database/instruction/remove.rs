@@ -117,7 +117,7 @@ impl<'a> Remove<'a> {
   /// // Remove a DOI paper
   /// let remove = Remove::by_source(Source::DOI, "10.1145/1327452.1327492");
   /// ```
-  pub fn by_source(source: Source, identifier: &'a str) -> Self {
+  pub fn by_source(source: &'a str, identifier: &'a str) -> Self {
     Self::from_query(Query::by_source(source, identifier))
   }
 

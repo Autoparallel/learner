@@ -77,7 +77,7 @@ use std::{
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
-use paper::{Author, Paper, Source};
+use paper::{Author, Paper};
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};

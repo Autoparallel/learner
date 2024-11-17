@@ -13,7 +13,7 @@ pub struct JsonConfig {
 
 #[async_trait]
 impl ResponseProcessor for JsonConfig {
-  async fn process_response(&self, data: &[u8]) -> Result<PaperNew> {
+  async fn process_response(&self, data: &[u8]) -> Result<Paper> {
     let json: Value = serde_json::from_slice(data)
       .map_err(|e| LearnerError::ApiError(format!("Failed to parse JSON: {}", e)))?;
 
@@ -48,7 +48,7 @@ impl ResponseProcessor for JsonConfig {
       .and_then(|map| self.get_by_path(&json, &map.path))
       .map(String::from);
 
-    Ok(PaperNew {
+    Ok(Paper {
       title,
       authors,
       abstract_text,

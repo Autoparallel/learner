@@ -17,7 +17,7 @@ pub struct XmlConfig {
 
 #[async_trait]
 impl ResponseProcessor for XmlConfig {
-  async fn process_response(&self, data: &[u8]) -> Result<PaperNew> {
+  async fn process_response(&self, data: &[u8]) -> Result<Paper> {
     let xml = if self.strip_namespaces {
       strip_xml_namespaces(&String::from_utf8_lossy(data))
     } else {
@@ -85,7 +85,7 @@ impl ResponseProcessor for XmlConfig {
 
     let doi = self.field_maps.get("doi").and_then(|map| content.get(&map.path)).map(String::from);
 
-    Ok(PaperNew {
+    Ok(Paper {
       title,
       authors,
       abstract_text,

@@ -9,46 +9,14 @@ mod xml;
 pub use json::*;
 pub use xml::*;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaperNew {
-  /// The paper's full title
-  pub title:             String,
-  /// Complete list of paper authors with affiliations
-  pub authors:           Vec<Author>,
-  /// Full abstract or summary text
-  pub abstract_text:     String,
-  /// Publication or last update timestamp
-  pub publication_date:  DateTime<Utc>,
-  /// Source repository or system (arXiv, IACR, DOI)
-  pub source:            String,
-  /// Source-specific paper identifier
-  pub source_identifier: String,
-  /// Optional URL to PDF document
-  pub pdf_url:           Option<String>,
-  /// Optional DOI reference
-  pub doi:               Option<String>,
-}
-
-#[async_trait]
-pub trait ResponseProcessor: Send + Sync {
-  async fn process_response(&self, data: &[u8]) -> Result<PaperNew>;
-}
-
-/// Supported response formats
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type")]
-pub enum ResponseFormat {
-  /// XML responses
-  #[serde(rename = "xml")]
-  Xml(XmlConfig),
-  /// JSON responses
-  #[serde(rename = "json")]
-  Json(JsonConfig),
+#[derive(Default)]
+pub struct Retriever {
+  configs: HashMap<String, RetrieverConfig>,
 }
 
 /// A paper retriever configuration and implementation
 #[derive(Debug, Clone, Deserialize)]
-pub struct Retriever {
+pub struct RetrieverConfig {
   /// Name of this retriever
   pub name:              String,
   /// Base URL for API requests
@@ -67,6 +35,80 @@ pub struct Retriever {
   pub headers:           HashMap<String, String>,
 }
 
+impl Retriever {
+  /// Create a new empty retriever
+  pub fn new() -> Self { Self::default() }
+
+  pub fn with_config(mut self, config: RetrieverConfig) {
+    self.configs.insert(config.name.clone(), config);
+  }
+
+  /// Add a retriever configuration from TOML string
+  pub fn with_config_str(mut self, toml_str: &str) -> Result<Self> {
+    let config: RetrieverConfig = toml::from_str(toml_str)?;
+    self.configs.insert(config.name.clone(), config);
+    Ok(self)
+  }
+
+  /// Add a retriever configuration from a TOML file
+  pub fn with_config_file(self, path: impl AsRef<Path>) -> Result<Self> {
+    let content = std::fs::read_to_string(path)?;
+    self.with_config_str(&content)
+  }
+
+  /// Add multiple configurations from a directory of TOML files
+  pub fn with_config_dir(self, dir: impl AsRef<Path>) -> Result<Self> {
+    let dir = dir.as_ref();
+    if !dir.is_dir() {
+      return Err(LearnerError::Path(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "Config directory not found",
+      )));
+    }
+
+    let mut retriever = self;
+    for entry in std::fs::read_dir(dir)? {
+      let entry = entry?;
+      let path = entry.path();
+      if path.extension().map_or(false, |ext| ext == "toml") {
+        retriever = retriever.with_config_file(path)?;
+      }
+    }
+    Ok(retriever)
+  }
+
+  /// Try to retrieve a paper using any matching configuration
+  pub async fn get_paper(&self, input: &str) -> Result<Paper> {
+    let mut matches = Vec::new();
+
+    // Find all configs that match the input
+    for config in self.configs.values() {
+      if config.pattern.is_match(input) {
+        matches.push(config);
+      }
+    }
+
+    match matches.len() {
+      0 => Err(LearnerError::InvalidIdentifier),
+      1 => matches[0].retrieve_paper(input).await,
+      _ => Err(LearnerError::AmbiguousIdentifier(
+        matches.into_iter().map(|c| c.name.clone()).collect(),
+      )),
+    }
+  }
+}
+
+/// Supported response formats
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type")]
+pub enum ResponseFormat {
+  /// XML responses
+  #[serde(rename = "xml")]
+  Xml(XmlConfig),
+  /// JSON responses
+  #[serde(rename = "json")]
+  Json(JsonConfig),
+}
 #[derive(Debug, Clone, Deserialize)]
 pub struct FieldMap {
   /// JSON path to extract value from
@@ -88,14 +130,12 @@ pub enum Transform {
   Url { base: String, suffix: Option<String> },
 }
 
-/// Custom deserializer for Regex
-fn deserialize_regex<'de, D>(deserializer: D) -> std::result::Result<Regex, D::Error>
-where D: serde::Deserializer<'de> {
-  let s: String = String::deserialize(deserializer)?;
-  Regex::new(&s).map_err(serde::de::Error::custom)
+#[async_trait]
+pub trait ResponseProcessor: Send + Sync {
+  async fn process_response(&self, data: &[u8]) -> Result<Paper>;
 }
 
-impl Retriever {
+impl RetrieverConfig {
   /// Extract canonical identifier from input
   pub fn extract_identifier<'a>(&self, input: &'a str) -> Result<&'a str> {
     self
@@ -107,7 +147,7 @@ impl Retriever {
   }
 
   /// Retrieve a paper using this retriever's configuration
-  pub async fn retrieve_paper(&self, input: &str) -> Result<PaperNew> {
+  pub async fn retrieve_paper(&self, input: &str) -> Result<Paper> {
     let identifier = self.extract_identifier(input)?;
     let url = self.endpoint_template.replace("{identifier}", identifier);
 
@@ -144,6 +184,13 @@ impl Retriever {
   }
 }
 
+/// Custom deserializer for Regex
+fn deserialize_regex<'de, D>(deserializer: D) -> std::result::Result<Regex, D::Error>
+where D: serde::Deserializer<'de> {
+  let s: String = String::deserialize(deserializer)?;
+  Regex::new(&s).map_err(serde::de::Error::custom)
+}
+
 fn apply_transform(value: &str, transform: &Transform) -> Result<String> {
   match transform {
     Transform::Replace { pattern, replacement } => Regex::new(pattern)
@@ -169,7 +216,7 @@ mod tests {
     let config_str =
       fs::read_to_string("tests/.config/retriever_arxiv.toml").expect("Failed to read config file");
 
-    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
+    let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Verify basic fields
     assert_eq!(retriever.name, "arxiv");
@@ -231,7 +278,7 @@ mod tests {
   file",
     );
 
-    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
+    let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Test with a real arXiv paper
     let paper = retriever.retrieve_paper("2301.07041").await.unwrap();
@@ -249,7 +296,7 @@ mod tests {
     let config_str =
       fs::read_to_string("tests/.config/retriever_iacr.toml").expect("Failed to read config file");
 
-    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
+    let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Verify basic fields
     assert_eq!(retriever.name, "iacr");
@@ -317,7 +364,7 @@ mod tests {
     let config_str =
       fs::read_to_string("tests/.config/retriever_iacr.toml").expect("Failed to read config file");
 
-    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
+    let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Test with a real IACR paper
     let paper = retriever.retrieve_paper("2016/260").await.unwrap();
@@ -335,7 +382,7 @@ mod tests {
     let config_str =
       fs::read_to_string("tests/.config/retriever_doi.toml").expect("Failed to read config file");
 
-    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
+    let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Verify basic fields
     assert_eq!(retriever.name, "doi");
@@ -390,7 +437,7 @@ mod tests {
     let config_str =
       fs::read_to_string("tests/.config/retriever_doi.toml").expect("Failed to read config file");
 
-    let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
+    let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
 
     // Test with a real DOI paper
     let paper = retriever.retrieve_paper("10.1145/1327452.1327492").await.unwrap();

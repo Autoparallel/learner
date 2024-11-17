@@ -88,8 +88,8 @@ pub struct Paper {
   pub abstract_text:     String,
   /// Publication or last update timestamp
   pub publication_date:  DateTime<Utc>,
-  /// Source repository or system (arXiv, IACR, DOI)
-  pub source:            Source,
+  /// Source repository or system (arXiv, DOI, IACR, etc.)
+  pub source:            String,
   /// Source-specific paper identifier
   pub source_identifier: String,
   /// Optional URL to PDF document
@@ -125,131 +125,101 @@ pub struct Author {
   pub email:       Option<String>,
 }
 
-/// Paper source system or repository.
-///
-/// Represents the different systems from which papers can be retrieved,
-/// each with its own identifier format and access patterns. The enum
-/// supports:
-///
-/// - arXiv: Both new (2301.07041) and old (math.AG/0601001) formats
-/// - IACR: Cryptology ePrint Archive format (2023/123)
-/// - DOI: Standard DOI format (10.1145/1327452.1327492)
-///
-/// # Examples
-///
-/// ```
-/// use std::str::FromStr;
-///
-/// use learner::paper::Source;
-///
-/// let arxiv = Source::from_str("arxiv").unwrap();
-/// let doi = Source::from_str("doi").unwrap();
-/// ```
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-pub enum Source {
-  /// arXiv.org papers (e.g., "2301.07041" or "math.AG/0601001")
-  Arxiv,
-  /// IACR Cryptology ePrint Archive papers (e.g., "2023/123")
-  IACR,
-  /// Papers with Digital Object Identifiers
-  DOI,
-}
-
 impl Paper {
-  // TODO (autoparallel): This should probably be a `new_from_url` or just `from_url` or something.
-  /// Creates a new paper from various identifier formats.
-  ///
-  /// This method serves as the primary entry point for paper creation,
-  /// supporting multiple input formats and automatically determining the
-  /// appropriate source handler. It accepts:
-  ///
-  /// - Full URLs from supported repositories
-  /// - Direct identifiers (arXiv ID, DOI, IACR ID)
-  /// - Both new and legacy identifier formats
-  ///
-  /// The method will fetch metadata from the appropriate source and
-  /// construct a complete Paper instance.
-  ///
-  /// # Arguments
-  ///
-  /// * `input` - Paper identifier in any supported format:
-  ///   - arXiv URLs: "https://arxiv.org/abs/2301.07041"
-  ///   - arXiv IDs: "2301.07041" or "math.AG/0601001"
-  ///   - IACR URLs: "https://eprint.iacr.org/2016/260"
-  ///   - IACR IDs: "2023/123"
-  ///   - DOI URLs: "https://doi.org/10.1145/1327452.1327492"
-  ///   - DOIs: "10.1145/1327452.1327492"
-  ///
-  /// # Returns
-  ///
-  /// Returns a `Result<Paper>` which is:
-  /// - `Ok(Paper)` - Successfully created paper with metadata
-  /// - `Err(LearnerError)` - Failed to parse input or fetch metadata
-  ///
-  /// # Examples
-  ///
-  /// ```no_run
-  /// # use learner::paper::Paper;
-  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// // From URL
-  /// let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
-  ///
-  /// // From identifier
-  /// let paper = Paper::new("2301.07041").await?;
-  ///
-  /// // From DOI
-  /// let paper = Paper::new("10.1145/1327452.1327492").await?;
-  /// # Ok(())
-  /// # }
-  /// ```
-  pub async fn new(input: &str) -> Result<Self> {
-    lazy_static! {
-        // arXiv patterns
-        static ref ARXIV_NEW: Regex = Regex::new(r"^(\d{4}\.\d{4,5})$").unwrap();
-        static ref ARXIV_OLD: Regex = Regex::new(r"^([a-zA-Z-]+/\d{7})$").unwrap();
+  // // TODO (autoparallel): This should probably be a `new_from_url` or just `from_url` or
+  // something. /// Creates a new paper from various identifier formats.
+  // ///
+  // /// This method serves as the primary entry point for paper creation,
+  // /// supporting multiple input formats and automatically determining the
+  // /// appropriate source handler. It accepts:
+  // ///
+  // /// - Full URLs from supported repositories
+  // /// - Direct identifiers (arXiv ID, DOI, IACR ID)
+  // /// - Both new and legacy identifier formats
+  // ///
+  // /// The method will fetch metadata from the appropriate source and
+  // /// construct a complete Paper instance.
+  // ///
+  // /// # Arguments
+  // ///
+  // /// * `input` - Paper identifier in any supported format:
+  // ///   - arXiv URLs: "https://arxiv.org/abs/2301.07041"
+  // ///   - arXiv IDs: "2301.07041" or "math.AG/0601001"
+  // ///   - IACR URLs: "https://eprint.iacr.org/2016/260"
+  // ///   - IACR IDs: "2023/123"
+  // ///   - DOI URLs: "https://doi.org/10.1145/1327452.1327492"
+  // ///   - DOIs: "10.1145/1327452.1327492"
+  // ///
+  // /// # Returns
+  // ///
+  // /// Returns a `Result<Paper>` which is:
+  // /// - `Ok(Paper)` - Successfully created paper with metadata
+  // /// - `Err(LearnerError)` - Failed to parse input or fetch metadata
+  // ///
+  // /// # Examples
+  // ///
+  // /// ```no_run
+  // /// # use learner::paper::Paper;
+  // /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  // /// // From URL
+  // /// let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
+  // ///
+  // /// // From identifier
+  // /// let paper = Paper::new("2301.07041").await?;
+  // ///
+  // /// // From DOI
+  // /// let paper = Paper::new("10.1145/1327452.1327492").await?;
+  // /// # Ok(())
+  // /// # }
+  // /// ```
+  // pub async fn new(input: &str) -> Result<Self> {
+  //   lazy_static! {
+  //       // arXiv patterns
+  //       static ref ARXIV_NEW: Regex = Regex::new(r"^(\d{4}\.\d{4,5})$").unwrap();
+  //       static ref ARXIV_OLD: Regex = Regex::new(r"^([a-zA-Z-]+/\d{7})$").unwrap();
 
-        // IACR pattern
-        static ref IACR: Regex = Regex::new(r"^(\d{4}/\d+)$").unwrap();
+  //       // IACR pattern
+  //       static ref IACR: Regex = Regex::new(r"^(\d{4}/\d+)$").unwrap();
 
-        // DOI pattern
-        static ref DOI: Regex = Regex::new(r"^10\.\d{4,9}/[-._;()/:\w]+$").unwrap();
-    }
+  //       // DOI pattern
+  //       static ref DOI: Regex = Regex::new(r"^10\.\d{4,9}/[-._;()/:\w]+$").unwrap();
+  //   }
 
-    // First try to parse as URL
-    if let Ok(url) = Url::parse(input) {
-      return match url.host_str() {
-        Some("arxiv.org") => {
-          let id = extract_arxiv_id(&url)?;
-          ArxivClient::new().fetch_paper(&id).await
-        },
-        Some("eprint.iacr.org") => {
-          let id = extract_iacr_id(&url)?;
-          IACRClient::new().fetch_paper(&id).await
-        },
-        Some("doi.org") => {
-          let doi = extract_doi(&url)?;
-          DOIClient::new().fetch_paper(&doi).await
-        },
-        _ => Err(LearnerError::InvalidIdentifier),
-      };
-    }
+  //   // First try to parse as URL
+  //   if let Ok(url) = Url::parse(input) {
+  //     return match url.host_str() {
+  //       Some("arxiv.org") => {
+  //         let id = extract_arxiv_id(&url)?;
+  //         ArxivClient::new().fetch_paper(&id).await
+  //       },
+  //       Some("eprint.iacr.org") => {
+  //         let id = extract_iacr_id(&url)?;
+  //         IACRClient::new().fetch_paper(&id).await
+  //       },
+  //       Some("doi.org") => {
+  //         let doi = extract_doi(&url)?;
+  //         DOIClient::new().fetch_paper(&doi).await
+  //       },
+  //       _ => Err(LearnerError::InvalidIdentifier),
+  //     };
+  //   }
 
-    // If not a URL, try to match against known patterns
-    match input {
-      // arXiv patterns
-      id if ARXIV_NEW.is_match(id) || ARXIV_OLD.is_match(id) =>
-        ArxivClient::new().fetch_paper(id).await,
+  //   // If not a URL, try to match against known patterns
+  //   match input {
+  //     // arXiv patterns
+  //     id if ARXIV_NEW.is_match(id) || ARXIV_OLD.is_match(id) =>
+  //       ArxivClient::new().fetch_paper(id).await,
 
-      // IACR pattern
-      id if IACR.is_match(id) => IACRClient::new().fetch_paper(id).await,
+  //     // IACR pattern
+  //     id if IACR.is_match(id) => IACRClient::new().fetch_paper(id).await,
 
-      // DOI pattern
-      id if DOI.is_match(id) => DOIClient::new().fetch_paper(id).await,
+  //     // DOI pattern
+  //     id if DOI.is_match(id) => DOIClient::new().fetch_paper(id).await,
 
-      // No pattern matched
-      _ => Err(LearnerError::InvalidIdentifier),
-    }
-  }
+  //     // No pattern matched
+  //     _ => Err(LearnerError::InvalidIdentifier),
+  //   }
+  // }
 
   /// Downloads the paper's PDF to the specified directory.
   ///
@@ -334,163 +304,119 @@ impl Paper {
   }
 }
 
-impl Display for Source {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      Source::Arxiv => write!(f, "Arxiv"),
-      Source::IACR => write!(f, "IACR"),
-      Source::DOI => write!(f, "DOI"),
-    }
-  }
-}
-
-impl FromStr for Source {
-  type Err = LearnerError;
-
-  fn from_str(s: &str) -> Result<Self> {
-    match &s.to_lowercase() as &str {
-      "arxiv" => Ok(Source::Arxiv),
-      "iacr" => Ok(Source::IACR),
-      "doi" => Ok(Source::DOI),
-      s => Err(LearnerError::InvalidSource(s.to_owned())),
-    }
-  }
-}
-
-// TODO (autoparallel): These three functions should really be some simple generic alongside the
-// rest of the stuff we have in here
-/// Extracts the arXiv identifier from a URL.
-///
-/// Parses URLs like "https://arxiv.org/abs/2301.07041" to extract "2301.07041".
-fn extract_arxiv_id(url: &Url) -> Result<String> {
-  let path = url.path();
-  let re = regex::Regex::new(r"abs/([^/]+)$").unwrap();
-  re.captures(path)
-    .and_then(|cap| cap.get(1))
-    .map(|m| m.as_str().to_string())
-    .ok_or(LearnerError::InvalidIdentifier)
-}
-
-/// Extracts the IACR identifier from a URL.
-///
-/// Parses URLs like "https://eprint.iacr.org/2016/260" to extract "2016/260".
-fn extract_iacr_id(url: &Url) -> Result<String> {
-  let path = url.path();
-  let re = regex::Regex::new(r"(\d{4}/\d+)$").unwrap();
-  re.captures(path)
-    .and_then(|cap| cap.get(1))
-    .map(|m| m.as_str().to_string())
-    .ok_or(LearnerError::InvalidIdentifier)
-}
-
-/// Extracts the DOI from a URL.
-///
-/// Parses URLs like "https://doi.org/10.1145/1327452.1327492" to extract the DOI.
-fn extract_doi(url: &Url) -> Result<String> {
-  url.path().strip_prefix('/').map(|s| s.to_string()).ok_or(LearnerError::InvalidIdentifier)
-}
-
 #[cfg(test)]
 mod tests {
 
   use super::*;
 
-  #[traced_test]
-  #[tokio::test]
-  async fn test_arxiv_paper_from_id() {
-    let paper = Paper::new("2301.07041").await.unwrap();
-    assert!(!paper.title.is_empty());
-    assert!(!paper.authors.is_empty());
-    assert_eq!(paper.source, Source::Arxiv);
-    dbg!(paper);
-  }
+  #[test]
+  fn test_test_test() { todo!("Need to rehash all these tests now.") }
 
-  #[traced_test]
-  #[tokio::test]
-  async fn test_arxiv_paper_from_url() {
-    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
-    assert_eq!(paper.source, Source::Arxiv);
-    assert_eq!(paper.source_identifier, "2301.07041");
-  }
+  // #[traced_test]
+  // #[tokio::test]
+  // async fn test_arxiv_paper_from_id() {
+  //   todo!();
+  //   let paper = Paper::new("2301.07041").await.unwrap();
+  //   assert!(!paper.title.is_empty());
+  //   assert!(!paper.authors.is_empty());
+  //   assert_eq!(paper.source, "arxiv");
+  //   dbg!(paper);
+  // }
 
-  #[traced_test]
-  #[tokio::test]
-  async fn test_iacr_paper_from_id() {
-    let paper = Paper::new("2016/260").await.unwrap();
-    assert!(!paper.title.is_empty());
-    assert!(!paper.authors.is_empty());
-    assert_eq!(paper.source, Source::IACR);
-  }
+  // #[traced_test]
+  // #[tokio::test]
+  // async fn test_arxiv_paper_from_url() {
+  //   todo!();
+  //   let paper = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
+  //   assert_eq!(paper.source, "arxiv");
+  //   assert_eq!(paper.source_identifier, "2301.07041");
+  // }
 
-  #[traced_test]
-  #[tokio::test]
-  async fn test_iacr_paper_from_url() {
-    let paper = Paper::new("https://eprint.iacr.org/2016/260").await.unwrap();
-    assert!(!paper.title.is_empty());
-    assert!(!paper.authors.is_empty());
-    assert_eq!(paper.source, Source::IACR);
-  }
+  // #[traced_test]
+  // #[tokio::test]
+  // async fn test_iacr_paper_from_id() {
+  //   todo!();
+  //   let paper = Paper::new("2016/260").await.unwrap();
+  //   assert!(!paper.title.is_empty());
+  //   assert!(!paper.authors.is_empty());
+  //   assert_eq!(paper.source, "iacr");
+  // }
 
-  #[traced_test]
-  #[tokio::test]
-  async fn test_doi_paper_from_id() {
-    let paper = Paper::new("10.1145/1327452.1327492").await.unwrap();
-    assert!(!paper.title.is_empty());
-    assert!(!paper.authors.is_empty());
-    assert_eq!(paper.source, Source::DOI);
-  }
+  // #[traced_test]
+  // #[tokio::test]
+  // async fn test_iacr_paper_from_url() {
+  //   todo!();
+  //   let paper = Paper::new("https://eprint.iacr.org/2016/260").await.unwrap();
+  //   assert!(!paper.title.is_empty());
+  //   assert!(!paper.authors.is_empty());
+  //   assert_eq!(paper.source, "iacr");
+  // }
 
-  #[traced_test]
-  #[tokio::test]
-  async fn test_doi_paper_from_url() {
-    let paper = Paper::new("https://doi.org/10.1145/1327452.1327492").await.unwrap();
-    assert!(!paper.title.is_empty());
-    assert!(!paper.authors.is_empty());
-    assert_eq!(paper.source, Source::DOI);
-  }
+  // #[traced_test]
+  // #[tokio::test]
+  // async fn test_doi_paper_from_id() {
+  //   todo!();
+  //   let paper = Paper::new("10.1145/1327452.1327492").await.unwrap();
+  //   assert!(!paper.title.is_empty());
+  //   assert!(!paper.authors.is_empty());
+  //   assert_eq!(paper.source, "doi");
+  // }
 
-  #[traced_test]
-  #[tokio::test]
-  async fn test_arxiv_pdf_from_paper() {
-    let paper = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
-    let dir = tempdir().unwrap();
-    paper.download_pdf(dir.path()).await.unwrap();
-    let formatted_title = format::format_title("Verifiable Fully Homomorphic Encryption", Some(50));
-    let path = dir.into_path().join(format!("{}.pdf", formatted_title));
-    assert!(path.exists());
-  }
+  // #[traced_test]
+  // #[tokio::test]
+  // async fn test_doi_paper_from_url() {
+  //   todo!();
+  //   let paper = Paper::new("https://doi.org/10.1145/1327452.1327492").await.unwrap();
+  //   assert!(!paper.title.is_empty());
+  //   assert!(!paper.authors.is_empty());
+  //   assert_eq!(paper.source, "doi");
+  // }
 
-  #[traced_test]
-  #[tokio::test]
-  async fn test_iacr_pdf_from_paper() {
-    let paper = Paper::new("https://eprint.iacr.org/2016/260").await.unwrap();
-    let dir = tempdir().unwrap();
-    paper.download_pdf(dir.path()).await.unwrap();
-    let formatted_title =
-      format::format_title("On the Size of Pairing-based Non-interactive Arguments", Some(50));
-    let path = dir.into_path().join(format!("{}.pdf", formatted_title));
-    assert!(path.exists());
-  }
+  // #[traced_test]
+  // #[tokio::test]
+  // async fn test_arxiv_pdf_from_paper() {
+  //   todo!();
+  //   let paper = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
+  //   let dir = tempdir().unwrap();
+  //   paper.download_pdf(dir.path()).await.unwrap();
+  //   let formatted_title = format::format_title("Verifiable Fully Homomorphic Encryption",
+  // Some(50));   let path = dir.into_path().join(format!("{}.pdf", formatted_title));
+  //   assert!(path.exists());
+  // }
 
-  // TODO (autoparallel): This technically passes, but it is not actually getting a PDF from this
-  // site.
-  #[ignore]
-  #[traced_test]
-  #[tokio::test]
-  async fn test_doi_pdf_from_paper() {
-    let paper = Paper::new("https://doi.org/10.1145/1327452.1327492").await.unwrap();
-    dbg!(&paper);
-    let dir = tempdir().unwrap();
-    paper.download_pdf(dir.path()).await.unwrap();
-    let path = dir.into_path().join(paper.filename());
-    assert!(path.exists());
-  }
+  // #[traced_test]
+  // #[tokio::test]
+  // async fn test_iacr_pdf_from_paper() {
+  //   todo!();
+  //   let paper = Paper::new("https://eprint.iacr.org/2016/260").await.unwrap();
+  //   let dir = tempdir().unwrap();
+  //   paper.download_pdf(dir.path()).await.unwrap();
+  //   let formatted_title =
+  //     format::format_title("On the Size of Pairing-based Non-interactive Arguments", Some(50));
+  //   let path = dir.into_path().join(format!("{}.pdf", formatted_title));
+  //   assert!(path.exists());
+  // }
 
-  #[traced_test]
-  #[tokio::test]
-  async fn test_broken_api_link() {
-    assert!(Paper::new("https://arxiv.org/abs/2401.00000").await.is_err());
-  }
+  // // TODO (autoparallel): This technically passes, but it is not actually getting a PDF from this
+  // // site.
+  // #[traced_test]
+  // #[tokio::test]
+  // async fn test_doi_pdf_from_paper() {
+  //   todo!();
+  //   let paper = Paper::new("https://doi.org/10.1145/1327452.1327492").await.unwrap();
+  //   dbg!(&paper);
+  //   let dir = tempdir().unwrap();
+  //   paper.download_pdf(dir.path()).await.unwrap();
+  //   let path = dir.into_path().join(paper.filename());
+  //   assert!(path.exists());
+  // }
+
+  // #[traced_test]
+  // #[tokio::test]
+  // async fn test_broken_api_link() {
+  //   todo!();
+  //   assert!(Paper::new("https://arxiv.org/abs/2401.00000").await.is_err());
+  // }
 
   //  TODO (autoparallel): Convenient entrypoint to try seeing if the PDF comes out correct. What I
   // have tried now is using a `reqwest` client with ```

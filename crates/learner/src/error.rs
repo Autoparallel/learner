@@ -171,4 +171,10 @@ pub enum LearnerError {
   /// caused the conflict.
   #[error("Tried to add a paper titled \"{0}\" that was already in the database.")]
   DatabaseDuplicatePaper(String),
+
+  #[error("Retriever matched multiple different identifiers for a request: {0:?}")]
+  AmbiguousIdentifier(Vec<String>),
+
+  #[error(transparent)]
+  TomlDeError(#[from] toml::de::Error),
 }

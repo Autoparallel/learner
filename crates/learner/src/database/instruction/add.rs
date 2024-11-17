@@ -273,7 +273,7 @@ impl DatabaseInstruction for Add<'_> {
     match &self.addition {
       Addition::Paper(paper) => {
         // Check for existing paper
-        if Query::by_source(paper.source, &paper.source_identifier)
+        if Query::by_source(&paper.source, &paper.source_identifier)
           .execute(db)
           .await?
           .into_iter()
