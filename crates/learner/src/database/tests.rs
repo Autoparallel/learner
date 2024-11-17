@@ -3,16 +3,9 @@ use super::*;
 /// Helper function to set up a test database
 async fn setup_test_db() -> (Database, PathBuf, tempfile::TempDir) {
   let dir = tempdir().unwrap();
-  // Make both paths absolute
-  let abs_dir = dir.path().canonicalize().unwrap();
-  let db_path = abs_dir.join("test.db");
-  let storage_path = abs_dir.join("storage"); // Add a storage directory
-
-  // Create the database and explicitly set the storage path
-  let db = Database::open(&db_path).await.unwrap();
-  db.set_storage_path(&storage_path).await.unwrap();
-
-  (db, db_path, dir)
+  let path = dir.path().join("test.db");
+  let db = Database::open(&path).await.unwrap();
+  (db, path, dir)
 }
 
 #[traced_test]
@@ -52,6 +45,15 @@ fn test_default_storage_path() {
     .parent()
     .unwrap()
     .starts_with(dirs::document_dir().unwrap_or_else(|| PathBuf::from("."))));
+}
+
+#[traced_test]
+#[tokio::test]
+async fn test_new_db_uses_default_storage() {
+  let (db, _path, _dir) = setup_test_db().await;
+
+  let storage_path = db.get_storage_path().await.expect("Storage path should be set");
+  assert_eq!(storage_path, Database::default_storage_path());
 }
 
 #[traced_test]
@@ -110,12 +112,12 @@ async fn test_storage_path_valid() -> Result<()> {
 #[tokio::test]
 async fn test_storage_path_relative() {
   let (db, _path, _dir) = setup_test_db().await;
-  let result = db.set_storage_path("relative/path").await;
-
-  assert!(matches!(
-      result,
-      Err(LearnerError::Path(e)) if e.kind() == std::io::ErrorKind::InvalidInput
-  ));
+  let storage_path = "relative/path";
+  db.set_storage_path(storage_path).await.unwrap();
+  assert_eq!(
+    std::env::current_dir().unwrap().join(storage_path).to_str().unwrap(),
+    db.get_storage_path().await.unwrap().to_str().unwrap()
+  );
 }
 
 #[cfg(unix)]

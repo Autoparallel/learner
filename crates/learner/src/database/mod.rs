@@ -237,21 +237,17 @@ impl Database {
     let original_path_result = self.get_storage_path().await;
     let path = path.as_ref();
 
-    // Ensure path is absolute
-    if !path.is_absolute() {
-      return Err(LearnerError::Path(std::io::Error::new(
-        std::io::ErrorKind::InvalidInput,
-        "Storage path must be absolute",
-      )));
-    }
+    // Convert relative paths to absolute using current working directory
+    let absolute_path =
+      if !path.is_absolute() { std::env::current_dir()?.join(path) } else { path.to_path_buf() };
 
     // Create a test file to verify write permissions
-    let test_file = path.join(".learner_write_test");
+    let test_file = absolute_path.join(".learner_write_test");
 
     // First try to create the directory structure
-    match std::fs::create_dir_all(path) {
+    match std::fs::create_dir_all(&absolute_path) {
       Ok(_) => {
-        // Test write permissions by creating and removing a file
+        // Rest of the code remains the same, but use absolute_path instead of path
         match std::fs::write(&test_file, b"test") {
           Ok(_) => {
             // Clean up test file
@@ -281,7 +277,7 @@ impl Database {
     }
 
     // If we get here, the path is valid and writable
-    let path_str = path.to_string_lossy().to_string();
+    let path_str = absolute_path.to_string_lossy().to_string();
 
     self
       .conn
@@ -299,7 +295,7 @@ impl Database {
       warn!(
         "Original storage path was {:?}, set a new path to {:?}. Please be careful to check that \
          your documents have been moved or that you intended to do this operation!",
-        original_path, path
+        original_path, absolute_path
       );
     }
 
