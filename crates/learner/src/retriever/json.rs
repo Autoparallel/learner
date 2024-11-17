@@ -137,7 +137,57 @@ impl JsonConfig {
   }
 
   fn extract_optional_field(&self, json: &Value, map: &FieldMap) -> Result<Option<String>> {
-    self.extract_field(json, "").map(Some).or(Ok(None))
+    let mut values = Vec::new();
+    for path in &map.paths {
+      let mut current = json;
+      for part in path.split('/') {
+        current = match current.get(part) {
+          Some(value) => value,
+          None => continue,
+        };
+
+        // Handle arrays specially
+        if current.is_array() {
+          if let Some(first) = current.as_array().unwrap().first() {
+            // For arrays of strings/numbers, use directly
+            if first.is_string() || first.is_number() {
+              values.push(first.as_str().unwrap_or_default().to_string());
+            } else {
+              // For arrays of objects, continue traversing
+              current = first;
+            }
+          }
+          continue;
+        }
+      }
+
+      // At the end of path traversal
+      match current {
+        Value::String(s) => values.push(s.clone()),
+        Value::Array(arr) if !arr.is_empty() =>
+          if let Some(s) = arr[0].as_str() {
+            values.push(s.to_string());
+          },
+        Value::Number(n) => values.push(n.to_string()),
+        _ =>
+          if let Some(s) = current.as_str() {
+            values.push(s.to_string());
+          },
+      }
+    }
+
+    if values.is_empty() {
+      Ok(None)
+    } else {
+      let value =
+        if let Some(sep) = &map.join_separator { values.join(sep) } else { values[0].clone() };
+
+      if let Some(transform) = &map.transform {
+        self.apply_transform(&value, transform).map(Some)
+      } else {
+        Ok(Some(value))
+      }
+    }
   }
 
   fn extract_authors(&self, json: &Value, map: &FieldMap) -> Result<Vec<Author>> {

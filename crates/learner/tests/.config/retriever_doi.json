@@ -30,17 +30,11 @@
             "publication_date": {
                 "paths": [
                     "message/created/date-time"
-                ],
-                "transform": {
-                    "type": "Date",
-                    "from_format": "%Y-%m-%d",
-                    "to_format": "%Y-%m-%dT00:00:00Z"
-                }
+                ]
             },
             "pdf_url": {
                 "paths": [
-                    "message/link/0/URL",
-                    "message/resource/primary/URL"
+                    "message/link/0/URL"
                 ]
             },
             "doi": {

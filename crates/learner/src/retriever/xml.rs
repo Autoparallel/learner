@@ -34,17 +34,6 @@ pub struct FieldMap {
   #[serde(default)]
   pub transform:      Option<Transform>,
 }
-/// Available transformations for field values
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type")]
-pub enum Transform {
-  /// Replace text using regex
-  Replace { pattern: String, replacement: String },
-  /// Format a date string
-  Date { from_format: String, to_format: String },
-  /// Convert a URL
-  Url { base: String, suffix: Option<String> },
-}
 
 #[async_trait]
 impl ResponseProcessor for XmlConfig {
