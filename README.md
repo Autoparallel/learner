@@ -42,7 +42,7 @@
 ```toml
 [dependencies]
 learner = { version = "*" }  # Uses latest version
-
+```
 ### CLI Tool
 
 ```bash
