@@ -39,7 +39,7 @@ fn test_default_storage_path() {
 
   // Should end with learner/papers
   assert!(path.ends_with("learner/papers") || path.ends_with("learner\\papers"));
-
+  dbg!(&path);
   // Should be rooted in a valid directory
   assert!(path
     .parent()
