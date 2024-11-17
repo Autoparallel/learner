@@ -18,11 +18,9 @@
 //!
 //! ```no_run
 //! use learner::{
-//!   database::{
-//!     instruction::{Query, Remove},
-//!     Database,
-//!   },
+//!   database::{Database, Query, Remove},
 //!   paper::Source,
+//!   prelude::*,
 //! };
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -85,7 +83,7 @@ impl<'a> Remove<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::{Remove, Query};
+  /// # use learner::database::{Remove, Query};
   /// // Remove papers matching a text search
   /// let query = Query::text("quantum computing");
   /// let remove = Remove::from_query(query);
@@ -111,7 +109,7 @@ impl<'a> Remove<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Remove;
+  /// # use learner::database::Remove;
   /// # use learner::paper::Source;
   /// // Remove an arXiv paper
   /// let remove = Remove::by_source(Source::Arxiv, "2301.07041");
@@ -135,7 +133,7 @@ impl<'a> Remove<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Remove;
+  /// # use learner::database::Remove;
   /// // Remove all papers by an author
   /// let remove = Remove::by_author("Alice Researcher");
   /// ```
@@ -156,7 +154,7 @@ impl<'a> Remove<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Remove;
+  /// # use learner::{database::Remove, prelude::*};
   /// # use learner::paper::Source;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// # let mut db = learner::database::Database::open("papers.db").await?;

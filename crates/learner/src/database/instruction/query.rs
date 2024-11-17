@@ -19,8 +19,9 @@
 //!
 //! ```no_run
 //! use learner::{
-//!   database::{instruction::Query, Database},
+//!   database::{Database, OrderField, Query},
 //!   paper::Source,
+//!   prelude::*,
 //! };
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -131,8 +132,7 @@ impl<'a> Query<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Query;
-  /// # use learner::database::instruction::QueryCriteria;
+  /// # use learner::database::{Query, QueryCriteria};
   /// let query = Query::new(QueryCriteria::All);
   /// ```
   pub fn new(criteria: QueryCriteria<'a>) -> Self {
@@ -151,7 +151,7 @@ impl<'a> Query<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Query;
+  /// # use learner::database::Query;
   /// let query = Query::text("quantum computing");
   /// ```
   pub fn text(query: &'a str) -> Self { Self::new(QueryCriteria::Text(query)) }
@@ -165,7 +165,7 @@ impl<'a> Query<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Query;
+  /// # use learner::database::Query;
   /// # use learner::paper::Paper;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// let paper = Paper::new("2301.07041").await?;
@@ -190,7 +190,7 @@ impl<'a> Query<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Query;
+  /// # use learner::database::Query;
   /// # use learner::paper::Source;
   /// let query = Query::by_source(Source::Arxiv, "2301.07041");
   /// ```
@@ -210,7 +210,7 @@ impl<'a> Query<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Query;
+  /// # use learner::database::Query;
   /// let query = Query::by_author("Alice Researcher");
   /// ```
   pub fn by_author(name: &'a str) -> Self { Self::new(QueryCriteria::Author(name)) }
@@ -220,7 +220,7 @@ impl<'a> Query<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Query;
+  /// # use learner::database::Query;
   /// let query = Query::list_all();
   /// ```
   pub fn list_all() -> Self { Self::new(QueryCriteria::All) }
@@ -234,7 +234,7 @@ impl<'a> Query<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Query;
+  /// # use learner::database::Query;
   /// # use chrono::{DateTime, Utc};
   /// let date = DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap().with_timezone(&Utc);
   /// let query = Query::before_date(date);
@@ -250,7 +250,7 @@ impl<'a> Query<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::{Query, OrderField};
+  /// # use learner::database::{Query, OrderField};
   /// let query = Query::list_all().order_by(OrderField::PublicationDate);
   /// ```
   pub fn order_by(mut self, field: OrderField) -> Self {
@@ -263,7 +263,7 @@ impl<'a> Query<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::{Query, OrderField};
+  /// # use learner::database::{Query, OrderField};
   /// let query = Query::list_all().order_by(OrderField::PublicationDate).descending();
   /// ```
   pub fn descending(mut self) -> Self {

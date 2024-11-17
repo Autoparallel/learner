@@ -23,11 +23,9 @@
 //!
 //! ```no_run
 //! use learner::{
-//!   database::{
-//!     instruction::{Add, Query},
-//!     Database,
-//!   },
+//!   database::{Add, Database, Query},
 //!   paper::{Paper, Source},
+//!   prelude::*,
 //! };
 //!
 //! #[tokio::main]
@@ -109,7 +107,11 @@ use crate::{clients::*, error::*};
 /// # Usage
 ///
 /// ```no_run
-/// use learner::{database::Add, paper::Paper, prelude::*};
+/// use learner::{
+///   database::{Add, Database},
+///   paper::Paper,
+///   prelude::*,
+/// };
 ///
 /// async fn example() -> Result<(), LearnerError> {
 ///   // Now you can use both `DatabaseInstruction` and our `LearnerError`` type

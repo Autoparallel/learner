@@ -29,11 +29,9 @@
 //!
 //! ```no_run
 //! use learner::{
-//!   database::{
-//!     instruction::{Add, Query},
-//!     Database,
-//!   },
+//!   database::{Add, Database, Query},
 //!   paper::Paper,
+//!   prelude::*,
 //! };
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -63,7 +61,7 @@ mod instruction;
 
 pub use self::instruction::{
   add::Add,
-  query::{OrderField, Query},
+  query::{OrderField, Query, QueryCriteria},
   remove::Remove,
   DatabaseInstruction,
 };
@@ -83,7 +81,7 @@ pub use self::instruction::{
 /// metadata management features.
 pub struct Database {
   /// Active connection to the SQLite database
-  conn: Connection,
+  pub conn: Connection,
 }
 
 impl Database {

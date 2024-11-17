@@ -25,11 +25,9 @@
 //!
 //! ```no_run
 //! use learner::{
-//!   database::{
-//!     instruction::{Add, Query, Remove},
-//!     Database,
-//!   },
+//!   database::{Add, Database, Query, Remove},
 //!   paper::Paper,
+//!   prelude::*,
 //! };
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -93,7 +91,7 @@ use self::query::Query;
 /// Querying papers with different criteria:
 ///
 /// ```no_run
-/// # use learner::database::{Database, instruction::{DatabaseInstruction, Query}};
+/// # use learner::database::{Database, DatabaseInstruction, Query};
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut db = Database::open("papers.db").await?;
 ///
@@ -116,7 +114,7 @@ use self::query::Query;
 /// Implementing a custom instruction:
 ///
 /// ```no_run
-/// # use learner::database::{Database, instruction::DatabaseInstruction};
+/// # use learner::{database::{Database, DatabaseInstruction}, error::LearnerError};
 /// # use async_trait::async_trait;
 /// struct CountPapers;
 ///
@@ -124,12 +122,14 @@ use self::query::Query;
 /// impl DatabaseInstruction for CountPapers {
 ///   type Output = i64;
 ///
-///   async fn execute(&self, db: &mut Database) -> Result<Self::Output> {
-///     db.conn
-///       .call(|conn| {
-///         conn.query_row("SELECT COUNT(*) FROM papers", [], |row| row.get(0)).map_err(Into::into)
-///       })
-///       .await
+///   async fn execute(&self, db: &mut Database) -> std::result::Result<Self::Output, LearnerError> {
+///     Ok(
+///       db.conn
+///         .call(|conn| {
+///           conn.query_row("SELECT COUNT(*) FROM papers", [], |row| row.get(0)).map_err(Into::into)
+///         })
+///         .await?,
+///     )
 ///   }
 /// }
 /// # type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

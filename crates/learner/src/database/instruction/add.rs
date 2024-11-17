@@ -17,15 +17,13 @@
 //!
 //! ```no_run
 //! use learner::{
-//!   database::{
-//!     instruction::{Add, Query},
-//!     Database,
-//!   },
+//!   database::{Add, Database, Query},
 //!   paper::Paper,
+//!   prelude::*,
 //! };
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let mut db = Database::open("papers.db").await?;
+//! let mut db = Database::open(Database::default_path()).await?;
 //!
 //! // Add just paper metadata
 //! let paper = Paper::new("2301.07041").await?;
@@ -97,7 +95,7 @@ impl<'a> Add<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Add;
+  /// # use learner::database::Add;
   /// # use learner::paper::Paper;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// let paper = Paper::new("2301.07041").await?;
@@ -121,7 +119,7 @@ impl<'a> Add<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Add;
+  /// # use learner::database::Add;
   /// # use learner::paper::Paper;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// let paper = Paper::new("2301.07041").await?;
@@ -146,7 +144,7 @@ impl<'a> Add<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::{Add, Query};
+  /// # use learner::database::{Add, Query};
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// // Add documents for all papers by an author
   /// let query = Query::by_author("Alice Researcher");
@@ -168,7 +166,7 @@ impl<'a> Add<'a> {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::database::instruction::Add;
+  /// # use learner::database::Add;
   /// # use learner::paper::Paper;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// let paper = Paper::new("2301.07041").await?;
