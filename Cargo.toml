@@ -28,8 +28,10 @@ tokio = { version = "1.41", features = [
 tracing = { version = "0.1" }
 
 # learner dependencies
+async-trait = { version = "0.1" }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = { version = "5.0" }
+futures = { version = "0.3.31" }
 lazy_static = { version = "1.5" }
 lopdf = { version = "0.34" }
 quick-xml = { version = "0.37", features = ["serialize"] }
@@ -41,8 +43,6 @@ reqwest = { version = "0.12", features = [
 rusqlite = { version = "0.32", features = ["bundled", "functions", "chrono"] }
 serde_json = { version = "1.0" }
 tokio-rusqlite = { version = "0.6" }
-async-trait = { version = "0.1" }
-futures = { version = "0.3.31" }
 
 ## TUI dependencies
 crossterm = { version = "0.28" }

@@ -1,39 +1,98 @@
-//! Database instruction implementations for paper management.
+//! Query instruction implementation for retrieving papers from the database.
 //!
-//! This module provides a trait-based abstraction for database operations,
-//! allowing for type-safe and composable database queries and modifications.
-//! Each instruction type implements specific database operations while
-//! maintaining proper borrowing semantics and async safety.
+//! This module provides a flexible query system for searching and retrieving papers
+//! using various criteria. It supports:
+//!
+//! - Full-text search across titles and abstracts
+//! - Source-specific identifier lookups
+//! - Author name searches
+//! - Publication date filtering
+//! - Custom result ordering
+//!
+//! The implementation prioritizes:
+//! - Efficient query execution using prepared statements
+//! - SQLite full-text search integration
+//! - Type-safe query construction
+//! - Flexible result ordering
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use learner::{
+//!   database::{instruction::Query, Database},
+//!   paper::Source,
+//! };
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut db = Database::open("papers.db").await?;
+//!
+//! // Full-text search
+//! let papers = Query::text("quantum computing")
+//!   .order_by(OrderField::PublicationDate)
+//!   .descending()
+//!   .execute(&mut db)
+//!   .await?;
+//!
+//! // Search by author
+//! let papers = Query::by_author("Alice Researcher").execute(&mut db).await?;
+//!
+//! // Lookup by source identifier
+//! let papers = Query::by_source(Source::Arxiv, "2301.07041").execute(&mut db).await?;
+//! # Ok(())
+//! # }
+//! ```
 
 use super::*;
 
 /// Represents different ways to query papers in the database.
+///
+/// This enum defines the supported search criteria for paper queries,
+/// each providing different ways to locate papers in the database:
+///
+/// - Text-based searching using SQLite FTS
+/// - Direct lookups by source identifiers
+/// - Author-based searches
+/// - Publication date filtering
+/// - Complete collection retrieval
 #[derive(Debug)]
 pub enum QueryCriteria<'a> {
-  /// Full-text search across titles and abstracts
+  /// Full-text search across titles and abstracts using SQLite FTS
   Text(&'a str),
-  /// Search by source system and identifier
-  SourceId { source: Source, identifier: &'a str },
-  /// Search by author name (partial matches supported)
+  /// Direct lookup by source system and identifier
+  SourceId {
+    /// The source system (e.g., arXiv, DOI)
+    source:     Source,
+    /// The source-specific identifier
+    identifier: &'a str,
+  },
+  /// Search by author name with partial matching
   Author(&'a str),
-  /// Retrieve all papers
+  /// Retrieve the complete paper collection
   All,
-  /// Papers published before a specific date
+  /// Filter papers by publication date
   BeforeDate(DateTime<Utc>),
 }
 
-/// Available fields for ordering query results
+/// Available fields for ordering query results.
+///
+/// This enum defines the paper attributes that can be used for
+/// sorting query results. Each field maps to specific database
+/// columns and handles appropriate comparison logic.
 #[derive(Debug, Clone, Copy)]
 pub enum OrderField {
-  /// Order by paper title
+  /// Order alphabetically by paper title
   Title,
-  /// Order by publication date
+  /// Order chronologically by publication date
   PublicationDate,
-  /// Order by source and identifier
+  /// Order by source system and identifier
   Source,
 }
 
 impl OrderField {
+  /// Converts the ordering field to its SQL representation.
+  ///
+  /// Returns the appropriate SQL column names for ORDER BY clauses,
+  /// handling both single-column and multi-column ordering.
   fn as_sql_str(&self) -> &'static str {
     match self {
       OrderField::Title => "title",
@@ -43,23 +102,77 @@ impl OrderField {
   }
 }
 
-/// A query for retrieving papers from the database
+/// A query builder for retrieving papers from the database.
+///
+/// This struct provides a fluent interface for constructing paper queries,
+/// supporting various search criteria and result ordering options. It handles:
+///
+/// - Query criteria specification
+/// - Result ordering configuration
+/// - SQL generation and execution
+/// - Paper reconstruction from rows
 #[derive(Debug)]
 pub struct Query<'a> {
+  /// The search criteria to apply
   criteria:   QueryCriteria<'a>,
+  /// Optional field to sort results by
   order_by:   Option<OrderField>,
+  /// Whether to sort in descending order
   descending: bool,
 }
 
 impl<'a> Query<'a> {
-  /// Creates a new query with the given criteria
+  /// Creates a new query with the given criteria.
+  ///
+  /// # Arguments
+  ///
+  /// * `criteria` - The search criteria to use
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Query;
+  /// # use learner::database::instruction::QueryCriteria;
+  /// let query = Query::new(QueryCriteria::All);
+  /// ```
   pub fn new(criteria: QueryCriteria<'a>) -> Self {
     Self { criteria, order_by: None, descending: false }
   }
 
-  /// Creates a full-text search query
+  /// Creates a full-text search query.
+  ///
+  /// Searches through paper titles and abstracts using SQLite's FTS5
+  /// full-text search engine with wildcard matching.
+  ///
+  /// # Arguments
+  ///
+  /// * `query` - The text to search for
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Query;
+  /// let query = Query::text("quantum computing");
+  /// ```
   pub fn text(query: &'a str) -> Self { Self::new(QueryCriteria::Text(query)) }
 
+  /// Creates a query to find a specific paper.
+  ///
+  /// # Arguments
+  ///
+  /// * `paper` - The paper whose source and identifier should be matched
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Query;
+  /// # use learner::paper::Paper;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let paper = Paper::new("2301.07041").await?;
+  /// let query = Query::by_paper(&paper);
+  /// # Ok(())
+  /// # }
+  /// ```
   pub fn by_paper(paper: &'a Paper) -> Self {
     Self::new(QueryCriteria::SourceId {
       source:     paper.source,
@@ -67,32 +180,98 @@ impl<'a> Query<'a> {
     })
   }
 
-  /// Creates a query to find a paper by its source and identifier
+  /// Creates a query to find a paper by its source and identifier.
+  ///
+  /// # Arguments
+  ///
+  /// * `source` - The paper source (arXiv, DOI, etc.)
+  /// * `identifier` - The source-specific identifier
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Query;
+  /// # use learner::paper::Source;
+  /// let query = Query::by_source(Source::Arxiv, "2301.07041");
+  /// ```
   pub fn by_source(source: Source, identifier: &'a str) -> Self {
     Self::new(QueryCriteria::SourceId { source, identifier })
   }
 
-  /// Creates a query to find papers by author name
+  /// Creates a query to find papers by author name.
+  ///
+  /// Performs a partial match on author names, allowing for flexible
+  /// name searches.
+  ///
+  /// # Arguments
+  ///
+  /// * `name` - The author name to search for
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Query;
+  /// let query = Query::by_author("Alice Researcher");
+  /// ```
   pub fn by_author(name: &'a str) -> Self { Self::new(QueryCriteria::Author(name)) }
 
-  /// Creates a query that returns all papers
+  /// Creates a query that returns all papers.
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Query;
+  /// let query = Query::list_all();
+  /// ```
   pub fn list_all() -> Self { Self::new(QueryCriteria::All) }
 
-  /// Creates a query for papers published before a specific date
+  /// Creates a query for papers published before a specific date.
+  ///
+  /// # Arguments
+  ///
+  /// * `date` - The cutoff date for publication
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Query;
+  /// # use chrono::{DateTime, Utc};
+  /// let date = DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap().with_timezone(&Utc);
+  /// let query = Query::before_date(date);
+  /// ```
   pub fn before_date(date: DateTime<Utc>) -> Self { Self::new(QueryCriteria::BeforeDate(date)) }
 
-  /// Sets the field to order results by
+  /// Sets the field to order results by.
+  ///
+  /// # Arguments
+  ///
+  /// * `field` - The field to sort by
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::{Query, OrderField};
+  /// let query = Query::list_all().order_by(OrderField::PublicationDate);
+  /// ```
   pub fn order_by(mut self, field: OrderField) -> Self {
     self.order_by = Some(field);
     self
   }
 
-  /// Sets the order to descending (default is ascending)
+  /// Sets the order to descending (default is ascending).
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::{Query, OrderField};
+  /// let query = Query::list_all().order_by(OrderField::PublicationDate).descending();
+  /// ```
   pub fn descending(mut self) -> Self {
     self.descending = true;
     self
   }
 
+  /// Builds the SQL for retrieving paper IDs based on search criteria.
   fn build_criteria_sql(&self) -> (String, Vec<impl ToSql>) {
     match &self.criteria {
       QueryCriteria::Text(query) => (
@@ -128,6 +307,7 @@ impl<'a> Query<'a> {
     }
   }
 
+  /// Builds the SQL for retrieving complete paper data.
   fn build_paper_sql(&self) -> String {
     let base = "SELECT title, abstract_text, publication_date,
                            source, source_identifier, pdf_url, doi

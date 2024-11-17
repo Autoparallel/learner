@@ -1,140 +1,204 @@
-//! Paper management and metadata types for the learner library.
+//! Core paper management and metadata types for academic paper handling.
 //!
-//! This module provides types and functionality for working with academic papers from
-//! various sources including arXiv, IACR, and DOI-based repositories. It handles paper
-//! metadata, author information, and source-specific identifier parsing.
+//! This module provides the fundamental types and functionality for working with
+//! academic papers from various sources. It handles:
+//!
+//! - Paper metadata management
+//! - Multi-source identifier parsing
+//! - Author information
+//! - Document downloading
+//! - Source-specific identifier formats
+//!
+//! The implementation supports papers from:
+//! - arXiv (both new-style and old-style identifiers)
+//! - IACR (International Association for Cryptologic Research)
+//! - DOI (Digital Object Identifier)
 //!
 //! # Examples
+//!
+//! Creating papers from different sources:
 //!
 //! ```no_run
 //! use learner::paper::Paper;
 //!
-//! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create a paper from an arXiv URL
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // From arXiv URL
 //! let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
 //! println!("Title: {}", paper.title);
 //!
-//! // Or from a DOI
+//! // From DOI
 //! let paper = Paper::new("10.1145/1327452.1327492").await?;
 //!
-//! // Save to database
-//! let db = learner::database::Database::open("papers.db").await?;
-//! paper.save(&db).await?;
+//! // From IACR
+//! let paper = Paper::new("2023/123").await?;
+//!
+//! // Download associated PDF
+//! use std::path::PathBuf;
+//! let storage = PathBuf::from("papers");
+//! paper.download_pdf(&storage).await?;
 //! # Ok(())
 //! # }
 //! ```
 
 use super::*;
 
-/// A complete academic paper with its metadata.
+/// Complete representation of an academic paper with metadata.
 ///
-/// This struct represents a paper from any supported source (arXiv, IACR, DOI)
-/// along with its metadata including title, authors, abstract, and identifiers.
+/// This struct serves as the core data type for paper management, containing
+/// all relevant metadata and document references. It supports papers from
+/// multiple sources while maintaining a consistent interface for:
+///
+/// - Basic metadata (title, abstract, dates)
+/// - Author information
+/// - Source-specific identifiers
+/// - Document access
+///
+/// Papers can be created from various identifier formats and URLs, with the
+/// appropriate source being automatically detected.
 ///
 /// # Examples
 ///
+/// Creating and using papers:
+///
 /// ```no_run
+/// # use learner::paper::Paper;
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// // Fetch a paper from arXiv
-/// let paper = learner::paper::Paper::new("2301.07041").await?;
+/// // Create from identifier
+/// let paper = Paper::new("2301.07041").await?;
 ///
 /// // Access metadata
 /// println!("Title: {}", paper.title);
 /// println!("Authors: {}", paper.authors.len());
 /// println!("Abstract: {}", paper.abstract_text);
 ///
-/// // Download the PDF if available
-/// if let Some(pdf_url) = &paper.pdf_url {
-///   paper.download_pdf("paper.pdf".into()).await?;
+/// // Handle documents
+/// if let Some(url) = &paper.pdf_url {
+///   println!("PDF available at: {}", url);
 /// }
 /// # Ok(())
 /// # }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Paper {
-  /// The paper's title
+  /// The paper's full title
   pub title:             String,
-  /// List of the paper's authors
+  /// Complete list of paper authors with affiliations
   pub authors:           Vec<Author>,
-  /// The paper's abstract text
+  /// Full abstract or summary text
   pub abstract_text:     String,
-  /// When the paper was published or last updated
+  /// Publication or last update timestamp
   pub publication_date:  DateTime<Utc>,
-  /// The source system (arXiv, IACR, DOI)
+  /// Source repository or system (arXiv, IACR, DOI)
   pub source:            Source,
-  /// The source-specific identifier (e.g., arXiv ID, DOI)
+  /// Source-specific paper identifier
   pub source_identifier: String,
-  /// URL to the paper's PDF, if available
+  /// Optional URL to PDF document
   pub pdf_url:           Option<String>,
-  /// The paper's DOI, if available
+  /// Optional DOI reference
   pub doi:               Option<String>,
 }
 
-/// Represents an author of an academic paper.
+/// Author information for academic papers.
 ///
-/// Contains the author's name and optional affiliation and contact information.
+/// Represents a single author of a paper, including their name and optional
+/// institutional details. This struct supports varying levels of author
+/// information availability across different sources.
+///
+/// # Examples
+///
+/// ```
+/// use learner::paper::Author;
+///
+/// let author = Author {
+///   name:        "Alice Researcher".to_string(),
+///   affiliation: Some("Example University".to_string()),
+///   email:       Some("alice@example.edu".to_string()),
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Author {
-  /// The author's full name
+  /// Author's full name
   pub name:        String,
-  /// The author's institutional affiliation, if available
+  /// Optional institutional affiliation
   pub affiliation: Option<String>,
-  /// The author's email address, if available
+  /// Optional contact email
   pub email:       Option<String>,
 }
 
-/// The source repository or system from which a paper originates.
+/// Paper source system or repository.
 ///
-/// This enum represents the supported academic paper sources, each with its own
-/// identifier format and access patterns.
+/// Represents the different systems from which papers can be retrieved,
+/// each with its own identifier format and access patterns. The enum
+/// supports:
+///
+/// - arXiv: Both new (2301.07041) and old (math.AG/0601001) formats
+/// - IACR: Cryptology ePrint Archive format (2023/123)
+/// - DOI: Standard DOI format (10.1145/1327452.1327492)
+///
+/// # Examples
+///
+/// ```
+/// use std::str::FromStr;
+///
+/// use learner::paper::Source;
+///
+/// let arxiv = Source::from_str("arxiv").unwrap();
+/// let doi = Source::from_str("doi").unwrap();
+/// ```
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Source {
-  /// Papers from arxiv.org, using either new-style (2301.07041) or
-  /// old-style (math.AG/0601001) identifiers
+  /// arXiv.org papers (e.g., "2301.07041" or "math.AG/0601001")
   Arxiv,
-  /// Papers from the International Association for Cryptologic Research (eprint.iacr.org)
+  /// IACR Cryptology ePrint Archive papers (e.g., "2023/123")
   IACR,
-  /// Papers identified by a Digital Object Identifier (DOI)
+  /// Papers with Digital Object Identifiers
   DOI,
 }
 
 impl Paper {
   // TODO (autoparallel): This should probably be a `new_from_url` or just `from_url` or something.
-  // May be worth implementing a bunch of `From`s for paper eventually
-  /// Create a new paper from a URL, identifier, or DOI.
+  /// Creates a new paper from various identifier formats.
   ///
-  /// This method accepts various formats for paper identification and automatically
-  /// determines the appropriate source and fetches the paper's metadata.
+  /// This method serves as the primary entry point for paper creation,
+  /// supporting multiple input formats and automatically determining the
+  /// appropriate source handler. It accepts:
+  ///
+  /// - Full URLs from supported repositories
+  /// - Direct identifiers (arXiv ID, DOI, IACR ID)
+  /// - Both new and legacy identifier formats
+  ///
+  /// The method will fetch metadata from the appropriate source and
+  /// construct a complete Paper instance.
   ///
   /// # Arguments
   ///
-  /// * `input` - One of the following:
-  ///   - An arXiv URL (e.g., "https://arxiv.org/abs/2301.07041")
-  ///   - An arXiv ID (e.g., "2301.07041" or "math.AG/0601001")
-  ///   - An IACR URL (e.g., "https://eprint.iacr.org/2016/260")
-  ///   - An IACR ID (e.g., "2023/123")
-  ///   - A DOI URL (e.g., "https://doi.org/10.1145/1327452.1327492")
-  ///   - A DOI (e.g., "10.1145/1327452.1327492")
+  /// * `input` - Paper identifier in any supported format:
+  ///   - arXiv URLs: "https://arxiv.org/abs/2301.07041"
+  ///   - arXiv IDs: "2301.07041" or "math.AG/0601001"
+  ///   - IACR URLs: "https://eprint.iacr.org/2016/260"
+  ///   - IACR IDs: "2023/123"
+  ///   - DOI URLs: "https://doi.org/10.1145/1327452.1327492"
+  ///   - DOIs: "10.1145/1327452.1327492"
   ///
   /// # Returns
   ///
   /// Returns a `Result<Paper>` which is:
-  /// - `Ok(Paper)` - Successfully fetched paper with metadata
-  /// - `Err(LearnerError)` - Failed to parse input or fetch paper
+  /// - `Ok(Paper)` - Successfully created paper with metadata
+  /// - `Err(LearnerError)` - Failed to parse input or fetch metadata
   ///
   /// # Examples
   ///
   /// ```no_run
   /// # use learner::paper::Paper;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// // From arXiv URL
-  /// let paper1 = Paper::new("https://arxiv.org/abs/2301.07041").await?;
+  /// // From URL
+  /// let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
   ///
-  /// // From arXiv ID
-  /// let paper2 = Paper::new("2301.07041").await?;
+  /// // From identifier
+  /// let paper = Paper::new("2301.07041").await?;
   ///
   /// // From DOI
-  /// let paper3 = Paper::new("10.1145/1327452.1327492").await?;
+  /// let paper = Paper::new("10.1145/1327452.1327492").await?;
   /// # Ok(())
   /// # }
   /// ```
@@ -187,7 +251,40 @@ impl Paper {
     }
   }
 
-  pub async fn download_pdf(&self, dir: &PathBuf) -> Result<PathBuf> {
+  /// Downloads the paper's PDF to the specified directory.
+  ///
+  /// This method handles the retrieval and storage of the paper's PDF
+  /// document, if available. It will:
+  ///
+  /// 1. Check for PDF availability
+  /// 2. Download the document
+  /// 3. Store it with a formatted filename
+  /// 4. Handle network and storage errors
+  ///
+  /// # Arguments
+  ///
+  /// * `dir` - Target directory for PDF storage
+  ///
+  /// # Returns
+  ///
+  /// Returns a `Result` containing:
+  /// - `Ok(PathBuf)` - Path to the stored PDF file
+  /// - `Err(LearnerError)` - If download or storage fails
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::paper::Paper;
+  /// # use std::path::PathBuf;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let paper = Paper::new("2301.07041").await?;
+  /// let dir = PathBuf::from("papers");
+  /// let pdf_path = paper.download_pdf(&dir).await?;
+  /// println!("PDF stored at: {}", pdf_path.display());
+  /// # Ok(())
+  /// # }
+  /// ```
+  pub async fn download_pdf(&self, dir: &Path) -> Result<PathBuf> {
     let Some(pdf_url) = &self.pdf_url else {
       return Err(LearnerError::ApiError("No PDF URL available".into()));
     };
@@ -208,6 +305,29 @@ impl Paper {
     }
   }
 
+  /// Generates a standardized filename for the paper's PDF.
+  ///
+  /// Creates a filesystem-safe filename based on the paper's title,
+  /// suitable for PDF storage. The filename is:
+  /// - Truncated to a reasonable length
+  /// - Cleaned of problematic characters
+  /// - Suffixed with ".pdf"
+  ///
+  /// # Returns
+  ///
+  /// Returns a [`PathBuf`] containing the formatted filename.
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::paper::Paper;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let paper = Paper::new("2301.07041").await?;
+  /// let filename = paper.filename();
+  /// println!("Suggested filename: {}", filename.display());
+  /// # Ok(())
+  /// # }
+  /// ```
   pub fn filename(&self) -> PathBuf {
     let formatted_title = format::format_title(&self.title, Some(50));
     PathBuf::from(format!("{}.pdf", formatted_title))
@@ -334,7 +454,7 @@ mod tests {
   async fn test_arxiv_pdf_from_paper() {
     let paper = Paper::new("https://arxiv.org/abs/2301.07041").await.unwrap();
     let dir = tempdir().unwrap();
-    paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
+    paper.download_pdf(dir.path()).await.unwrap();
     let formatted_title = format::format_title("Verifiable Fully Homomorphic Encryption", Some(50));
     let path = dir.into_path().join(format!("{}.pdf", formatted_title));
     assert!(path.exists());
@@ -345,7 +465,7 @@ mod tests {
   async fn test_iacr_pdf_from_paper() {
     let paper = Paper::new("https://eprint.iacr.org/2016/260").await.unwrap();
     let dir = tempdir().unwrap();
-    paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
+    paper.download_pdf(dir.path()).await.unwrap();
     let formatted_title =
       format::format_title("On the Size of Pairing-based Non-interactive Arguments", Some(50));
     let path = dir.into_path().join(format!("{}.pdf", formatted_title));
@@ -361,7 +481,7 @@ mod tests {
     let paper = Paper::new("https://doi.org/10.1145/1327452.1327492").await.unwrap();
     dbg!(&paper);
     let dir = tempdir().unwrap();
-    paper.download_pdf(&dir.path().to_path_buf()).await.unwrap();
+    paper.download_pdf(dir.path()).await.unwrap();
     let path = dir.into_path().join(paper.filename());
     assert!(path.exists());
   }

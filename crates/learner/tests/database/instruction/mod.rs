@@ -1,11 +1,6 @@
 use chrono::{TimeZone, Utc};
 use learner::{
-  database::{
-    add::Add,
-    query::{OrderField, Query},
-    remove::Remove,
-    Database,
-  },
+  database::{Add, Database, OrderField, Query, Remove},
   paper::Source,
 };
 

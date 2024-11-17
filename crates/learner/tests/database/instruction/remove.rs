@@ -152,7 +152,6 @@ mod dry_run {
 
 /// Query-based removal tests
 mod query_based_removal {
-  use learner::database::query::OrderField;
 
   use super::*;
 

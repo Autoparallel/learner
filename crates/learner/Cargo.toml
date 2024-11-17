@@ -15,8 +15,10 @@ default = []
 tui     = ["dep:ratatui", "dep:crossterm"]
 
 [dependencies]
+async-trait    = { workspace = true }
 chrono         = { workspace = true }
 dirs           = { workspace = true }
+futures        = { workspace = true }
 lazy_static    = { workspace = true }
 lopdf          = { workspace = true }
 quick-xml      = { workspace = true }
@@ -29,8 +31,6 @@ thiserror      = { workspace = true }
 tokio          = { workspace = true }
 tokio-rusqlite = { workspace = true }
 tracing        = { workspace = true }
-async-trait    = { workspace = true }
-futures        = { workspace = true }
 
 # TUI dependencies (optional)
 crossterm = { workspace = true, optional = true }

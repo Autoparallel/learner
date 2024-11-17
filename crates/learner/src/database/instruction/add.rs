@@ -1,7 +1,45 @@
-//! Database instruction for adding papers and documents.
+//! Database instruction implementation for adding papers and documents.
 //!
-//! This module provides functionality to add papers, their metadata, and associated
-//! documents to the database, handling both individual papers and batch operations.
+//! This module provides functionality for adding papers and their associated documents
+//! to the database. It supports several addition patterns:
+//!
+//! - Adding paper metadata only
+//! - Adding complete papers with documents
+//! - Batch addition of documents for existing papers
+//!
+//! The implementation emphasizes:
+//! - Atomic transactions for data consistency
+//! - Efficient batch processing
+//! - Concurrent document downloads
+//! - Duplicate handling
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use learner::{
+//!   database::{
+//!     instruction::{Add, Query},
+//!     Database,
+//!   },
+//!   paper::Paper,
+//! };
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut db = Database::open("papers.db").await?;
+//!
+//! // Add just paper metadata
+//! let paper = Paper::new("2301.07041").await?;
+//! Add::paper(&paper).execute(&mut db).await?;
+//!
+//! // Add paper with document
+//! Add::complete(&paper).execute(&mut db).await?;
+//!
+//! // Add documents for papers matching a query
+//! let query = Query::by_author("Alice Researcher");
+//! Add::documents(query).execute(&mut db).await?;
+//! # Ok(())
+//! # }
+//! ```
 
 use std::collections::HashSet;
 
@@ -12,32 +50,132 @@ use super::*;
 // TODO (autoparallel): Would be good to have `Papers` and `Documents` and `Completes` instead,
 // possibly, and just have a simple API for single paper calls that just dumps into the 3 variants.
 /// Represents different types of additions to the database.
+///
+/// This enum defines the supported addition operations, each handling a different
+/// aspect of paper and document management:
+///
+/// - Metadata-only additions
+/// - Complete paper additions (metadata + document)
+/// - Batch document additions for existing papers
 #[derive(Debug)]
 pub enum Addition<'a> {
-  /// Add just the paper metadata
+  /// Add just the paper metadata without associated documents
   Paper(&'a Paper),
-  /// Add both paper and its document
+  /// Add both paper metadata and download its associated document
   Complete(&'a Paper),
-  /// Add documents for papers matching a query
+  /// Add documents for papers matching a specified query
   Documents(Query<'a>),
 }
 
 /// Database instruction for adding papers and documents.
+///
+/// This struct implements the [`DatabaseInstruction`] trait to provide
+/// paper and document addition functionality. It handles:
+///
+/// - Paper metadata insertion
+/// - Author information management
+/// - Document downloading and storage
+/// - Batch processing for multiple papers
+///
+/// Operations are performed atomically using database transactions to
+/// ensure consistency.
 pub struct Add<'a> {
+  /// The type of addition operation to perform
   addition: Addition<'a>,
 }
 
 impl<'a> Add<'a> {
-  /// Add a new paper to the database
+  /// Creates an instruction to add paper metadata only.
+  ///
+  /// This method creates an addition that will store the paper's metadata
+  /// in the database without downloading or storing its associated document.
+  ///
+  /// # Arguments
+  ///
+  /// * `paper` - Reference to the paper to add
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Add;
+  /// # use learner::paper::Paper;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let paper = Paper::new("2301.07041").await?;
+  /// let instruction = Add::paper(&paper);
+  /// # Ok(())
+  /// # }
+  /// ```
   pub fn paper(paper: &'a Paper) -> Self { Self { addition: Addition::Paper(paper) } }
 
-  /// Add a new paper along with its document
+  /// Creates an instruction to add a complete paper with its document.
+  ///
+  /// This method creates an addition that will:
+  /// 1. Store the paper's metadata
+  /// 2. Download the paper's document
+  /// 3. Store the document in the configured storage location
+  ///
+  /// # Arguments
+  ///
+  /// * `paper` - Reference to the paper to add
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Add;
+  /// # use learner::paper::Paper;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let paper = Paper::new("2301.07041").await?;
+  /// let instruction = Add::complete(&paper);
+  /// # Ok(())
+  /// # }
+  /// ```
   pub fn complete(paper: &'a Paper) -> Self { Self { addition: Addition::Complete(paper) } }
 
-  /// Add documents for papers matching the query
+  /// Creates an instruction to add documents for papers matching a query.
+  ///
+  /// This method supports batch document addition by:
+  /// 1. Finding papers matching the query
+  /// 2. Filtering out papers that already have documents
+  /// 3. Concurrently downloading missing documents
+  /// 4. Storing documents in the configured location
+  ///
+  /// # Arguments
+  ///
+  /// * `query` - Query to identify papers needing documents
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::{Add, Query};
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// // Add documents for all papers by an author
+  /// let query = Query::by_author("Alice Researcher");
+  /// let instruction = Add::documents(query);
+  ///
+  /// // Or add documents for papers matching a search
+  /// let query = Query::text("quantum computing");
+  /// let instruction = Add::documents(query);
+  /// # Ok(())
+  /// # }
+  /// ```
   pub fn documents(query: Query<'a>) -> Self { Self { addition: Addition::Documents(query) } }
 
-  /// Chain a document addition to a paper addition
+  /// Converts a paper-only addition to a complete addition.
+  ///
+  /// This method allows for fluent conversion of a paper metadata addition
+  /// to include document download and storage.
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Add;
+  /// # use learner::paper::Paper;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let paper = Paper::new("2301.07041").await?;
+  /// let instruction = Add::paper(&paper).with_document();
+  /// # Ok(())
+  /// # }
+  /// ```
   pub fn with_document(self) -> Self {
     match self.addition {
       Addition::Paper(paper) => Self { addition: Addition::Complete(paper) },
@@ -45,6 +183,7 @@ impl<'a> Add<'a> {
     }
   }
 
+  /// Builds the SQL for inserting paper metadata.
   fn build_paper_sql(paper: &Paper) -> (String, Vec<Option<String>>) {
     (
       "INSERT INTO papers (
@@ -64,6 +203,7 @@ impl<'a> Add<'a> {
     )
   }
 
+  /// Builds the SQL for inserting author information.
   fn build_author_sql(author: &Author, paper: &Paper) -> (String, Vec<Option<String>>) {
     (
       "INSERT INTO authors (paper_id, name, affiliation, email)
@@ -81,6 +221,7 @@ impl<'a> Add<'a> {
     )
   }
 
+  /// Builds the SQL for recording document storage information.
   fn build_document_sql(
     paper: &Paper,
     storage_path: &Path,
@@ -101,6 +242,7 @@ impl<'a> Add<'a> {
     )
   }
 
+  /// Builds the SQL for checking existing document records.
   fn build_existing_docs_sql(papers: &[&Paper]) -> (String, Vec<Option<String>>) {
     let mut params = Vec::new();
     let mut param_placeholders = Vec::new();

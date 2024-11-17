@@ -1,37 +1,181 @@
+//! Remove instruction implementation for paper deletion from the database.
+//!
+//! This module provides functionality for safely removing papers and their associated
+//! data from the database. It supports:
+//!
+//! - Query-based paper removal
+//! - Dry run simulation
+//! - Cascade deletion of related data
+//! - Atomic transactions
+//!
+//! The implementation emphasizes:
+//! - Safe deletion with transaction support
+//! - Cascading removals across related tables
+//! - Validation before deletion
+//! - Preview capabilities through dry runs
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use learner::{
+//!   database::{
+//!     instruction::{Query, Remove},
+//!     Database,
+//!   },
+//!   paper::Source,
+//! };
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut db = Database::open("papers.db").await?;
+//!
+//! // Remove a specific paper
+//! Remove::by_source(Source::Arxiv, "2301.07041").execute(&mut db).await?;
+//!
+//! // Preview deletion with dry run
+//! let papers = Remove::by_author("Alice Researcher").dry_run().execute(&mut db).await?;
+//!
+//! println!("Would remove {} papers", papers.len());
+//! # Ok(())
+//! # }
+//! ```
+
 use super::*;
 
-/// Options for configuring the remove operation
+/// Configuration options for paper removal operations.
+///
+/// This struct allows customization of how the remove operation
+/// behaves, particularly useful for validation and testing.
 #[derive(Default)]
 pub struct RemoveOptions {
-  /// If true, only simulate the removal and return what would be removed
+  /// When true, simulates the removal operation without modifying the database.
+  ///
+  /// This is useful for:
+  /// - Previewing which papers would be removed
+  /// - Validating removal queries
+  /// - Testing removal logic safely
   pub dry_run: bool,
 }
 
-/// Remove instruction for papers in the database
+/// Instruction for removing papers from the database.
+///
+/// This struct implements the [`DatabaseInstruction`] trait to provide
+/// paper removal functionality. It handles:
+///
+/// - Paper identification through queries
+/// - Related data cleanup (authors, files)
+/// - Transaction management
+/// - Dry run simulation
 pub struct Remove<'a> {
+  /// The query identifying papers to remove
   query:   Query<'a>,
+  /// Configuration options for the removal
   options: RemoveOptions,
 }
 
 impl<'a> Remove<'a> {
-  /// Create a remove instruction from any query
+  /// Creates a remove instruction from an existing query.
+  ///
+  /// This method allows any query to be converted into a remove operation,
+  /// providing maximum flexibility in identifying papers to remove.
+  ///
+  /// # Arguments
+  ///
+  /// * `query` - The query that identifies papers to remove
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::{Remove, Query};
+  /// // Remove papers matching a text search
+  /// let query = Query::text("quantum computing");
+  /// let remove = Remove::from_query(query);
+  ///
+  /// // Remove papers before a date
+  /// use chrono::{DateTime, Utc};
+  /// let date = DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z").unwrap().with_timezone(&Utc);
+  /// let query = Query::before_date(date);
+  /// let remove = Remove::from_query(query);
+  /// ```
   pub fn from_query(query: Query<'a>) -> Self { Self { query, options: RemoveOptions::default() } }
 
-  /// Convenience method for removing by source and id
+  /// Creates a remove instruction for a specific paper by its source and identifier.
+  ///
+  /// This is a convenience method for the common case of removing
+  /// a single paper identified by its source system and ID.
+  ///
+  /// # Arguments
+  ///
+  /// * `source` - The paper's source system (arXiv, DOI, etc.)
+  /// * `identifier` - The source-specific identifier
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Remove;
+  /// # use learner::paper::Source;
+  /// // Remove an arXiv paper
+  /// let remove = Remove::by_source(Source::Arxiv, "2301.07041");
+  ///
+  /// // Remove a DOI paper
+  /// let remove = Remove::by_source(Source::DOI, "10.1145/1327452.1327492");
+  /// ```
   pub fn by_source(source: Source, identifier: &'a str) -> Self {
     Self::from_query(Query::by_source(source, identifier))
   }
 
-  /// Convenience method for removing by author
+  /// Creates a remove instruction for all papers by a specific author.
+  ///
+  /// This method provides a way to remove all papers associated with
+  /// a particular author name. It performs partial matching on the name.
+  ///
+  /// # Arguments
+  ///
+  /// * `name` - The author name to match
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Remove;
+  /// // Remove all papers by an author
+  /// let remove = Remove::by_author("Alice Researcher");
+  /// ```
   pub fn by_author(name: &'a str) -> Self { Self::from_query(Query::by_author(name)) }
 
-  /// Enable dry run mode - no papers will actually be removed
+  /// Enables dry run mode for the remove operation.
+  ///
+  /// In dry run mode, the operation will:
+  /// - Query papers that would be removed
+  /// - Return the list of papers
+  /// - Not modify the database
+  ///
+  /// This is useful for:
+  /// - Previewing removal operations
+  /// - Validating queries
+  /// - Testing removal logic
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::instruction::Remove;
+  /// # use learner::paper::Source;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// # let mut db = learner::database::Database::open("papers.db").await?;
+  /// // Preview papers that would be removed
+  /// let papers = Remove::by_author("Alice Researcher").dry_run().execute(&mut db).await?;
+  ///
+  /// println!("Would remove {} papers", papers.len());
+  /// # Ok(())
+  /// # }
+  /// ```
   pub fn dry_run(mut self) -> Self {
     self.options.dry_run = true;
     self
   }
 
-  /// Build SQL to get paper IDs
+  /// Builds SQL to retrieve paper IDs for removal.
+  ///
+  /// Generates the SQL and parameters needed to find database IDs
+  /// for papers matching the removal criteria.
   fn build_paper_ids_sql(paper: &Paper) -> (String, Vec<Option<String>>) {
     ("SELECT id FROM papers WHERE source = ? AND source_identifier = ?".to_string(), vec![
       Some(paper.source.to_string()),
@@ -39,7 +183,11 @@ impl<'a> Remove<'a> {
     ])
   }
 
-  /// Build SQL to remove papers and related data
+  /// Builds SQL to remove papers and all related data.
+  ///
+  /// Generates cascading DELETE statements to remove papers and their
+  /// associated data (authors, files) in the correct order to maintain
+  /// referential integrity.
   fn build_remove_sql(ids: &[i64]) -> (String, Vec<Option<String>>) {
     let ids_str = ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(",");
 

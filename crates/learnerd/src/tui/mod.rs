@@ -46,7 +46,7 @@ use crossterm::{
   terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use learner::{
-  database::query::{OrderField, Query},
+  database::{OrderField, Query},
   format::format_title,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};

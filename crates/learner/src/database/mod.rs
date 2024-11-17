@@ -1,3 +1,58 @@
+//! Database management and operations for academic paper metadata.
+//!
+//! This module provides a flexible SQLite-based storage system for managing academic paper
+//! metadata and references while allowing users to maintain control over how and where their
+//! documents are stored. The database tracks:
+//!
+//! - Paper metadata (title, authors, abstract, publication date)
+//! - Source information (arXiv, DOI, IACR)
+//! - Document storage locations
+//! - Full-text search capabilities
+//!
+//! The design emphasizes:
+//! - User control over data storage locations
+//! - Flexible integration with external PDF viewers and tools
+//! - Efficient querying and organization of paper metadata
+//! - Separation of metadata from document storage
+//!
+//! # Architecture
+//!
+//! The database module uses a command pattern through the [`DatabaseInstruction`] trait,
+//! allowing for type-safe and composable database operations. Common operations are
+//! implemented as distinct instruction types:
+//!
+//! - [`Query`] - For searching and retrieving papers
+//! - [`Add`] - For adding new papers and documents
+//! - [`Remove`] - For removing papers from the database
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use learner::{
+//!   database::{
+//!     instruction::{Add, Query},
+//!     Database,
+//!   },
+//!   paper::Paper,
+//! };
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // Open database at default location
+//! let mut db = Database::open(Database::default_path()).await?;
+//!
+//! // Add a paper
+//! let paper = Paper::new("2301.07041").await?;
+//! Add::paper(&paper).execute(&mut db).await?;
+//!
+//! // Search for papers about neural networks
+//! let papers = Query::text("neural networks").execute(&mut db).await?;
+//!
+//! // Customize document storage location
+//! db.set_storage_path("~/Documents/research/papers").await?;
+//! # Ok(())
+//! # }
+//! ```
+
 use tokio_rusqlite::Connection;
 
 use super::*;
@@ -6,41 +61,64 @@ mod instruction;
 // pub mod models;
 #[cfg(test)] mod tests;
 
-pub use self::instruction::*;
+pub use self::instruction::{
+  add::Add,
+  query::{OrderField, Query},
+  remove::Remove,
+  DatabaseInstruction,
+};
 
-/// Main database connection handler
+/// Main database connection handler for the paper management system.
+///
+/// The `Database` struct provides the primary interface for interacting with the SQLite
+/// database that stores paper metadata and document references. It handles:
+///
+/// - Database initialization and schema management
+/// - Storage path configuration for documents
+/// - Connection management for async database operations
+///
+/// The database is designed to separate metadata storage (managed by this system)
+/// from document storage (which can be managed by external tools), allowing users
+/// to maintain their preferred document organization while benefiting from the
+/// metadata management features.
 pub struct Database {
+  /// Active connection to the SQLite database
   conn: Connection,
 }
 
 impl Database {
   /// Opens an existing database or creates a new one at the specified path.
   ///
-  /// This method will:
-  /// 1. Create the database file if it doesn't exist
-  /// 2. Initialize the schema using migrations
-  /// 3. Set up full-text search indexes
+  /// This method performs complete database initialization:
+  /// 1. Creates parent directories if they don't exist
+  /// 2. Initializes the SQLite database file
+  /// 3. Applies schema migrations
+  /// 4. Sets up full-text search indexes for paper metadata
+  /// 5. Configures default storage paths if not already set
   ///
   /// # Arguments
   ///
-  /// * `path` - Path where the database file should be created or opened
+  /// * `path` - Path where the database file should be created or opened. This can be:
+  ///   - An absolute path to a specific location
+  ///   - A relative path from the current directory
+  ///   - The result of [`Database::default_path()`] for platform-specific default location
   ///
   /// # Returns
   ///
   /// Returns a [`Result`] containing either:
-  /// - A [`Database`] handle for database operations
-  /// - A [`LearnerError`] if database creation or initialization fails
+  /// - A [`Database`] handle ready for operations
+  /// - A [`LearnerError`] if initialization fails
   ///
   /// # Examples
   ///
   /// ```no_run
   /// # use learner::database::Database;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// // Open in a specific location
-  /// let db = Database::open("papers.db").await?;
-  ///
-  /// // Or use the default location
+  /// // Use platform-specific default location
   /// let db = Database::open(Database::default_path()).await?;
+  ///
+  /// // Or specify a custom location
+  /// let db = Database::open("/path/to/papers.db").await?;
   /// # Ok(())
   /// # }
   /// ```
@@ -72,7 +150,29 @@ impl Database {
     Ok(db)
   }
 
-  /// Get the current storage path for document files
+  /// Gets the configured storage path for document files.
+  ///
+  /// The storage path determines where document files (like PDFs) will be saved
+  /// when downloaded through the system. This path is stored in the database
+  /// configuration and can be modified using [`Database::set_storage_path()`].
+  ///
+  /// # Returns
+  ///
+  /// Returns a `Result` containing either:
+  /// - The configured [`PathBuf`] for document storage
+  /// - A [`LearnerError`] if the path cannot be retrieved
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::Database;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let db = Database::open(Database::default_path()).await?;
+  /// let storage_path = db.get_storage_path().await?;
+  /// println!("Documents are stored in: {}", storage_path.display());
+  /// # Ok(())
+  /// # }
+  /// ```
   pub async fn get_storage_path(&self) -> Result<PathBuf> {
     Ok(
       self
@@ -90,29 +190,51 @@ impl Database {
 
   /// Sets the storage path for document files, validating that the path is usable.
   ///
-  /// This function performs several checks to ensure the path is valid for storing files:
+  /// This method configures where document files (like PDFs) will be stored when
+  /// downloaded through the system. It performs extensive validation to ensure the
+  /// path is usable and accessible:
+  ///
   /// - Verifies the path exists or can be created
-  /// - Checks if the filesystem is writable
-  /// - Validates sufficient permissions
-  /// - Ensures the path is absolute
+  /// - Confirms the filesystem is writable
+  /// - Validates sufficient permissions exist
+  /// - Ensures the path is absolute for reliability
+  ///
+  /// When changing the storage path, existing documents are not automatically moved.
+  /// Users should manually migrate their documents if needed.
   ///
   /// # Arguments
   ///
-  /// * `path` - The path where document files should be stored
+  /// * `path` - The path where document files should be stored. Must be an absolute path.
   ///
   /// # Returns
   ///
   /// Returns a `Result` containing:
-  /// - `Ok(())` if the path is valid and has been set
+  /// - `Ok(())` if the path is valid and has been configured
   /// - `Err(LearnerError)` if the path is invalid or cannot be used
   ///
   /// # Errors
   ///
   /// This function will return an error if:
+  /// - The path is not absolute
   /// - The path cannot be created
   /// - The filesystem is read-only
   /// - Insufficient permissions exist
-  /// - The path is not absolute
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::database::Database;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let db = Database::open(Database::default_path()).await?;
+  ///
+  /// // Set custom storage location
+  /// db.set_storage_path("/data/papers").await?;
+  ///
+  /// // Or use home directory
+  /// db.set_storage_path("~/Documents/papers").await?;
+  /// # Ok(())
+  /// # }
+  /// ```
   pub async fn set_storage_path(&self, path: impl AsRef<Path>) -> Result<()> {
     let original_path_result = self.get_storage_path().await;
     let path = path.as_ref();
@@ -186,37 +308,57 @@ impl Database {
     Ok(())
   }
 
-  /// Returns the default path for the database file.
+  /// Returns the platform-specific default path for the database file.
   ///
-  /// The path is constructed as follows:
-  /// - On Unix: `~/.local/share/learner/learner.db`
-  /// - On macOS: `~/Library/Application Support/learner/learner.db`
-  /// - On Windows: `%APPDATA%\learner\learner.db`
+  /// This method provides a sensible default location for the database file
+  /// following platform conventions:
+  ///
+  /// - Unix: `~/.local/share/learner/learner.db`
+  /// - macOS: `~/Library/Application Support/learner/learner.db`
+  /// - Windows: `%APPDATA%\learner\learner.db`
   /// - Fallback: `./learner.db` in the current directory
+  ///
+  /// # Returns
+  ///
+  /// Returns a [`PathBuf`] pointing to the default database location for the
+  /// current platform.
   ///
   /// # Examples
   ///
   /// ```no_run
-  /// let path = learner::database::Database::default_path();
-  /// println!("Database will be stored at: {}", path.display());
+  /// use learner::database::Database;
+  ///
+  /// let path = Database::default_path();
+  /// println!("Default database location: {}", path.display());
   /// ```
   pub fn default_path() -> PathBuf {
     dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("learner").join("learner.db")
   }
 
-  /// Returns the default path for PDF storage.
+  /// Returns the platform-specific default path for document storage.
   ///
-  /// The path is constructed as follows:
-  /// - On Unix: `~/Documents/learner/papers`
-  /// - On macOS: `~/Documents/learner/papers`
-  /// - On Windows: `Documents\learner\papers`
+  /// This method provides a sensible default location for storing document files
+  /// following platform conventions:
+  ///
+  /// - Unix: `~/Documents/learner/papers`
+  /// - macOS: `~/Documents/learner/papers`
+  /// - Windows: `Documents\learner\papers`
   /// - Fallback: `./papers` in the current directory
+  ///
+  /// Users can override this default using [`Database::set_storage_path()`].
+  ///
+  /// # Returns
+  ///
+  /// Returns a [`PathBuf`] pointing to the default document storage location
+  /// for the current platform.
   ///
   /// # Examples
   ///
   /// ```no_run
-  /// let path = learner::database::Database::default_storage_path();
-  /// println!("PDFs will be stored at: {}", path.display());
+  /// use learner::database::Database;
+  ///
+  /// let path = Database::default_storage_path();
+  /// println!("Default document storage: {}", path.display());
   /// ```
   pub fn default_storage_path() -> PathBuf {
     dirs::document_dir().unwrap_or_else(|| PathBuf::from(".")).join("learner").join("papers")
