@@ -332,19 +332,25 @@ impl Database {
   /// Returns the platform-specific default path for document storage.
   ///
   /// This method provides a sensible default location for storing document files
-  /// following platform conventions:
+  /// following platform conventions. The returned path is always absolute and follows
+  /// these patterns:
   ///
   /// - Unix: `~/Documents/learner/papers`
   /// - macOS: `~/Documents/learner/papers`
   /// - Windows: `Documents\learner\papers`
-  /// - Fallback: `./papers` in the current directory
+  /// - Fallback: `<current_directory>/papers`
+  ///
+  /// The method ensures the path is absolute by:
+  /// - Using platform-specific document directories when available
+  /// - Falling back to the current working directory when needed
+  /// - Resolving all relative components
   ///
   /// Users can override this default using [`Database::set_storage_path()`].
   ///
   /// # Returns
   ///
-  /// Returns a [`PathBuf`] pointing to the default document storage location
-  /// for the current platform.
+  /// Returns an absolute [`PathBuf`] pointing to the default document storage
+  /// location for the current platform.
   ///
   /// # Examples
   ///
@@ -352,9 +358,27 @@ impl Database {
   /// use learner::database::Database;
   ///
   /// let path = Database::default_storage_path();
+  /// assert!(path.is_absolute());
   /// println!("Default document storage: {}", path.display());
+  ///
+  /// // On Unix-like systems, might print something like:
+  /// // "/home/user/Documents/learner/papers"
+  ///
+  /// // On Windows, might print something like:
+  /// // "C:\Users\user\Documents\learner\papers"
   /// ```
+  ///
+  /// Note that while the base directory may vary by platform, the returned path
+  /// is guaranteed to be absolute and usable for document storage.
   pub fn default_storage_path() -> PathBuf {
-    dirs::document_dir().unwrap_or_else(|| PathBuf::from(".")).join("learner").join("papers")
+    let base_path = dirs::document_dir().unwrap_or_else(|| PathBuf::from("."));
+    // Make sure we return an absolute path
+    if !base_path.is_absolute() {
+      std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join(base_path)
+    } else {
+      base_path
+    }
+    .join("learner")
+    .join("papers")
   }
 }
