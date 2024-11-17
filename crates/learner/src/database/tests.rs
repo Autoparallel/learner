@@ -3,7 +3,9 @@ use super::*;
 /// Helper function to set up a test database
 async fn setup_test_db() -> (Database, PathBuf, tempfile::TempDir) {
   let dir = tempdir().unwrap();
-  let path = dir.path().join("test.db");
+  // Convert to absolute path explicitly
+  let abs_dir = dir.path().canonicalize().unwrap();
+  let path = abs_dir.join("test.db");
   let db = Database::open(&path).await.unwrap();
   (db, path, dir)
 }
