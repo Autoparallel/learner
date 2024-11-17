@@ -81,7 +81,7 @@ pub async fn init(cli: Cli) -> Result<()> {
   let db = Database::open(&db_path).await?;
 
   // Set up PDF directory
-  let pdf_dir = Database::default_pdf_path();
+  let pdf_dir = Database::default_storage_path();
   println!(
     "\n{} PDF files will be stored in: {}",
     style(PAPER).cyan(),
@@ -106,7 +106,7 @@ pub async fn init(cli: Cli) -> Result<()> {
   };
 
   std::fs::create_dir_all(&pdf_dir)?;
-  db.set_config("pdf_dir", &pdf_dir.to_string_lossy()).await?;
+  db.set_storage_path(&pdf_dir.to_string_lossy().to_string()).await?;
 
   println!("{} Database initialized successfully!", style(SUCCESS).green());
   Ok(())

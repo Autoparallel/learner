@@ -41,6 +41,7 @@ use learner::{
   database::Database,
   error::LearnerError,
   paper::{Paper, Source},
+  prelude::*,
 };
 use tracing::{debug, trace};
 use tracing_subscriber::EnvFilter;
@@ -109,9 +110,10 @@ pub struct Cli {
 /// - 3+: trace
 fn setup_logging(verbosity: u8) {
   let filter = match verbosity {
-    0 => "warn",
-    1 => "info",
-    2 => "debug",
+    0 => "error",
+    1 => "warn",
+    2 => "info",
+    3 => "debug",
     _ => "trace",
   };
 

@@ -225,7 +225,7 @@ impl UIState {
     if let Some(paper) = self.selected_paper() {
       let pdf_path = format!(
         "{}/{}.pdf",
-        Database::default_pdf_path().display(),
+        Database::default_storage_path().display(),
         format_title(&paper.title, Some(50))
       );
 

@@ -14,7 +14,7 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
     default_path
   });
   trace!("Using database at: {}", path.display());
-  let db = Database::open(&path).await?;
+  let mut db = Database::open(&path).await?;
 
   println!("{} Fetching paper: {}", style(LOOKING_GLASS).cyan(), style(&identifier).yellow());
 
@@ -29,9 +29,15 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
     style(paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", ")).white()
   );
 
-  match paper.save(&db).await {
-    Ok(id) => {
-      println!("\n{} Saved paper with ID: {}", style(SAVE).green(), style(id).yellow());
+  // TODO (autoparallel): This flow could be refactored now with the `Add::complete` to make it
+  // easier.
+  match Add::paper(&paper).execute(&mut db).await {
+    Ok(papers) => {
+      println!(
+        "\n{} Saved paper with ID: {}",
+        style(SAVE).green(),
+        style(papers[0].source_identifier.clone()).yellow()
+      );
 
       // Handle PDF download for newly added paper
       if paper.pdf_url.is_some() && !no_pdf {
@@ -44,19 +50,10 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
         if should_download {
           println!("{} Downloading PDF...", style(LOOKING_GLASS).cyan());
 
-          let pdf_dir = match db.get_config("pdf_dir").await? {
-            Some(dir) => PathBuf::from(dir),
-            None => {
-              println!(
-                "{} PDF directory not configured. Run {} first",
-                style(WARNING).yellow(),
-                style("learnerd init").cyan()
-              );
-              return Ok(());
-            },
-          };
+          let _pdf_dir = db.get_storage_path().await?;
 
-          match paper.download_pdf(pdf_dir).await {
+          // TODO: Don't use this direct download.
+          match Add::complete(&paper).execute(&mut db).await {
             Ok(_) => {
               println!("{} PDF downloaded successfully!", style(SUCCESS).green());
             },
@@ -80,69 +77,68 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
         println!("\n{} No PDF URL available for this paper", style(WARNING).yellow());
       }
     },
-    Err(e) if e.is_duplicate_error() => {
-      println!("\n{} This paper is already in your database", style("ℹ").blue());
+    Err(e) =>
+      if let LearnerError::DatabaseDuplicatePaper(_) = e {
+        println!("\n{} This paper is already in your database", style("ℹ").blue());
 
-      // Check existing PDF status
-      if paper.pdf_url.is_some() && !no_pdf {
-        if let Ok(Some(dir)) = db.get_config("pdf_dir").await {
-          let pdf_dir = PathBuf::from(dir);
-          let formatted_title = learner::format::format_title(&paper.title, Some(50));
-          let pdf_path = pdf_dir.join(format!("{}.pdf", formatted_title));
+        // Check existing PDF status
+        if paper.pdf_url.is_some() && !no_pdf {
+          if let Ok(pdf_dir) = db.get_storage_path().await {
+            let pdf_path = pdf_dir.join(paper.filename());
+            if pdf_path.exists() {
+              println!(
+                "   {} PDF exists at: {}",
+                style("📄").cyan(),
+                style(pdf_path.display()).yellow()
+              );
 
-          if pdf_path.exists() {
-            println!(
-              "   {} PDF exists at: {}",
-              style("📄").cyan(),
-              style(pdf_path.display()).yellow()
-            );
+              let should_redownload = if cli.accept_defaults {
+                false // Default to not redownloading in automated mode
+              } else {
+                dialoguer::Confirm::new()
+                  .with_prompt("Download fresh copy? (This will overwrite the existing file)")
+                  .default(false)
+                  .interact()?
+              };
 
-            let should_redownload = if cli.accept_defaults {
-              false // Default to not redownloading in automated mode
-            } else {
-              dialoguer::Confirm::new()
-                .with_prompt("Download fresh copy? (This will overwrite the existing file)")
-                .default(false)
-                .interact()?
-            };
-
-            if should_redownload {
-              println!("{} Downloading fresh copy of PDF...", style(LOOKING_GLASS).cyan());
-              match paper.download_pdf(pdf_dir).await {
-                Ok(_) => println!("{} PDF downloaded successfully!", style(SUCCESS).green()),
-                Err(e) => println!(
-                  "{} Failed to download PDF: {}",
-                  style(WARNING).yellow(),
-                  style(e.to_string()).red()
-                ),
+              if should_redownload {
+                println!("{} Downloading fresh copy of PDF...", style(LOOKING_GLASS).cyan());
+                match paper.download_pdf(&pdf_dir).await {
+                  Ok(_) => println!("{} PDF downloaded successfully!", style(SUCCESS).green()),
+                  Err(e) => println!(
+                    "{} Failed to download PDF: {}",
+                    style(WARNING).yellow(),
+                    style(e.to_string()).red()
+                  ),
+                }
               }
-            }
-          } else {
-            let should_download = if cli.accept_defaults {
-              true // Default to downloading in automated mode
             } else {
-              dialoguer::Confirm::new()
-                .with_prompt("PDF not found. Download it now?")
-                .default(true)
-                .interact()?
-            };
+              let should_download = if cli.accept_defaults {
+                true // Default to downloading in automated mode
+              } else {
+                dialoguer::Confirm::new()
+                  .with_prompt("PDF not found. Download it now?")
+                  .default(true)
+                  .interact()?
+              };
 
-            if should_download {
-              println!("{} Downloading PDF...", style(LOOKING_GLASS).cyan());
-              match paper.download_pdf(pdf_dir).await {
-                Ok(_) => println!("{} PDF downloaded successfully!", style(SUCCESS).green()),
-                Err(e) => println!(
-                  "{} Failed to download PDF: {}",
-                  style(WARNING).yellow(),
-                  style(e.to_string()).red()
-                ),
+              if should_download {
+                println!("{} Downloading PDF...", style(LOOKING_GLASS).cyan());
+                match paper.download_pdf(&pdf_dir).await {
+                  Ok(_) => println!("{} PDF downloaded successfully!", style(SUCCESS).green()),
+                  Err(e) => println!(
+                    "{} Failed to download PDF: {}",
+                    style(WARNING).yellow(),
+                    style(e.to_string()).red()
+                  ),
+                }
               }
             }
           }
+        } else {
+          return Err(LearnerdError::from(e));
         }
-      }
-    },
-    Err(e) => return Err(LearnerdError::Learner(e)),
+      },
   }
 
   Ok(())

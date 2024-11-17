@@ -90,8 +90,10 @@ build-linux:
 
 # Run the tests on your local OS
 test:
-    @just header "Running tests"
-    cargo test --workspace --all-targets
+    @just header "Running main test suite"
+    cargo test --workspace --all-targets --all-features
+    @just header "Running doc tests"
+    cargo test --workspace --doc
 
 # Run clippy for the workspace on your local OS
 lint:

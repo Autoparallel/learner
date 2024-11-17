@@ -12,7 +12,7 @@ repository = "https://github.com/autoparallel/learner"
 
 [workspace.dependencies]
 # local
-learner = { path = "crates/learner", version = "=0.6.0" }
+learner = { path = "crates/learner", version = "=0.7.0" }
 
 # shared dependencies
 serde = { version = "1.0", features = ["derive"] }
@@ -28,8 +28,10 @@ tokio = { version = "1.41", features = [
 tracing = { version = "0.1" }
 
 # learner dependencies
+async-trait = { version = "0.1" }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = { version = "5.0" }
+futures = { version = "0.3.31" }
 lazy_static = { version = "1.5" }
 lopdf = { version = "0.34" }
 quick-xml = { version = "0.37", features = ["serialize"] }

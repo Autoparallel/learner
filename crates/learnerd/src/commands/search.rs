@@ -14,7 +14,7 @@ pub async fn search(cli: Cli, query: String) -> Result<()> {
     default_path
   });
   trace!("Using database at: {}", path.display());
-  let db = Database::open(&path).await?;
+  let mut db = Database::open(&path).await?;
 
   println!("{} Searching for: {}", style(LOOKING_GLASS).cyan(), style(&query).yellow());
 
@@ -22,7 +22,7 @@ pub async fn search(cli: Cli, query: String) -> Result<()> {
   let search_query = query.split_whitespace().collect::<Vec<_>>().join(" OR ");
   debug!("Modified search query: {}", search_query);
 
-  let papers = db.search_papers(&search_query).await?;
+  let papers = Query::text(&search_query).execute(&mut db).await?;
   if papers.is_empty() {
     println!("{} No papers found matching: {}", style(WARNING).yellow(), style(&query).yellow());
   } else {

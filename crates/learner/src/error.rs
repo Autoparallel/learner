@@ -161,46 +161,14 @@ pub enum LearnerError {
   #[error("No messages were supplied to send to the LLM.")]
   LLMMissingMessage,
 
-  // TODO (autoparallel): This can be gotten rid of if we use an enum to handle the ways to sort
-  // data in the database instead of a string.
-  /// An error working with the database.
-  #[error("{0}")]
-  Database(String),
-}
-
-impl LearnerError {
-  /// Checks if this error represents a duplicate entry in the database.
+  /// Indicates an attempt to add a paper that already exists in the database.
   ///
-  /// This helper method checks for SQLite's unique constraint violation, which
-  /// occurs when trying to insert a paper that already exists in the database
-  /// (matching source and source_identifier).
+  /// This error occurs during paper addition operations when the database
+  /// already contains a paper with the same source and identifier. This helps
+  /// prevent duplicate entries and maintains database integrity.
   ///
-  /// # Examples
-  ///
-  /// ```
-  /// use learner::error::LearnerError;
-  ///
-  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// let db = learner::database::Database::open("papers.db").await?;
-  /// let paper = learner::paper::Paper::new("2301.07041").await?;
-  ///
-  /// match paper.save(&db).await {
-  ///   Ok(id) => println!("Saved paper with ID: {}", id),
-  ///   Err(e) if e.is_duplicate_error() => println!("Paper already exists!"),
-  ///   Err(e) => return Err(e.into()),
-  /// }
-  /// # Ok(())
-  /// # }
-  /// ```
-  ///
-  /// This is particularly useful for providing friendly error messages when
-  /// attempting to add papers that are already in the database.
-  pub fn is_duplicate_error(&self) -> bool {
-    matches!(
-        self,
-        LearnerError::AsyncSqlite(tokio_rusqlite::Error::Rusqlite(
-            rusqlite::Error::SqliteFailure(error, _)
-        )) if error.code == rusqlite::ErrorCode::ConstraintViolation
-    )
-  }
+  /// The error includes the paper's title to help users identify which paper
+  /// caused the conflict.
+  #[error("Tried to add a paper titled \"{0}\" that was already in the database.")]
+  DatabaseDuplicatePaper(String),
 }
