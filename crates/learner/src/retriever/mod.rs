@@ -67,6 +67,15 @@ pub struct Retriever {
   pub headers:           HashMap<String, String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct FieldMap {
+  /// JSON path to extract value from
+  pub path:      String,
+  /// Optional transformation to apply
+  #[serde(default)]
+  pub transform: Option<Transform>,
+}
+
 /// Available transformations for field values
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type")]
@@ -132,6 +141,20 @@ impl Retriever {
         Ok(paper)
       },
     }
+  }
+}
+
+fn apply_transform(value: &str, transform: &Transform) -> Result<String> {
+  match transform {
+    Transform::Replace { pattern, replacement } => Regex::new(pattern)
+      .map_err(|e| LearnerError::ApiError(format!("Invalid regex: {}", e)))
+      .map(|re| re.replace_all(value, replacement.as_str()).into_owned()),
+    Transform::Date { from_format, to_format } =>
+      chrono::NaiveDateTime::parse_from_str(value, from_format)
+        .map_err(|e| LearnerError::ApiError(format!("Invalid date: {}", e)))
+        .map(|dt| dt.format(to_format).to_string()),
+    Transform::Url { base, suffix } =>
+      Ok(format!("{}{}", base.replace("{value}", value), suffix.as_deref().unwrap_or(""))),
   }
 }
 
@@ -277,7 +300,7 @@ mod tests {
 
       // Verify OAI-PMH paths
       if let Some(map) = field_maps.get("title") {
-        assert!(map.paths.contains(&"OAI-PMH/GetRecord/record/metadata/dc/title".to_string()));
+        assert!(map.path.contains(&"OAI-PMH/GetRecord/record/metadata/dc/title".to_string()));
       } else {
         panic!("Missing title field map");
       }

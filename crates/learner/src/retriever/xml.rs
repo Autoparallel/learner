@@ -5,9 +5,6 @@ use serde::Deserialize;
 
 use super::*;
 
-// TODO (autoparallel): We should deserialize into a regex for the transforms and likely make it
-// static too so it isn't rebuilt every time
-
 /// Configuration for XML response processing
 #[derive(Debug, Clone, Deserialize)]
 pub struct XmlConfig {
@@ -18,127 +15,83 @@ pub struct XmlConfig {
   pub field_maps:       HashMap<String, FieldMap>,
 }
 
-/// Mapping configuration for a paper field
-#[derive(Debug, Clone, Deserialize)]
-pub struct FieldMap {
-  /// Path(s) to extract content from
-  pub paths:          Vec<String>,
-  /// How to join multiple values if found
-  #[serde(default)]
-  pub join_separator: Option<String>,
-  /// Optional transformation to apply
-  #[serde(default)]
-  pub transform:      Option<Transform>,
-}
-
 #[async_trait]
 impl ResponseProcessor for XmlConfig {
   async fn process_response(&self, data: &[u8]) -> Result<PaperNew> {
-    let mut xml = String::from_utf8_lossy(data).to_string();
-    if self.strip_namespaces {
-      xml = strip_xml_namespaces(&xml);
-    }
-
-    trace!("Processing XML: {}", xml);
+    let xml = if self.strip_namespaces {
+      strip_xml_namespaces(&String::from_utf8_lossy(data))
+    } else {
+      String::from_utf8_lossy(data).to_string()
+    };
 
     let content = self.extract_content(&xml)?;
 
-    // Helper closure to extract required field
+    // Helper function to extract and transform field
     let get_field = |name: &str| -> Result<String> {
       let map = self
         .field_maps
         .get(name)
         .ok_or_else(|| LearnerError::ApiError(format!("Missing field mapping for {}", name)))?;
 
-      let values: Vec<String> =
-        map.paths.iter().filter_map(|path| content.get(path)).cloned().collect();
+      let value = content
+        .get(&map.path)
+        .ok_or_else(|| LearnerError::ApiError(format!("No content found for {}", name)))?;
 
-      if values.is_empty() {
-        return Err(LearnerError::ApiError(format!("No content found for {}", name)));
-      }
-
-      // Join values if needed
-      let value =
-        if let Some(sep) = &map.join_separator { values.join(sep) } else { values[0].clone() };
-
-      // Apply transformation if configured
       if let Some(transform) = &map.transform {
-        self.apply_transform(&value, transform)
+        apply_transform(value, transform)
       } else {
-        Ok(value)
+        Ok(value.clone())
       }
     };
 
-    // Extract required fields
     let title = get_field("title")?;
     let abstract_text = get_field("abstract")?;
-    let publication_date_str = get_field("publication_date")?;
-
-    // Parse the date, supporting multiple formats
-    let publication_date =
-      if let Ok(date) = chrono::DateTime::parse_from_rfc3339(&publication_date_str) {
-        date.with_timezone(&Utc)
-      } else {
-        // Try parsing with different formats
-        chrono::NaiveDateTime::parse_from_str(&publication_date_str, "%Y-%m-%dT%H:%M:%SZ")
-          .map(|dt| Utc.from_utc_datetime(&dt))
-          .map_err(|e| {
-            LearnerError::ApiError(format!(
-              "Invalid date format: {} - Error: {}",
-              publication_date_str, e
-            ))
-          })?
-      };
+    let publication_date = chrono::DateTime::parse_from_rfc3339(&get_field("publication_date")?)
+      .map(|dt| dt.with_timezone(&Utc))
+      .map_err(|e| LearnerError::ApiError(format!("Invalid date format: {}", e)))?;
 
     // Extract authors
-    let author_map = self
-      .field_maps
-      .get("authors")
-      .ok_or_else(|| LearnerError::ApiError("Missing authors mapping".to_string()))?;
-    let authors: Vec<Author> = author_map
-      .paths
-      .iter()
-      .filter_map(|path| content.get(path))
-      .map(|name| Author { name: name.clone(), affiliation: None, email: None })
-      .collect();
-
-    if authors.is_empty() {
-      return Err(LearnerError::ApiError("No authors found".to_string()));
-    }
-
-    // Extract optional PDF URL
-    let pdf_url = if let Some(map) = self.field_maps.get("pdf_url") {
-      map
-        .paths
-        .first()
-        .and_then(|path| content.get(path))
-        .map(|url| {
-          if let Some(transform) = &map.transform {
-            self.apply_transform(url, transform).ok()
-          } else {
-            Some(url.clone())
-          }
+    let authors = if let Some(map) = self.field_maps.get("authors") {
+      let names: Vec<Author> = content
+        .get(&map.path)
+        .map(|s| {
+          s.split(';')
+            .map(|name| Author {
+              name:        name.trim().to_string(),
+              affiliation: None,
+              email:       None,
+            })
+            .collect()
         })
-        .flatten()
+        .unwrap_or_default();
+      if names.is_empty() {
+        return Err(LearnerError::ApiError("No authors found".to_string()));
+      }
+      names
     } else {
-      None
+      return Err(LearnerError::ApiError("Missing authors mapping".to_string()));
     };
 
-    // Extract optional DOI
-    let doi = self
-      .field_maps
-      .get("doi")
-      .and_then(|map| map.paths.first())
-      .and_then(|path| content.get(path))
-      .cloned();
+    // Optional fields
+    let pdf_url = self.field_maps.get("pdf_url").and_then(|map| {
+      content.get(&map.path).map(|url| {
+        if let Some(transform) = &map.transform {
+          apply_transform(url, transform).ok().unwrap_or_else(|| url.clone())
+        } else {
+          url.clone()
+        }
+      })
+    });
+
+    let doi = self.field_maps.get("doi").and_then(|map| content.get(&map.path)).map(String::from);
 
     Ok(PaperNew {
       title,
       authors,
       abstract_text,
       publication_date,
-      source: String::new(),            // Will be filled by retriever
-      source_identifier: String::new(), // Will be filled by retriever
+      source: String::new(),
+      source_identifier: String::new(),
       pdf_url,
       doi,
     })
@@ -149,73 +102,37 @@ impl XmlConfig {
   fn extract_content(&self, xml: &str) -> Result<HashMap<String, String>> {
     let mut reader = Reader::from_str(xml);
     let mut content = HashMap::new();
-    let mut current_path = Vec::new();
+    let mut path_stack = Vec::new();
     let mut buf = Vec::new();
 
-    loop {
-      match reader.read_event_into(&mut buf) {
-        Ok(Event::Start(ref e)) => {
-          current_path.push(e.name().as_ref().to_vec());
+    while let Ok(event) = reader.read_event_into(&mut buf) {
+      match event {
+        Event::Start(e) => {
+          path_stack.push(String::from_utf8_lossy(e.name().as_ref()).into_owned());
         },
-        Ok(Event::Text(e)) => {
-          let text = e.unescape().unwrap_or_default().into_owned();
-          if !text.trim().is_empty() {
-            let path = current_path
-              .iter()
-              .map(|p| String::from_utf8_lossy(p).into_owned())
-              .collect::<Vec<_>>()
-              .join("/");
-            content.insert(path, text.trim().to_string());
-          }
+        Event::Text(e) =>
+          if let Ok(text) = e.unescape() {
+            let text = text.trim();
+            if !text.is_empty() {
+              content.insert(path_stack.join("/"), text.to_string());
+            }
+          },
+        Event::End(_) => {
+          path_stack.pop();
         },
-        Ok(Event::End(_)) => {
-          current_path.pop();
-        },
-        Ok(Event::Eof) => break,
-        Err(e) => return Err(LearnerError::ApiError(format!("Failed to parse XML: {}", e))),
+        Event::Eof => break,
         _ => (),
       }
       buf.clear();
     }
 
-    trace!("Extracted content: {:?}", content);
     Ok(content)
-  }
-
-  fn apply_transform(&self, value: &str, transform: &Transform) -> Result<String> {
-    match transform {
-      Transform::Replace { pattern, replacement } => {
-        let re = Regex::new(pattern)
-          .map_err(|e| LearnerError::ApiError(format!("Invalid regex: {}", e)))?;
-        Ok(re.replace_all(value, replacement.as_str()).into_owned())
-      },
-      Transform::Date { from_format, to_format } => {
-        let dt = chrono::NaiveDateTime::parse_from_str(value, from_format)
-          .map_err(|e| LearnerError::ApiError(format!("Invalid date: {}", e)))?;
-        Ok(dt.format(to_format).to_string())
-      },
-      Transform::Url { base, suffix } => {
-        let mut url = base.replace("{value}", value);
-        if let Some(suffix) = suffix {
-          url.push_str(suffix);
-        }
-        Ok(url)
-      },
-    }
   }
 }
 
-/// Strip namespaces from XML string
 fn strip_xml_namespaces(xml: &str) -> String {
-  let mut result = xml.to_string();
-  for ns in &[
-    r#"xmlns="http://www.w3.org/2005/Atom""#,
-    r#"xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/""#,
-    r#"xmlns:dc="http://purl.org/dc/elements/1.1/""#,
-    r#"xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance""#,
-  ] {
-    result = result.replace(ns, "");
-  }
+  let re = regex::Regex::new(r#"xmlns(?::\w+)?="[^"]*""#).unwrap();
+  let mut result = re.replace_all(xml, "").to_string();
   result = result.replace("oai_dc:", "").replace("dc:", "");
   result
 }

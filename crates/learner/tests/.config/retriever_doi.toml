@@ -8,10 +8,10 @@ source            = "doi"
 type = "json"
 
 [response_format.field_maps.title]
-paths = ["message/title"]
+path = "message/title"
 
 [response_format.field_maps.abstract]
-paths = ["message/abstract"]
+path = "message/abstract"
 
 [response_format.field_maps.abstract.transform]
 pattern     = "<[^>]+>"
@@ -19,16 +19,16 @@ replacement = ""
 type        = "Replace"
 
 [response_format.field_maps.authors]
-paths = ["message/author"]
+path = "message/author"
 
 [response_format.field_maps.publication_date]
-paths = ["message/created/date-time"]
+path = "message/created/date-time"
 
 [response_format.field_maps.pdf_url]
-paths = ["message/link/0/URL"]
+path = "message/link/0/URL"
 
 [response_format.field_maps.doi]
-paths = ["message/DOI"]
+path = "message/DOI"
 
 [headers]
 Accept = "application/json"

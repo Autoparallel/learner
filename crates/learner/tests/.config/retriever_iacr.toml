@@ -9,19 +9,19 @@ type             = "xml"
 strip_namespaces = true
 
 [response_format.field_maps.title]
-paths = ["OAI-PMH/GetRecord/record/metadata/dc/title"]
+path = "OAI-PMH/GetRecord/record/metadata/dc/title"
 
 [response_format.field_maps.abstract]
-paths = ["OAI-PMH/GetRecord/record/metadata/dc/description"]
+path = "OAI-PMH/GetRecord/record/metadata/dc/description"
 
 [response_format.field_maps.authors]
-paths = ["OAI-PMH/GetRecord/record/metadata/dc/creator"]
+path = "OAI-PMH/GetRecord/record/metadata/dc/creator"
 
 [response_format.field_maps.publication_date]
-paths = ["OAI-PMH/GetRecord/record/metadata/dc/date"]
+path = "OAI-PMH/GetRecord/record/metadata/dc/date"
 
 [response_format.field_maps.pdf_url]
-paths = ["OAI-PMH/GetRecord/record/metadata/dc/identifier"]
+path = "OAI-PMH/GetRecord/record/metadata/dc/identifier"
 
 [response_format.field_maps.pdf_url.transform]
 type        = "Replace"

@@ -9,19 +9,19 @@ type             = "xml"
 strip_namespaces = true
 
 [response_format.field_maps.title]
-paths = ["feed/entry/title"]
+path = "feed/entry/title"
 
 [response_format.field_maps.abstract]
-paths = ["feed/entry/summary"]
+path = "feed/entry/summary"
 
 [response_format.field_maps.authors]
-paths = ["feed/entry/author/name"]
+path = "feed/entry/author/name"
 
 [response_format.field_maps.publication_date]
-paths = ["feed/entry/published"]
+path = "feed/entry/published"
 
 [response_format.field_maps.pdf_url]
-paths = ["feed/entry/id"]
+path = "feed/entry/id"
 
 [response_format.field_maps.pdf_url.transform]
 type        = "Replace"
