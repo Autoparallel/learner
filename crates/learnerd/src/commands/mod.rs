@@ -62,6 +62,8 @@ pub mod init;
 pub mod remove;
 pub mod search;
 
+use learner::database::{add::Add, query::Query};
+
 pub use self::{
   add::add, clean::clean, daemon::daemon, download::download, get::get, init::init, remove::remove,
   search::search,

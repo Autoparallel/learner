@@ -8,6 +8,9 @@ use std::collections::HashSet;
 use futures::future::try_join_all;
 
 use super::*;
+
+// TODO (autoparallel): Would be good to have `Papers` and `Documents` and `Completes` instead,
+// possibly, and just have a simple API for single paper calls that just dumps into the 3 variants.
 /// Represents different types of additions to the database.
 #[derive(Debug)]
 pub enum Addition<'a> {

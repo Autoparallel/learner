@@ -40,6 +40,7 @@ use self::query::Query;
 pub trait DatabaseInstruction {
   type Output;
 
-  // Take &mut reference to avoid taking ownership and allow multiple operations
+  // TODO (autoparallel): It may honestly be worth having two traits -- one that takes &mut db and
+  // another that takes &db so you don't need to have shared mutability access
   async fn execute(&self, db: &mut Database) -> Result<Self::Output>;
 }

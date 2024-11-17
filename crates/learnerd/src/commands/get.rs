@@ -14,7 +14,7 @@ pub async fn get(cli: Cli, source: Source, identifier: String) -> Result<()> {
     default_path
   });
   trace!("Using database at: {}", path.display());
-  let db = Database::open(&path).await?;
+  let mut db = Database::open(&path).await?;
 
   println!(
     "{} Fetching paper from {} with ID {}",
@@ -23,7 +23,8 @@ pub async fn get(cli: Cli, source: Source, identifier: String) -> Result<()> {
     style(&identifier).yellow()
   );
 
-  match db.get_paper_by_source_id(&source, &identifier).await? {
+  let papers = Query::by_source(source, &identifier).execute(&mut db).await?;
+  match papers.first() {
     Some(paper) => {
       debug!("Found paper: {:?}", paper);
       println!("\n{} Paper details:", style(PAPER).green());

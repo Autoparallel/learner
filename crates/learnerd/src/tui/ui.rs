@@ -284,7 +284,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   fn draw_pdf_status(&mut self, paper: &learner::paper::Paper, area: Rect) {
     let pdf_path = format!(
       "{}/{}.pdf",
-      Database::default_pdf_path().display(),
+      Database::default_storage_path().display(),
       format_title(&paper.title, Some(50))
     );
     let pdf_exists = std::path::Path::new(&pdf_path).exists();

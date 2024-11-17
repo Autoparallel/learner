@@ -1,7 +1,5 @@
 //! Module for abstracting the "add" functionality to the [`learner`] database.
 
-use learner::database::add::Add;
-
 use super::*;
 
 /// Function for the [`Commands::Add`] in the CLI.
@@ -16,7 +14,7 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
     default_path
   });
   trace!("Using database at: {}", path.display());
-  let db = Database::open(&path).await?;
+  let mut db = Database::open(&path).await?;
 
   println!("{} Fetching paper: {}", style(LOOKING_GLASS).cyan(), style(&identifier).yellow());
 
@@ -31,9 +29,15 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
     style(paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", ")).white()
   );
 
+  // TODO (autoparallel): This flow could be refactored now with the `Add::complete` to make it
+  // easier.
   match Add::paper(&paper).execute(&mut db).await {
-    Ok(id) => {
-      println!("\n{} Saved paper with ID: {}", style(SAVE).green(), style(id).yellow());
+    Ok(papers) => {
+      println!(
+        "\n{} Saved paper with ID: {}",
+        style(SAVE).green(),
+        style(papers[0].source_identifier.clone()).yellow()
+      );
 
       // Handle PDF download for newly added paper
       if paper.pdf_url.is_some() && !no_pdf {
@@ -49,7 +53,7 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
           let _pdf_dir = db.get_storage_path().await?;
 
           // TODO: Don't use this direct download.
-          match paper.download_pdf(&pdf_dir).await {
+          match Add::complete(&paper).execute(&mut db).await {
             Ok(_) => {
               println!("{} PDF downloaded successfully!", style(SUCCESS).green());
             },
@@ -78,11 +82,8 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
 
       // Check existing PDF status
       if paper.pdf_url.is_some() && !no_pdf {
-        if let Ok(dir) = db.get_storage_path().await {
-          let pdf_dir = PathBuf::from(dir);
-          let formatted_title = learner::format::format_title(&paper.title, Some(50));
-          let pdf_path = pdf_dir.join(format!("{}.pdf", formatted_title));
-
+        if let Ok(pdf_dir) = db.get_storage_path().await {
+          let pdf_path = pdf_dir.join(paper.filename());
           if pdf_path.exists() {
             println!(
               "   {} PDF exists at: {}",

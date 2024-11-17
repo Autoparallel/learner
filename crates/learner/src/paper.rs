@@ -24,8 +24,6 @@
 //! # }
 //! ```
 
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use super::*;
 
 /// A complete academic paper with its metadata.
@@ -189,27 +187,6 @@ impl Paper {
     }
   }
 
-  // Add method to generate paper ID
-  pub fn id(&self) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    self.hash(&mut hasher);
-    hasher.finish()
-  }
-
-  // / Download the paper's PDF to a specified path.
-  // /
-  // / # Arguments
-  // /
-  // / * `path` - The filesystem path where the PDF should be saved
-  // /
-  // / # Errors
-  // /
-  // / Returns `LearnerError` if:
-  // / - The paper has no PDF URL available
-  // / - The download fails
-  // / - Writing to the specified path fails
-
-  // TODO: UPDATE DOC HERE ABOUT HOW THIS RETURNS THE FILENAME
   pub async fn download_pdf(&self, dir: &PathBuf) -> Result<PathBuf> {
     let Some(pdf_url) = &self.pdf_url else {
       return Err(LearnerError::ApiError("No PDF URL available".into()));
@@ -234,19 +211,6 @@ impl Paper {
   pub fn filename(&self) -> PathBuf {
     let formatted_title = format::format_title(&self.title, Some(50));
     PathBuf::from(format!("{}.pdf", formatted_title))
-  }
-}
-
-// Make Paper hashable for ID generation
-impl Hash for Paper {
-  fn hash<H: Hasher>(&self, state: &mut H) {
-    self.title.hash(state);
-    self.abstract_text.hash(state);
-    self.publication_date.to_rfc3339().hash(state);
-    self.source.to_string().hash(state);
-    self.source_identifier.hash(state);
-    // Note: We don't hash PDF URL or DOI as they might not be available
-    // but are still the same paper
   }
 }
 

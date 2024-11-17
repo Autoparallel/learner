@@ -13,49 +13,25 @@ pub async fn download(cli: Cli, source: Source, identifier: String) -> Result<()
     );
     default_path
   });
-  let db = Database::open(&path).await?;
+  let mut db = Database::open(&path).await?;
 
-  let paper = match db.get_paper_by_source_id(&source, &identifier).await? {
-    Some(p) => p,
-    None => {
-      println!(
-        "{} Paper not found in database. Add it first with: {} {}",
-        style(WARNING).yellow(),
-        style("learnerd add").yellow(),
-        style(&identifier).cyan()
-      );
-      return Ok(());
-    },
-  };
+  let papers = Query::by_source(source, &identifier).execute(&mut db).await?;
+  if papers.is_empty() {
+    println!(
+      "{} Paper not found in database. Add it first with: {} {}",
+      style(WARNING).yellow(),
+      style("learnerd add").yellow(),
+      style(&identifier).cyan()
+    );
+    return Ok(());
+  }
 
-  if paper.pdf_url.is_none() {
+  if papers[0].pdf_url.is_none() {
     println!("{} No PDF URL available for this paper", style(WARNING).yellow());
     return Ok(());
   };
 
-  let pdf_dir = match db.get_config("pdf_dir").await? {
-    Some(dir) => PathBuf::from(dir),
-    None => {
-      println!(
-        "{} PDF directory not configured. Run {} first",
-        style(WARNING).yellow(),
-        style("learnerd init").cyan()
-      );
-      return Ok(());
-    },
-  };
-
-  if !pdf_dir.exists() {
-    println!(
-      "{} Creating PDF directory: {}",
-      style(LOOKING_GLASS).cyan(),
-      style(&pdf_dir.display()).yellow()
-    );
-    std::fs::create_dir_all(&pdf_dir)?;
-  }
-
-  let formatted_title = learner::format::format_title(&paper.title, Some(50));
-  let pdf_path = pdf_dir.join(format!("{}.pdf", formatted_title));
+  let pdf_path = db.get_storage_path().await?.join(papers[0].filename());
 
   let should_download = if pdf_path.exists() && !cli.accept_defaults {
     println!(
@@ -79,7 +55,7 @@ pub async fn download(cli: Cli, source: Source, identifier: String) -> Result<()
       println!("{} Downloading PDF...", style(LOOKING_GLASS).cyan());
     }
 
-    match paper.download_pdf(&pdf_dir.clone()).await {
+    match Add::complete(&papers[0]).execute(&mut db).await {
       Ok(_) => {
         println!("{} PDF downloaded successfully!", style(SUCCESS).green());
         println!("   {} Saved to: {}", style("📄").cyan(), style(&pdf_path.display()).yellow());
@@ -104,9 +80,9 @@ pub async fn download(cli: Cli, source: Source, identifier: String) -> Result<()
           },
           LearnerError::Path(_) => {
             println!(
-              "   {} Check if you have write permissions for: {}",
+              "   {} Check if you have write permissions for: {:?}",
               style("Tip:").blue(),
-              style(&pdf_dir.display()).yellow()
+              style(db.get_storage_path().await?).yellow()
             );
           },
           _ => {

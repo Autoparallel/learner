@@ -45,7 +45,10 @@ use crossterm::{
   execute,
   terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use learner::format::format_title;
+use learner::{
+  database::query::{OrderField, Query},
+  format::format_title,
+};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use super::*;
@@ -100,8 +103,8 @@ use ui::UIDrawer;
 /// - Disables mouse capture
 pub async fn run() -> Result<()> {
   // Initialize state
-  let db = Database::open(Database::default_path()).await?;
-  let papers = db.list_papers("title", false).await?;
+  let mut db = Database::open(Database::default_path()).await?;
+  let papers = Query::list_all().order_by(OrderField::Title).execute(&mut db).await?;
   let mut state = UIState::new(papers);
 
   // Setup terminal
