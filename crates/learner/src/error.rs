@@ -176,5 +176,8 @@ pub enum LearnerError {
   AmbiguousIdentifier(Vec<String>),
 
   #[error(transparent)]
-  TomlDeError(#[from] toml::de::Error),
+  TomlDe(#[from] toml::de::Error),
+
+  #[error("{0}")]
+  Config(String),
 }
