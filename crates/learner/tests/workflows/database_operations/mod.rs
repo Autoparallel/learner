@@ -7,14 +7,6 @@ mod add;
 mod query;
 mod remove;
 
-async fn setup_test_db() -> (Database, TempDir) {
-  let dir = tempdir().unwrap();
-  let db_path = dir.path().join("test.db");
-  let db = Database::open(&db_path).await.unwrap();
-  db.set_storage_path(dir.path()).await.unwrap();
-  (db, dir)
-}
-
 /// Helper function to create a test paper
 fn create_test_paper() -> Paper {
   Paper {

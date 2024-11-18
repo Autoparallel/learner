@@ -276,11 +276,19 @@ impl LearnerBuilder {
     let config = if let Some(config) = self.config {
       config
     } else if let Some(path) = self.config_path {
-      let content = std::fs::read_to_string(path)?;
+      let config_file = path.join("config.toml");
+      let content = std::fs::read_to_string(config_file)?;
       toml::from_str(&content).map_err(|e| LearnerError::Config(e.to_string()))?
     } else {
       Config::load()?
     };
+
+    // Ensure paths exist
+    std::fs::create_dir_all(&config.retrievers_path)?;
+    if let Some(parent) = config.database_path.parent() {
+      std::fs::create_dir_all(parent)?;
+    }
+    std::fs::create_dir_all(&config.storage_path)?;
 
     let database = Database::open(&config.database_path).await?;
     database.set_storage_path(&config.storage_path).await?;
@@ -319,22 +327,19 @@ mod tests {
   use super::*;
 
   #[tokio::test]
-  async fn test_learner_creation() -> Result<()> {
-    // Default configuration
-    let learner = Learner::new().await?;
-
-    // From specific path
-    let learner = Learner::from_path("~/.learner/config.toml").await?;
-
-    // Using builder pattern
-    let learner = Learner::builder().with_path("custom/path/config.toml").build().await?;
-
-    // Custom config
+  async fn test_learner_creation() {
+    let config_dir = tempdir().unwrap();
+    let database_dir = tempdir().unwrap();
+    let storage_dir = tempdir().unwrap();
     let config = Config::default()
-      .with_database_path(Path::new("/custom/db/path"))
-      .with_retrievers_path(Path::new("/custom/retrievers"));
-    let learner = Learner::builder().with_config(config).build().await?;
+      .with_database_path(&database_dir.path().join("learner.db"))
+      .with_retrievers_path(&config_dir.path().join("config/retrievers/"))
+      .with_storage_path(storage_dir.path());
+    let learner =
+      Learner::builder().with_path(config_dir.path()).with_config(config).build().await.unwrap();
 
-    Ok(())
+    assert_eq!(learner.config.retrievers_path, config_dir.path().join("config/retrievers/"));
+    assert_eq!(learner.config.database_path, database_dir.path().join("learner.db"));
+    assert_eq!(learner.database.get_storage_path().await.unwrap(), storage_dir.path());
   }
 }

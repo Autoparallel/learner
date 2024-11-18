@@ -25,8 +25,8 @@ path = "OAI-PMH/GetRecord/record/metadata/dc/identifier"
 
 [response_format.field_maps.pdf_url.transform]
 type        = "Replace"
-pattern     = "^https://eprint\\.iacr\\.org/"
-replacement = "https://eprint.iacr.org/"
+pattern     = "^(https://eprint\\.iacr\\.org/\\d{4}/\\d+)$"
+replacement = "$1.pdf"
 
 [headers]
 Accept = "application/xml"
