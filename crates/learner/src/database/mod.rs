@@ -79,6 +79,7 @@ pub use self::instruction::{
 /// from document storage (which can be managed by external tools), allowing users
 /// to maintain their preferred document organization while benefiting from the
 /// metadata management features.
+#[derive(Debug)]
 pub struct Database {
   /// Active connection to the SQLite database
   pub conn: Connection,

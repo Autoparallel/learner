@@ -9,7 +9,7 @@ mod xml;
 pub use json::*;
 pub use xml::*;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Retriever {
   configs: HashMap<String, RetrieverConfig>,
 }

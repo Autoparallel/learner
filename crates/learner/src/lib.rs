@@ -145,6 +145,9 @@ pub struct Config {
   #[serde(default = "Database::default_path")]
   pub database_path: PathBuf,
 
+  #[serde(default = "Database::default_storage_path")]
+  pub storage_path: PathBuf,
+
   #[serde(default = "Config::default_retrievers_path")]
   pub retrievers_path: PathBuf,
 }
@@ -211,14 +214,19 @@ impl Config {
     Ok(config)
   }
 
-  pub fn with_database_path(self, database_path: &Path) -> Self {
-    let Self { retrievers_path, .. } = self;
-    Self { database_path: database_path.to_path_buf(), retrievers_path }
+  pub fn with_database_path(mut self, database_path: &Path) -> Self {
+    self.database_path = database_path.to_path_buf();
+    self
   }
 
-  pub fn with_retrievers_path(self, retrievers_path: &Path) -> Self {
-    let Self { database_path, .. } = self;
-    Self { database_path, retrievers_path: retrievers_path.to_path_buf() }
+  pub fn with_retrievers_path(mut self, retrievers_path: &Path) -> Self {
+    self.retrievers_path = retrievers_path.to_path_buf();
+    self
+  }
+
+  pub fn with_storage_path(mut self, storage_path: &Path) -> Self {
+    self.storage_path = storage_path.to_path_buf();
+    self
   }
 }
 
@@ -226,16 +234,21 @@ impl Default for Config {
   fn default() -> Self {
     Self {
       database_path:   Database::default_path(),
+      storage_path:    Database::default_storage_path(),
       retrievers_path: Self::default_retrievers_path(),
     }
   }
 }
 
+// TODO: We should really let the database storage path be set prior to opening. We need a slightly
+// better database builder pattern.
+
 // Then we can update our Learner struct to use this config:
+#[derive(Debug)]
 pub struct Learner {
-  config:    Config,
-  database:  Database,
-  retriever: Retriever,
+  pub config:    Config,
+  pub database:  Database,
+  pub retriever: Retriever,
 }
 pub struct LearnerBuilder {
   config:      Option<Config>,
@@ -270,6 +283,8 @@ impl LearnerBuilder {
     };
 
     let database = Database::open(&config.database_path).await?;
+    database.set_storage_path(&config.storage_path).await?;
+
     let retriever = Retriever::new().with_config_dir(&config.retrievers_path)?;
 
     Ok(Learner { config, database, retriever })
@@ -298,7 +313,7 @@ impl Learner {
 }
 
 // Usage examples:
-
+// TODO: This test doesn't test adequately enough
 #[cfg(test)]
 mod tests {
   use super::*;

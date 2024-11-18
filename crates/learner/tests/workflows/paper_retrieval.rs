@@ -4,7 +4,7 @@ use super::*;
 
 #[tokio::test]
 async fn test_arxiv_retriever_integration() {
-  let config_str = fs::read_to_string("tests/.config/retriever_arxiv.toml").expect(
+  let config_str = fs::read_to_string("config/retrievers/arxiv.toml").expect(
     "Failed to read config
     file",
   );
@@ -25,7 +25,7 @@ async fn test_arxiv_retriever_integration() {
 #[tokio::test]
 async fn test_iacr_retriever_integration() {
   let config_str =
-    fs::read_to_string("tests/.config/retriever_iacr.toml").expect("Failed to read config file");
+    fs::read_to_string("config/retrievers/iacr.toml").expect("Failed to read config file");
 
   let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
 
@@ -43,7 +43,7 @@ async fn test_iacr_retriever_integration() {
 #[tokio::test]
 async fn test_doi_retriever_integration() {
   let config_str =
-    fs::read_to_string("tests/.config/retriever_doi.toml").expect("Failed to read config file");
+    fs::read_to_string("config/retrievers/doi.toml").expect("Failed to read config file");
 
   let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
 
