@@ -180,9 +180,8 @@ async fn main() -> Result<()> {
       "{} Failed to open Learner config! Please run `learner init` to set up a config!",
       style(ERROR).red(),
     );
-    Err(LearnerError::Config(
+    Err(LearnerdError::from(LearnerError::Config(
       "Configuration not initialized. Run 'learner init' first.".to_string(),
-    ))
-    .map_err(LearnerdError::from)
+    )))
   }
 }

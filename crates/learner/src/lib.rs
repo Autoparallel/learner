@@ -36,7 +36,7 @@
 //!
 //! ```no_run
 //! use learner::{
-//!   database::{Add, Query},
+//!   database::{Add, OrderField, Query},
 //!   paper::Paper,
 //!   prelude::*,
 //!   Learner,
