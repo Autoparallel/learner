@@ -37,12 +37,7 @@ use std::{path::PathBuf, str::FromStr};
 use clap::{builder::ArgAction, Parser, Subcommand};
 use console::{style, Emoji};
 use error::LearnerdError;
-use learner::{
-  database::Database,
-  error::LearnerError,
-  paper::{Paper, Source},
-  prelude::*,
-};
+use learner::{database::Database, error::LearnerError, paper::Paper, prelude::*};
 use tracing::{debug, trace};
 use tracing_subscriber::EnvFilter;
 

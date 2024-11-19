@@ -1,5 +1,5 @@
 use chrono::{TimeZone, Utc};
-use learner::database::{Add, Database, OrderField, Query, Remove};
+use learner::database::{Add, OrderField, Query, Remove};
 
 use super::*;
 

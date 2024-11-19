@@ -20,7 +20,6 @@
 //! ```no_run
 //! use learner::{
 //!   database::{Database, OrderField, Query},
-//!   paper::Source,
 //!   prelude::*,
 //! };
 //!
@@ -38,7 +37,7 @@
 //! let papers = Query::by_author("Alice Researcher").execute(&mut db).await?;
 //!
 //! // Lookup by source identifier
-//! let papers = Query::by_source(Source::Arxiv, "2301.07041").execute(&mut db).await?;
+//! let papers = Query::by_source("arxiv", "2301.07041").execute(&mut db).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -166,9 +165,10 @@ impl<'a> Query<'a> {
   ///
   /// ```no_run
   /// # use learner::database::Query;
-  /// # use learner::paper::Paper;
+  /// # use learner::{Learner, paper::Paper};
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// let paper = Paper::new("2301.07041").await?;
+  /// let learner = Learner::builder().build().await?;
+  /// let paper = learner.retriever.get_paper("2301.07041").await?;
   /// let query = Query::by_paper(&paper);
   /// # Ok(())
   /// # }
@@ -191,8 +191,7 @@ impl<'a> Query<'a> {
   ///
   /// ```no_run
   /// # use learner::database::Query;
-  /// # use learner::paper::Source;
-  /// let query = Query::by_source(Source::Arxiv, "2301.07041");
+  /// let query = Query::by_source("arxiv", "2301.07041");
   /// ```
   pub fn by_source(source: &'a str, identifier: &'a str) -> Self {
     Self::new(QueryCriteria::SourceId { source, identifier })

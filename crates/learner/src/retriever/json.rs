@@ -30,7 +30,7 @@ use super::*;
 ///
 /// ```no_run
 /// # use std::collections::HashMap;
-/// # use learner::retriever::{JsonConfig, FieldMap};
+/// # use learner::retriever::{json::JsonConfig, FieldMap};
 /// let config = JsonConfig {
 ///   field_maps: HashMap::from([("title".to_string(), FieldMap {
 ///     path:      "message/title/0".to_string(),

@@ -28,6 +28,7 @@
 //!   database::{Add, Database, Query, Remove},
 //!   paper::Paper,
 //!   prelude::*,
+//!   Learner,
 //! };
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -37,7 +38,9 @@
 //! let papers = Query::text("quantum computing").execute(&mut db).await?;
 //!
 //! // Add a new paper
-//! let paper = Paper::new("2301.07041").await?;
+//! # let learner = Learner::builder().build().await?;
+//! # let retriever = learner.retriever;
+//! let paper = retriever.get_paper("2301.07041").await?;
 //! Add::paper(&paper).execute(&mut db).await?;
 //!
 //! // Remove papers by author

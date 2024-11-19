@@ -6,7 +6,6 @@ use std::{
 
 use learner::{
   error::LearnerError,
-  format,
   llm::{LlamaRequest, Model},
   paper::{Author, Paper},
   pdf::PDFContentBuilder,

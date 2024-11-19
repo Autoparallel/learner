@@ -19,18 +19,20 @@
 //! Creating papers from different sources:
 //!
 //! ```no_run
-//! use learner::paper::Paper;
+//! use learner::{paper::Paper, Learner};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let learner = Learner::builder().build().await?;
+//!
 //! // From arXiv URL
-//! let paper = Paper::new("https://arxiv.org/abs/2301.07041").await?;
+//! let paper = learner.retriever.get_paper("https://arxiv.org/abs/2301.07041").await?;
 //! println!("Title: {}", paper.title);
 //!
 //! // From DOI
-//! let paper = Paper::new("10.1145/1327452.1327492").await?;
+//! let paper = learner.retriever.get_paper("10.1145/1327452.1327492").await?;
 //!
 //! // From IACR
-//! let paper = Paper::new("2023/123").await?;
+//! let paper = learner.retriever.get_paper("2023/123").await?;
 //!
 //! // Download associated PDF
 //! use std::path::PathBuf;
@@ -61,10 +63,12 @@ use super::*;
 /// Creating and using papers:
 ///
 /// ```no_run
-/// # use learner::paper::Paper;
+/// # use learner::{Learner, paper::Paper};
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// // Create a Learner instance to connect to a database
+/// let mut learner = Learner::builder().build().await?;
 /// // Create from identifier
-/// let paper = Paper::new("2301.07041").await?;
+/// let paper = learner.retriever.get_paper("2301.07041").await?;
 ///
 /// // Access metadata
 /// println!("Title: {}", paper.title);
@@ -149,10 +153,11 @@ impl Paper {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::paper::Paper;
+  /// # use learner::{Learner, paper::Paper};
   /// # use std::path::PathBuf;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// let paper = Paper::new("2301.07041").await?;
+  /// let learner = Learner::builder().build().await?;
+  /// let paper = learner.retriever.get_paper("2301.07041").await?;
   /// let dir = PathBuf::from("papers");
   /// let pdf_path = paper.download_pdf(&dir).await?;
   /// println!("PDF stored at: {}", pdf_path.display());
@@ -195,9 +200,11 @@ impl Paper {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::paper::Paper;
+  /// # use learner::{Learner, paper::Paper};
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// let paper = Paper::new("2301.07041").await?;
+  ///
+  /// let learner = Learner::builder().build().await?;
+  /// let paper = learner.retriever.get_paper("2301.07041").await?;
   /// let filename = paper.filename();
   /// println!("Suggested filename: {}", filename.display());
   /// # Ok(())

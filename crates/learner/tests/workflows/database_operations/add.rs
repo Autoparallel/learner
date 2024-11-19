@@ -72,7 +72,6 @@ mod basic_operations {
 
 /// Tests for paper addition with documents
 mod document_operations {
-  use learner::paper::Paper;
 
   use super::*;
 

@@ -68,8 +68,8 @@ use std::collections::HashMap;
 
 use super::*;
 
-mod json;
-mod xml;
+pub mod json;
+pub mod xml;
 
 /// Main entry point for paper retrieval operations.
 ///
@@ -253,13 +253,13 @@ pub enum Transform {
 /// # Examples
 ///
 /// ```no_run
-/// # use learner::retriever::{ResponseProcessor, Paper};
-/// # use learner::Result;
+/// # use learner::{retriever::ResponseProcessor, paper::Paper};
+/// # use learner::error::LearnerError;
 /// struct CustomProcessor;
 ///
-/// #[async_trait]
+/// #[async_trait::async_trait]
 /// impl ResponseProcessor for CustomProcessor {
-///   async fn process_response(&self, data: &[u8]) -> Result<Paper> {
+///   async fn process_response(&self, data: &[u8]) -> Result<Paper, LearnerError> {
 ///     // Parse response data and construct Paper
 ///     todo!()
 ///   }

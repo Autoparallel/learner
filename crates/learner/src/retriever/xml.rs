@@ -31,7 +31,7 @@ use super::*;
 ///
 /// ```no_run
 /// # use std::collections::HashMap;
-/// # use learner::retriever::{XmlConfig, FieldMap};
+/// # use learner::retriever::{xml::XmlConfig, FieldMap};
 /// let config = XmlConfig {
 ///   strip_namespaces: true,
 ///   field_maps:       HashMap::from([("title".to_string(), FieldMap {

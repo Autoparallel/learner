@@ -10,12 +10,13 @@
 //! # Examples
 //!
 //! ```
-//! use learner::{error::LearnerError, paper::Paper};
+//! use learner::{error::LearnerError, paper::Paper, Learner};
 //! // or `use learner::prelude::*` to bring in the error type
 //!
 //! # async fn example() -> Result<(), LearnerError> {
 //! // Network errors are automatically converted
-//! let result = Paper::new("invalid-id").await;
+//! let learner = Learner::builder().build().await?;
+//! let result = learner.retriever.get_paper("invalid-id").await;
 //! match result {
 //!   Err(LearnerError::InvalidIdentifier) => println!("Invalid paper ID format"),
 //!   Err(LearnerError::Network(e)) => println!("Network error: {}", e),
@@ -173,12 +174,65 @@ pub enum LearnerError {
   #[error("Tried to add a paper titled \"{0}\" that was already in the database.")]
   DatabaseDuplicatePaper(String),
 
+  /// Multiple retriever configurations matched an identifier.
+  ///
+  /// This error occurs when an input identifier matches the patterns of
+  /// multiple retrievers, making it ambiguous which one should be used.
+  ///
+  /// # Examples
+  ///
+  /// This can happen if:
+  /// - Multiple retrievers use overlapping patterns
+  /// - An identifier matches both DOI and arXiv patterns
+  /// - Custom retrievers conflict with built-in ones
+  ///
+  /// ```text
+  /// Error: Retriever matched multiple different identifiers for a request: ["arxiv", "custom_arxiv"]
+  /// ```
   #[error("Retriever matched multiple different identifiers for a request: {0:?}")]
   AmbiguousIdentifier(Vec<String>),
 
+  /// Failed to deserialize TOML configuration.
+  ///
+  /// This error occurs when parsing TOML configuration files fails,
+  /// typically due to invalid syntax or missing required fields.
+  ///
+  /// # Examples
+  ///
+  /// Common causes include:
+  /// - Malformed TOML syntax
+  /// - Missing required fields
+  /// - Invalid field types
+  /// - Unmatched brackets or quotes
+  ///
+  /// ```toml
+  /// # Invalid TOML - missing value
+  /// database_path =
+  ///
+  /// # Invalid TOML - wrong type
+  /// database_path = true  # should be a string
+  /// ```
   #[error(transparent)]
   TomlDe(#[from] toml::de::Error),
 
+  /// General configuration error.
+  ///
+  /// This error represents various configuration-related issues that
+  /// don't fit into more specific categories.
+  ///
+  /// # Examples
+  ///
+  /// Typical scenarios include:
+  /// - Invalid paths in configuration
+  /// - Permission issues with directories
+  /// - Missing required configurations
+  /// - Invalid field values
+  ///
+  /// ```text
+  /// Error: Invalid storage path: /nonexistent/directory
+  /// Error: Database path must be absolute
+  /// Error: Missing required retriever configuration
+  /// ```
   #[error("{0}")]
   Config(String),
 }

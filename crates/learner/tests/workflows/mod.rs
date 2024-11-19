@@ -1,6 +1,4 @@
-use std::fs::read_to_string;
-
-use learner::retriever::{ResponseFormat, RetrieverConfig, Transform};
+use learner::retriever::RetrieverConfig;
 
 use super::*;
 
