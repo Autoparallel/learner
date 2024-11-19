@@ -1,22 +1,11 @@
 use chrono::{TimeZone, Utc};
-use learner::{
-  database::{Add, Database, OrderField, Query, Remove},
-  paper::Source,
-};
+use learner::database::{Add, OrderField, Query, Remove};
 
 use super::*;
 
 mod add;
 mod query;
 mod remove;
-
-async fn setup_test_db() -> (Database, TempDir) {
-  let dir = tempdir().unwrap();
-  let db_path = dir.path().join("test.db");
-  let db = Database::open(&db_path).await.unwrap();
-  db.set_storage_path(dir.path()).await.unwrap();
-  (db, dir)
-}
 
 /// Helper function to create a test paper
 fn create_test_paper() -> Paper {
@@ -25,7 +14,7 @@ fn create_test_paper() -> Paper {
     abstract_text:     "This is a test abstract".to_string(),
     publication_date:  chrono::TimeZone::with_ymd_and_hms(&chrono::Utc, 2023, 1, 1, 0, 0, 0)
       .unwrap(),
-    source:            Source::Arxiv,
+    source:            "arxiv".to_string(),
     source_identifier: "2301.00000".to_string(),
     pdf_url:           Some("https://arxiv.org/pdf/2301.00000".to_string()),
     doi:               Some("10.0000/test.123".to_string()),
@@ -46,7 +35,7 @@ fn create_second_test_paper() -> Paper {
     abstract_text:     "This is a test abstract, but again!".to_string(),
     publication_date:  chrono::TimeZone::with_ymd_and_hms(&chrono::Utc, 2024, 1, 1, 0, 0, 0)
       .unwrap(),
-    source:            Source::Arxiv,
+    source:            "arxiv".to_string(),
     source_identifier: "2401.00000".to_string(),
     pdf_url:           Some("https://arxiv.org/pdf/2401.00000".to_string()),
     doi:               Some("10.1000/test.1234".to_string()),

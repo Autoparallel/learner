@@ -200,6 +200,7 @@ impl PDFContentBuilder {
     let path = self.path.ok_or_else(|| {
       LearnerError::Path(std::io::Error::new(std::io::ErrorKind::NotFound, "No PDF path specified"))
     })?;
+    debug!("Loading document from: {path:?}");
     let doc = Document::load(&path)?;
     let metadata = extract_metadata(&doc)?;
     let pages = extract_pages(&doc)?;

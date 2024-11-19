@@ -19,7 +19,6 @@
 //! ```no_run
 //! use learner::{
 //!   database::{Database, Query, Remove},
-//!   paper::Source,
 //!   prelude::*,
 //! };
 //!
@@ -27,7 +26,7 @@
 //! let mut db = Database::open("papers.db").await?;
 //!
 //! // Remove a specific paper
-//! Remove::by_source(Source::Arxiv, "2301.07041").execute(&mut db).await?;
+//! Remove::by_source("arxiv", "2301.07041").execute(&mut db).await?;
 //!
 //! // Preview deletion with dry run
 //! let papers = Remove::by_author("Alice Researcher").dry_run().execute(&mut db).await?;
@@ -110,14 +109,13 @@ impl<'a> Remove<'a> {
   ///
   /// ```no_run
   /// # use learner::database::Remove;
-  /// # use learner::paper::Source;
   /// // Remove an arXiv paper
-  /// let remove = Remove::by_source(Source::Arxiv, "2301.07041");
+  /// let remove = Remove::by_source("arxiv", "2301.07041");
   ///
   /// // Remove a DOI paper
-  /// let remove = Remove::by_source(Source::DOI, "10.1145/1327452.1327492");
+  /// let remove = Remove::by_source("doi", "10.1145/1327452.1327492");
   /// ```
-  pub fn by_source(source: Source, identifier: &'a str) -> Self {
+  pub fn by_source(source: &'a str, identifier: &'a str) -> Self {
     Self::from_query(Query::by_source(source, identifier))
   }
 
@@ -155,7 +153,6 @@ impl<'a> Remove<'a> {
   ///
   /// ```no_run
   /// # use learner::{database::Remove, prelude::*};
-  /// # use learner::paper::Source;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// # let mut db = learner::database::Database::open("papers.db").await?;
   /// // Preview papers that would be removed

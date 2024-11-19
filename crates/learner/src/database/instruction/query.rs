@@ -20,7 +20,6 @@
 //! ```no_run
 //! use learner::{
 //!   database::{Database, OrderField, Query},
-//!   paper::Source,
 //!   prelude::*,
 //! };
 //!
@@ -38,7 +37,7 @@
 //! let papers = Query::by_author("Alice Researcher").execute(&mut db).await?;
 //!
 //! // Lookup by source identifier
-//! let papers = Query::by_source(Source::Arxiv, "2301.07041").execute(&mut db).await?;
+//! let papers = Query::by_source("arxiv", "2301.07041").execute(&mut db).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -62,7 +61,7 @@ pub enum QueryCriteria<'a> {
   /// Direct lookup by source system and identifier
   SourceId {
     /// The source system (e.g., arXiv, DOI)
-    source:     Source,
+    source:     &'a str,
     /// The source-specific identifier
     identifier: &'a str,
   },
@@ -166,16 +165,17 @@ impl<'a> Query<'a> {
   ///
   /// ```no_run
   /// # use learner::database::Query;
-  /// # use learner::paper::Paper;
+  /// # use learner::{Learner, paper::Paper};
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// let paper = Paper::new("2301.07041").await?;
+  /// let learner = Learner::builder().build().await?;
+  /// let paper = learner.retriever.get_paper("2301.07041").await?;
   /// let query = Query::by_paper(&paper);
   /// # Ok(())
   /// # }
   /// ```
   pub fn by_paper(paper: &'a Paper) -> Self {
     Self::new(QueryCriteria::SourceId {
-      source:     paper.source,
+      source:     &paper.source,
       identifier: &paper.source_identifier,
     })
   }
@@ -191,10 +191,9 @@ impl<'a> Query<'a> {
   ///
   /// ```no_run
   /// # use learner::database::Query;
-  /// # use learner::paper::Source;
-  /// let query = Query::by_source(Source::Arxiv, "2301.07041");
+  /// let query = Query::by_source("arxiv", "2301.07041");
   /// ```
-  pub fn by_source(source: Source, identifier: &'a str) -> Self {
+  pub fn by_source(source: &'a str, identifier: &'a str) -> Self {
     Self::new(QueryCriteria::SourceId { source, identifier })
   }
 
@@ -366,13 +365,7 @@ impl DatabaseInstruction for Query<'_> {
                     Box::new(e),
                   )
                 })?,
-              source:            Source::from_str(&row.get::<_, String>(3)?).map_err(|e| {
-                rusqlite::Error::FromSqlConversionFailure(
-                  3,
-                  rusqlite::types::Type::Text,
-                  Box::new(e),
-                )
-              })?,
+              source:            row.get::<_, String>(3)?,
               source_identifier: row.get(4)?,
               pdf_url:           row.get(5)?,
               doi:               row.get(6)?,

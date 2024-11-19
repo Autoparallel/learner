@@ -3,7 +3,7 @@
 use super::*;
 
 /// Function for the [`Commands::Get`] in the CLI.
-pub async fn get(cli: Cli, source: Source, identifier: String) -> Result<()> {
+pub async fn get(cli: Cli, source: String, identifier: String) -> Result<()> {
   let path = cli.path.unwrap_or_else(|| {
     let default_path = Database::default_path();
     println!(
@@ -23,7 +23,7 @@ pub async fn get(cli: Cli, source: Source, identifier: String) -> Result<()> {
     style(&identifier).yellow()
   );
 
-  let papers = Query::by_source(source, &identifier).execute(&mut db).await?;
+  let papers = Query::by_source(&source, &identifier).execute(&mut db).await?;
   match papers.first() {
     Some(paper) => {
       debug!("Found paper: {:?}", paper);

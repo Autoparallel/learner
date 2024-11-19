@@ -3,7 +3,7 @@
 use super::*;
 
 /// Function for the [`Commands::Remove`] in the CLI.
-pub async fn remove(cli: Cli, source: Source, identifier: String) -> Result<()> {
+pub async fn remove(cli: Cli, source: String, identifier: String) -> Result<()> {
   let path = cli.path.unwrap_or_else(|| {
     let default_path = Database::default_path();
     println!(

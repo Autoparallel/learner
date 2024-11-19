@@ -32,21 +32,22 @@
 //!   database::{Add, Database, Query},
 //!   paper::Paper,
 //!   prelude::*,
+//!   Learner,
 //! };
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Open database at default location
-//! let mut db = Database::open(Database::default_path()).await?;
+//! // Create a default learner to open database at default location
+//! let mut learner = Learner::builder().build().await?;
 //!
 //! // Add a paper
-//! let paper = Paper::new("2301.07041").await?;
-//! Add::paper(&paper).execute(&mut db).await?;
+//! let paper = learner.retriever.get_paper("2301.07041").await?;
+//! Add::paper(&paper).execute(&mut learner.database).await?;
 //!
 //! // Search for papers about neural networks
-//! let papers = Query::text("neural networks").execute(&mut db).await?;
+//! let papers = Query::text("neural networks").execute(&mut learner.database).await?;
 //!
 //! // Customize document storage location
-//! db.set_storage_path("~/Documents/research/papers").await?;
+//! learner.database.set_storage_path("~/Documents/research/papers").await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -79,6 +80,7 @@ pub use self::instruction::{
 /// from document storage (which can be managed by external tools), allowing users
 /// to maintain their preferred document organization while benefiting from the
 /// metadata management features.
+#[derive(Debug)]
 pub struct Database {
   /// Active connection to the SQLite database
   pub conn: Connection,

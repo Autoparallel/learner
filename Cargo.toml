@@ -12,7 +12,7 @@ repository = "https://github.com/autoparallel/learner"
 
 [workspace.dependencies]
 # local
-learner = { path = "crates/learner", version = "=0.7.0" }
+learner = { path = "crates/learner", version = "=0.8.0" }
 
 # shared dependencies
 serde = { version = "1.0", features = ["derive"] }
@@ -43,6 +43,7 @@ reqwest = { version = "0.12", features = [
 rusqlite = { version = "0.32", features = ["bundled", "functions", "chrono"] }
 serde_json = { version = "1.0" }
 tokio-rusqlite = { version = "0.6" }
+toml = { version = "0.8" }
 
 ## TUI dependencies
 crossterm = { version = "0.28" }
@@ -65,3 +66,10 @@ serial_test  = { version = "3.1" }
 tempfile     = { version = "3.13" }
 tokio-test   = { version = "0.4" }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
+
+[profile.release]
+codegen-units = 1
+lto           = true
+opt-level     = 3
+panic         = "abort"
+strip         = true

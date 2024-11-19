@@ -20,13 +20,15 @@
 //!   database::{Add, Database, Query},
 //!   paper::Paper,
 //!   prelude::*,
+//!   Learner,
 //! };
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut db = Database::open(Database::default_path()).await?;
 //!
 //! // Add just paper metadata
-//! let paper = Paper::new("2301.07041").await?;
+//! # let learner = Learner::builder().build().await?;
+//! # let paper = learner.retriever.get_paper("2301.07041").await?;
 //! Add::paper(&paper).execute(&mut db).await?;
 //!
 //! // Add paper with document
@@ -97,8 +99,11 @@ impl<'a> Add<'a> {
   /// ```no_run
   /// # use learner::database::Add;
   /// # use learner::paper::Paper;
+  /// # use learner::Learner;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// let paper = Paper::new("2301.07041").await?;
+  /// # let learner = Learner::builder().build().await?;
+  /// # let retriever = learner.retriever;
+  /// let paper = retriever.get_paper("2301.07041").await?;
   /// let instruction = Add::paper(&paper);
   /// # Ok(())
   /// # }
@@ -121,8 +126,11 @@ impl<'a> Add<'a> {
   /// ```no_run
   /// # use learner::database::Add;
   /// # use learner::paper::Paper;
+  /// # use learner::Learner;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// let paper = Paper::new("2301.07041").await?;
+  /// # let learner = Learner::builder().build().await?;
+  /// # let retriever = learner.retriever;
+  /// let paper = retriever.get_paper("2301.07041").await?;
   /// let instruction = Add::complete(&paper);
   /// # Ok(())
   /// # }
@@ -167,9 +175,11 @@ impl<'a> Add<'a> {
   ///
   /// ```no_run
   /// # use learner::database::Add;
-  /// # use learner::paper::Paper;
+  /// # use learner::Learner;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// let paper = Paper::new("2301.07041").await?;
+  /// # let learner = Learner::builder().build().await?;
+  /// # let retriever = learner.retriever;
+  /// let paper = retriever.get_paper("2301.07041").await?;
   /// let instruction = Add::paper(&paper).with_document();
   /// # Ok(())
   /// # }
@@ -273,7 +283,7 @@ impl DatabaseInstruction for Add<'_> {
     match &self.addition {
       Addition::Paper(paper) => {
         // Check for existing paper
-        if Query::by_source(paper.source, &paper.source_identifier)
+        if Query::by_source(&paper.source, &paper.source_identifier)
           .execute(db)
           .await?
           .into_iter()

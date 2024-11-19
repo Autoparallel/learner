@@ -8,7 +8,7 @@ license.workspace    = true
 name                 = "learner"
 readme.workspace     = true
 repository.workspace = true
-version              = "0.7.0"
+version              = "0.8.0"
 
 [dependencies]
 async-trait    = { workspace = true }
@@ -26,6 +26,7 @@ serde_json     = { workspace = true }
 thiserror      = { workspace = true }
 tokio          = { workspace = true }
 tokio-rusqlite = { workspace = true }
+toml           = { workspace = true }
 tracing        = { workspace = true }
 
 [dev-dependencies]
