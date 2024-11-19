@@ -1,18 +1,73 @@
-use std::collections::HashMap;
+//! JSON response parser implementation.
+//!
+//! This module handles parsing of JSON API responses into Paper objects using
+//! configurable field mappings. It supports flexible path-based field extraction
+//! with optional transformations.
+//!
+//! # Example Configuration
+//!
+//! ```toml
+//! [response_format]
+//! type = "json"
+//!
+//! [response_format.field_maps]
+//! title = { path = "message/title/0" }
+//! abstract = { path = "message/abstract" }
+//! publication_date = { path = "message/published-print/date-parts/0" }
+//! authors = { path = "message/author" }
+//! ```
 
-use serde::Deserialize;
 use serde_json::Value;
 
 use super::*;
 
+/// Configuration for processing JSON API responses.
+///
+/// Provides field mapping rules to extract paper metadata from JSON responses
+/// using path-based access patterns.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use std::collections::HashMap;
+/// # use learner::retriever::{JsonConfig, FieldMap};
+/// let config = JsonConfig {
+///   field_maps: HashMap::from([("title".to_string(), FieldMap {
+///     path:      "message/title/0".to_string(),
+///     transform: None,
+///   })]),
+/// };
+/// ```
 #[derive(Debug, Clone, Deserialize)]
 pub struct JsonConfig {
-  /// JSON path mappings for fields
+  /// JSON path mappings for paper metadata fields
   pub field_maps: HashMap<String, FieldMap>,
 }
 
 #[async_trait]
 impl ResponseProcessor for JsonConfig {
+  /// Processes a JSON API response into a Paper object.
+  ///
+  /// Extracts paper metadata from the JSON response using configured field mappings.
+  /// Required fields (title, abstract, publication date, authors) must be present
+  /// and valid.
+  ///
+  /// # Arguments
+  ///
+  /// * `data` - Raw JSON response bytes
+  ///
+  /// # Returns
+  ///
+  /// Returns a Result containing either:
+  /// - A populated Paper object
+  /// - A LearnerError if parsing fails or required fields are missing
+  ///
+  /// # Errors
+  ///
+  /// This method will return an error if:
+  /// - JSON parsing fails
+  /// - Required fields are missing
+  /// - Field values are invalid or cannot be transformed
   async fn process_response(&self, data: &[u8]) -> Result<Paper> {
     let json: Value = serde_json::from_slice(data)
       .map_err(|e| LearnerError::ApiError(format!("Failed to parse JSON: {}", e)))?;
@@ -62,6 +117,14 @@ impl ResponseProcessor for JsonConfig {
 }
 
 impl JsonConfig {
+  /// Extracts a single field value using configured mapping.
+  ///
+  /// # Errors
+  ///
+  /// Returns error if:
+  /// - Field mapping is missing
+  /// - Field value cannot be found
+  /// - Value transformation fails
   fn extract_field(&self, json: &Value, field: &str) -> Result<String> {
     let map = self
       .field_maps
@@ -79,7 +142,14 @@ impl JsonConfig {
     }
   }
 
-  fn get_by_path<'a>(&self, json: &'a Value, path: &str) -> Option<String> {
+  /// Retrieves a value from JSON using slash-separated path.
+  ///
+  /// Supports both object key and array index access:
+  /// - "message/title" -> object access
+  /// - "authors/0/name" -> array access
+  ///
+  /// Handles string, array, and number values with appropriate conversion.
+  fn get_by_path(&self, json: &Value, path: &str) -> Option<String> {
     let mut current = json;
 
     for part in path.split('/') {
@@ -100,6 +170,15 @@ impl JsonConfig {
     }
   }
 
+  /// Extracts and processes author information from JSON.
+  ///
+  /// Handles author objects with given/family name fields and optional
+  /// affiliation information. Expects authors as an array matching the
+  /// configured path.
+  ///
+  /// # Errors
+  ///
+  /// Returns error if no valid authors are found in the response.
   fn extract_authors(&self, json: &Value, map: &FieldMap) -> Result<Vec<Author>> {
     let authors = if let Some(Value::Array(arr)) = get_path_value(json, &map.path) {
       arr
@@ -137,6 +216,10 @@ impl JsonConfig {
   }
 }
 
+/// Helper function to navigate JSON structure using path.
+///
+/// Similar to get_by_path but returns raw JSON Value instead of
+/// converted string.
 fn get_path_value<'a>(json: &'a Value, path: &str) -> Option<&'a Value> {
   let mut current = json;
   for part in path.split('/') {

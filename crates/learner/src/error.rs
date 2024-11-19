@@ -11,6 +11,7 @@
 //!
 //! ```
 //! use learner::{error::LearnerError, paper::Paper};
+//! // or `use learner::prelude::*` to bring in the error type
 //!
 //! # async fn example() -> Result<(), LearnerError> {
 //! // Network errors are automatically converted
@@ -27,7 +28,7 @@
 
 use thiserror::Error;
 
-/// Error type alias used for the [`learnerd`] crate.
+/// Error type alias used for the [`learner`] crate.
 pub type Result<T> = core::result::Result<T, LearnerError>;
 
 /// Errors that can occur when working with the learner library.
