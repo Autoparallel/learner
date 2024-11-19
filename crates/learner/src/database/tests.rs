@@ -125,6 +125,7 @@ async fn test_storage_path_relative() {
     std::env::current_dir().unwrap().join(storage_path).to_str().unwrap(),
     db.get_storage_path().await.unwrap().to_str().unwrap()
   );
+  tokio::fs::remove_dir_all("relative").await.unwrap_or(());
 }
 
 #[cfg(unix)]

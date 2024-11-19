@@ -409,7 +409,7 @@ impl Retriever {
     for entry in std::fs::read_dir(dir)? {
       let entry = entry?;
       let path = entry.path();
-      if path.extension().map_or(false, |ext| ext == "toml") {
+      if path.extension().is_some_and(|ext| ext == "toml") {
         retriever = retriever.with_config_file(path)?;
       }
     }

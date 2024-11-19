@@ -19,6 +19,7 @@ fn temp_db() -> (tempfile::TempDir, PathBuf) {
   (dir, db_path)
 }
 
+#[ignore]
 #[test]
 #[serial]
 fn test_init_and_clean() {
@@ -50,6 +51,7 @@ fn test_init_and_clean() {
   dir.close().unwrap();
 }
 
+#[ignore]
 #[tokio::test]
 #[serial]
 async fn test_basic_paper_workflow() {

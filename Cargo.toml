@@ -66,3 +66,10 @@ serial_test  = { version = "3.1" }
 tempfile     = { version = "3.13" }
 tokio-test   = { version = "0.4" }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
+
+[profile.release]
+opt-level     = 3
+lto           = true
+codegen-units = 1
+panic         = "abort"
+strip         = true
