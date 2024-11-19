@@ -69,6 +69,7 @@ pub use self::{
   search::search,
 };
 
+// TODO: Make these take `&str` and hold a lifetime here?
 /// Available commands for the CLI
 #[derive(Subcommand, Clone)]
 pub enum Commands {
@@ -95,7 +96,7 @@ pub enum Commands {
   Download {
     /// Source system (arxiv, doi, iacr)
     #[arg(value_enum)]
-    source: Source,
+    source: String,
 
     /// Paper identifier in the source system
     /// Example: "2301.07041" for arXiv
@@ -106,7 +107,7 @@ pub enum Commands {
   Remove {
     /// Source system (arxiv, doi, iacr)
     #[arg(value_enum)]
-    source: Source,
+    source: String,
 
     /// Paper identifier in the source system
     identifier: String,
@@ -116,7 +117,7 @@ pub enum Commands {
   Get {
     /// Source system (arxiv, doi, iacr)
     #[arg(value_enum)]
-    source: Source,
+    source: String,
 
     /// Paper identifier in the source system
     identifier: String,

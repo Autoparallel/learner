@@ -3,7 +3,7 @@
 use super::*;
 
 /// Function for the [`Commands::Download`] in the CLI.
-pub async fn download(cli: Cli, source: Source, identifier: String) -> Result<()> {
+pub async fn download(cli: Cli, source: String, identifier: String) -> Result<()> {
   let path = cli.path.unwrap_or_else(|| {
     let default_path = Database::default_path();
     println!(
@@ -15,7 +15,7 @@ pub async fn download(cli: Cli, source: Source, identifier: String) -> Result<()
   });
   let mut db = Database::open(&path).await?;
 
-  let papers = Query::by_source(source, &identifier).execute(&mut db).await?;
+  let papers = Query::by_source(&source, &identifier).execute(&mut db).await?;
   if papers.is_empty() {
     println!(
       "{} Paper not found in database. Add it first with: {} {}",

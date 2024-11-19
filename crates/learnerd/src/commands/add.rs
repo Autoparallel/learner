@@ -3,7 +3,7 @@
 use super::*;
 
 /// Function for the [`Commands::Add`] in the CLI.
-pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
+pub async fn add(learner: Learner, cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
   let path = cli.path.unwrap_or_else(|| {
     let default_path = Database::default_path();
     println!(
@@ -18,7 +18,7 @@ pub async fn add(cli: Cli, identifier: String, no_pdf: bool) -> Result<()> {
 
   println!("{} Fetching paper: {}", style(LOOKING_GLASS).cyan(), style(&identifier).yellow());
 
-  let paper = Paper::new(&identifier).await?;
+  let paper = learner.retriever.get_paper(&identifier).await?;
   debug!("Paper details: {:?}", paper);
 
   println!("\n{} Found paper:", style(SUCCESS).green());

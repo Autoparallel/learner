@@ -37,7 +37,7 @@ use std::{path::PathBuf, str::FromStr};
 use clap::{builder::ArgAction, Parser, Subcommand};
 use console::{style, Emoji};
 use error::LearnerdError;
-use learner::{database::Database, error::LearnerError, paper::Paper, prelude::*};
+use learner::{database::Database, error::LearnerError, paper::Paper, prelude::*, Config, Learner};
 use tracing::{debug, trace};
 use tracing_subscriber::EnvFilter;
 
@@ -63,6 +63,8 @@ static SAVE: Emoji<'_, '_> = Emoji("💾 ", "");
 static WARNING: Emoji<'_, '_> = Emoji("⚠️  ", "");
 /// Success indicator
 static SUCCESS: Emoji<'_, '_> = Emoji("✨ ", "");
+/// Error indicator
+static ERROR: Emoji<'_, '_> = Emoji("❗️ ", "");
 
 /// Command line interface configuration and argument parsing
 #[derive(Parser)]
@@ -157,16 +159,30 @@ async fn main() -> Result<()> {
     setup_logging(cli.verbose);
   }
 
-  match command {
-    Commands::Init => init(cli).await,
-    Commands::Add { identifier, no_pdf } => add(cli, identifier, no_pdf).await,
-    Commands::Remove { source, identifier } => remove(cli, source, identifier).await,
-    Commands::Get { source, identifier } => get(cli, source, identifier).await,
-    Commands::Search { query } => search(cli, query).await,
-    Commands::Clean => clean(cli).await,
-    Commands::Download { source, identifier } => download(cli, source, identifier).await,
-    Commands::Daemon { cmd } => daemon(cmd).await,
-    #[cfg(feature = "tui")]
-    Commands::Tui => tui::run().await,
+  // TODO: These commands should be reduced and honestly they should all take in `learner` so this
+  // is done cohesively. We could also probably start using `&str` everywhere.
+  if let Ok(learner) = Learner::from_path(Config::default_path()?).await {
+    match command {
+      Commands::Init => init(cli).await,
+      Commands::Add { identifier, no_pdf } => add(learner, cli, identifier, no_pdf).await,
+      Commands::Remove { source, identifier } => remove(cli, source, identifier).await,
+      Commands::Get { source, identifier } => get(cli, source, identifier).await,
+      Commands::Search { query } => search(cli, query).await,
+      Commands::Clean => clean(cli).await,
+      Commands::Download { source, identifier } => download(cli, source, identifier).await,
+      Commands::Daemon { cmd } => daemon(cmd).await,
+      #[cfg(feature = "tui")]
+      Commands::Tui => tui::run().await,
+    }
+  } else {
+    // TODO (autoparallel): May as well ask if the user wants to run `init`
+    eprintln!(
+      "{} Failed to open Learner config! Please run `learner init` to set up a config!",
+      style(ERROR).red(),
+    );
+    Err(LearnerError::Config(
+      "Configuration not initialized. Run 'learner init' first.".to_string(),
+    ))
+    .map_err(LearnerdError::from)
   }
 }
