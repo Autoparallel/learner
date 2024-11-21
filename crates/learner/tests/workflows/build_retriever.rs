@@ -20,6 +20,7 @@ fn test_arxiv_config_deserialization() {
   assert!(retriever.pattern.is_match("https://arxiv.org/abs/2301.07041"));
   assert!(retriever.pattern.is_match("https://arxiv.org/pdf/2301.07041"));
   assert!(retriever.pattern.is_match("https://arxiv.org/abs/math.AG/0601001"));
+  assert!(retriever.pattern.is_match("https://arxiv.org/abs/math/0404443"));
 
   // Test identifier extraction
   assert_eq!(retriever.extract_identifier("2301.07041").unwrap(), "2301.07041");
