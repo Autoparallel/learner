@@ -44,6 +44,7 @@ use tracing_subscriber::EnvFilter;
 pub mod commands;
 pub mod daemon;
 pub mod error;
+pub mod interaction;
 #[cfg(feature = "tui")] pub mod tui;
 
 use crate::{commands::*, daemon::*, error::*};
@@ -164,12 +165,9 @@ async fn main() -> Result<()> {
   if let Ok(learner) = Learner::from_path(Config::default_path()?).await {
     match command {
       Commands::Init => init(cli).await,
-      Commands::Add { identifier, no_pdf } => add(learner, cli, identifier, no_pdf).await,
+      Commands::Add { identifier, .. } => add(&cli, learner, &identifier).await,
       Commands::Remove { source, identifier } => remove(cli, source, identifier).await,
-      Commands::Get { source, identifier } => get(cli, source, identifier).await,
       Commands::Search { query } => search(cli, query).await,
-      Commands::Clean => clean(cli).await,
-      Commands::Download { source, identifier } => download(cli, source, identifier).await,
       Commands::Daemon { cmd } => daemon(cmd).await,
       #[cfg(feature = "tui")]
       Commands::Tui => tui::run().await,

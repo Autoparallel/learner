@@ -62,6 +62,8 @@ pub mod init;
 pub mod remove;
 pub mod search;
 
+use dialoguer::{Confirm, Input};
+use interaction::{ResponseContent, UserInteraction, INFO};
 use learner::database::{Add, Query};
 
 pub use self::{
@@ -83,26 +85,23 @@ pub enum Commands {
 
   /// Add a paper to the database by its identifier
   Add {
-    /// Paper identifier (arXiv ID, DOI, or IACR ID)
-    /// Examples: "2301.07041", "10.1145/1327452.1327492"
     identifier: String,
-
-    /// Skip PDF download prompt
-    #[arg(long)]
-    no_pdf: bool,
+    #[arg(long, group = "pdf_behavior")]
+    pdf:        bool,
+    #[arg(long, group = "pdf_behavior")]
+    no_pdf:     bool,
   },
 
-  /// Download the PDF for a given entry, replacing an existing PDF if desired.
-  Download {
-    /// Source system (arxiv, doi, iacr)
-    #[arg(value_enum)]
-    source: String,
+  // /// Download the PDF for a given entry, replacing an existing PDF if desired.
+  // Download {
+  //   /// Source system (arxiv, doi, iacr)
+  //   #[arg(value_enum)]
+  //   source: String,
 
-    /// Paper identifier in the source system
-    /// Example: "2301.07041" for arXiv
-    identifier: String,
-  },
-
+  //   /// Paper identifier in the source system
+  //   /// Example: "2301.07041" for arXiv
+  //   identifier: String,
+  // },
   /// Remove a paper from the database by its source and identifier
   Remove {
     /// Source system (arxiv, doi, iacr)
@@ -113,24 +112,20 @@ pub enum Commands {
     identifier: String,
   },
 
-  /// Retrieve and display a paper's details
-  Get {
-    /// Source system (arxiv, doi, iacr)
-    #[arg(value_enum)]
-    source: String,
+  // /// Retrieve and display a paper's details
+  // Get {
+  //   /// Source system (arxiv, doi, iacr)
+  //   #[arg(value_enum)]
+  //   source: String,
 
-    /// Paper identifier in the source system
-    identifier: String,
-  },
-
+  //   /// Paper identifier in the source system
+  //   identifier: String,
+  // },
   /// Search papers in the database
   Search {
     /// Search query - supports full text search
     query: String,
   },
-
-  /// Removes the entire database after confirmation
-  Clean,
 
   /// Manage the learnerd daemon
   Daemon {
@@ -138,4 +133,110 @@ pub enum Commands {
     #[command(subcommand)]
     cmd: DaemonCommands,
   },
+}
+
+impl UserInteraction for Cli {
+  fn confirm(&self, message: &str) -> Result<bool> {
+    // Check if pdf flags are present
+    if let Some(Commands::Add { pdf, no_pdf, .. }) = self.command {
+      return Ok(if pdf {
+        true
+      } else if no_pdf {
+        false
+      } else if self.accept_defaults {
+        false
+      } else {
+        Confirm::new().with_prompt(message).default(false).interact()?
+      });
+    }
+
+    // Default behavior for other commands
+    if self.accept_defaults {
+      return Ok(false);
+    }
+
+    Confirm::new()
+      .with_prompt(message)
+      .default(false)
+      .interact()
+      .map_err(|e| LearnerdError::Interaction(e.to_string()))
+  }
+
+  fn prompt(&self, message: &str) -> Result<String> {
+    Input::new()
+      .with_prompt(message)
+      .interact_text()
+      .map_err(|e| LearnerdError::Interaction(e.to_string()))
+  }
+
+  fn reply(&self, content: ResponseContent) -> Result<()> {
+    match content {
+      ResponseContent::Paper(paper, detailed) => {
+        println!("\n{} Paper details:", style(PAPER).green());
+        println!("   {} {}", style("Title:").green().bold(), style(&paper.title).white());
+        println!(
+          "   {} {}",
+          style("Authors:").green().bold(),
+          style(paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "))
+            .white()
+        );
+
+        if detailed {
+          println!(
+            "   {} {}",
+            style("Abstract:").green().bold(),
+            style(&paper.abstract_text).white()
+          );
+          println!(
+            "   {} {}",
+            style("Published:").green().bold(),
+            style(&paper.publication_date).white()
+          );
+          if let Some(url) = &paper.pdf_url {
+            println!("   {} {}", style("PDF URL:").green().bold(), style(url).blue().underlined());
+          }
+          if let Some(doi) = &paper.doi {
+            println!("   {} {}", style("DOI:").green().bold(), style(doi).blue().underlined());
+          }
+        }
+      },
+      ResponseContent::Papers(papers) => {
+        if papers.is_empty() {
+          println!("{} No papers found", style(WARNING).yellow());
+          return Ok(());
+        }
+
+        println!("\n{} Found {} papers:", style(SUCCESS).green(), style(papers.len()).yellow());
+        for (i, paper) in papers.iter().enumerate() {
+          println!("\n{}. {}", style(i + 1).yellow(), style(&paper.title).white().bold());
+
+          let authors = paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>();
+          let author_display = if authors.is_empty() {
+            style("No authors listed").red().italic().to_string()
+          } else {
+            style(authors.join(", ")).white().to_string()
+          };
+          println!("   {} {}", style("Authors:").green(), author_display);
+
+          // Show a preview of the abstract
+          if !paper.abstract_text.is_empty() {
+            let preview = paper.abstract_text.chars().take(100).collect::<String>();
+            let preview =
+              if paper.abstract_text.len() > 100 { format!("{}...", preview) } else { preview };
+            println!("   {} {}", style("Abstract:").green(), style(preview).white().italic());
+          }
+        }
+      },
+      ResponseContent::Success(message) => {
+        println!("{} {}", style(SUCCESS).green(), style(message).white());
+      },
+      ResponseContent::Error(error) => {
+        println!("{} {}", style(ERROR).red(), style(error).red());
+      },
+      ResponseContent::Info(message) => {
+        println!("{} {}", style(INFO).blue(), style(message).white());
+      },
+    }
+    Ok(())
+  }
 }

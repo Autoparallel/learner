@@ -65,4 +65,7 @@ pub enum LearnerdError {
   /// Daemon-specific errors
   #[error("Daemon error: {0}")]
   Daemon(String),
+
+  #[error("Interaction error: {0}")]
+  Interaction(String),
 }
