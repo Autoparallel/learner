@@ -469,6 +469,24 @@ impl Retriever {
       )),
     }
   }
+
+  pub fn sanitize_identifier(&self, input: &str) -> Result<(String, String)> {
+    let mut matches = Vec::new();
+
+    for config in self.configs.values() {
+      if config.pattern.is_match(input) {
+        matches.push((config.source.clone(), config.extract_identifier(input)?.to_string()));
+      }
+    }
+
+    match matches.len() {
+      0 => Err(LearnerError::InvalidIdentifier),
+      1 => Ok(matches.remove(0)),
+      _ => Err(LearnerError::AmbiguousIdentifier(
+        matches.into_iter().map(|(source, _)| source).collect(),
+      )),
+    }
+  }
 }
 
 impl RetrieverConfig {
