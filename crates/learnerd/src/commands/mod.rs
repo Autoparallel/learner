@@ -122,24 +122,24 @@ pub enum Commands {
 #[derive(Args, Clone)]
 pub struct SearchFilter {
   /// Filter by author name
-  #[arg(long, group = "search_type")]
+  #[arg(long)]
   author: Option<String>,
 
   /// Filter by paper source (arxiv, doi, iacr)
-  #[arg(long, group = "search_type")]
+  #[arg(long)]
   source: Option<String>,
 
   /// Filter by publication date (YYYY-MM-DD)
-  #[arg(long, group = "search_type")]
+  #[arg(long)]
   before: Option<String>,
+  // TODO (autoparallel): Allow for proper scoped searches
+  // /// Search only titles
+  // #[arg(long, group = "search_scope")]
+  // title_only: bool,
 
-  /// Search only titles
-  #[arg(long, group = "search_scope")]
-  title_only: bool,
-
-  /// Search only abstracts
-  #[arg(long, group = "search_scope")]
-  abstract_only: bool,
+  // /// Search only abstracts
+  // #[arg(long, group = "search_scope")]
+  // abstract_only: bool,
 }
 
 impl UserInteraction for Cli {
