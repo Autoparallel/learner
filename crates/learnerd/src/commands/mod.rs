@@ -61,6 +61,7 @@ pub mod init;
 pub mod remove;
 pub mod search;
 
+use chrono::{DateTime, Utc};
 use clap::{arg, Args};
 use dialoguer::{Confirm, Input};
 use interaction::*;
@@ -89,14 +90,29 @@ pub enum Commands {
     no_pdf:     bool,
   },
 
-  /// Remove a paper from the database by its source and identifier
+  /// Remove papers from the database
   Remove {
-    /// Source system (arxiv, doi, iacr)
-    #[arg(value_enum)]
-    source: String,
+    /// Paper identifier or search terms
+    query: String,
 
-    /// Paper identifier in the source system
-    identifier: String,
+    #[command(flatten)]
+    filter: SearchFilter,
+
+    /// Show what would be removed without actually removing
+    #[arg(long)]
+    dry_run: bool,
+
+    /// Skip confirmation prompts
+    #[arg(long)]
+    force: bool,
+
+    /// PDF handling
+    #[arg(long, group = "pdf_behavior")]
+    remove_pdf: bool,
+
+    /// Keep PDFs when removing papers
+    #[arg(long, group = "pdf_behavior")]
+    keep_pdf: bool,
   },
 
   Search {
@@ -271,4 +287,20 @@ impl UserInteraction for Cli {
     }
     Ok(())
   }
+}
+
+fn parse_date(date_str: &str) -> Result<DateTime<Utc>> {
+  let parsed = if date_str.len() == 4 {
+    // Just year provided
+    DateTime::parse_from_str(&format!("{}-01-01 00:00:00 +0000", date_str), "%Y-%m-%d %H:%M:%S %z")
+  } else if date_str.len() == 7 {
+    // Year and month provided
+    DateTime::parse_from_str(&format!("{}-01 00:00:00 +0000", date_str), "%Y-%m-%d %H:%M:%S %z")
+  } else {
+    // Full date provided
+    DateTime::parse_from_str(&format!("{} 00:00:00 +0000", date_str), "%Y-%m-%d %H:%M:%S %z")
+  }
+  .map_err(|e| LearnerdError::Interaction(format!("Invalid date format: {}", e)))?;
+
+  Ok(parsed.with_timezone(&Utc))
 }

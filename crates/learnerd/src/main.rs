@@ -161,15 +161,20 @@ async fn main() -> Result<()> {
     setup_logging(cli.verbose);
   }
 
-  // TODO: In the `reply` interaction, we now hardcode the pdf storage path. That should be passed
-  // into these commands from here. There's work to do to make this all properly configurable.
-  // TODO: These commands should be reduced and honestly they should all take in `learner` so this
+  // TODO: This is messy, we don't really need to do all this unwinding of structs here for sure.
+  // The methods should just take cli and learner, then yield out the command inside.
+  //  TODO: In the
+  // `reply` interaction, we now hardcode the pdf storage path. That should be passed into these
+  // commands from here. There's work to do to make this all properly configurable.
+  // TODO: These
+  // commands should be reduced and honestly they should all take in `learner` so this
   // is done cohesively. We could also probably start using `&str` everywhere.
   if let Ok(learner) = Learner::from_path(Config::default_path()?).await {
     match command {
       Commands::Init => init(cli).await,
       Commands::Add { identifier, .. } => add(&cli, learner, &identifier).await,
-      Commands::Remove { source, identifier } => remove(cli, source, identifier).await,
+      Commands::Remove { query, filter, dry_run, force, remove_pdf, keep_pdf } =>
+        remove(&cli, learner, &query, &filter, dry_run, force, remove_pdf, keep_pdf).await,
       Commands::Search { query, filter, detailed } =>
         search(&cli, learner, &query, &filter, detailed).await,
       Commands::Daemon { cmd } => daemon(cmd).await,
