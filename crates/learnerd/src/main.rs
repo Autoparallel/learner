@@ -167,7 +167,8 @@ async fn main() -> Result<()> {
       Commands::Init => init(cli).await,
       Commands::Add { identifier, .. } => add(&cli, learner, &identifier).await,
       Commands::Remove { source, identifier } => remove(cli, source, identifier).await,
-      Commands::Search { query } => search(cli, query).await,
+      Commands::Search { query, filter, detailed } =>
+        search(&cli, learner, &query, &filter, detailed).await,
       Commands::Daemon { cmd } => daemon(cmd).await,
       #[cfg(feature = "tui")]
       Commands::Tui => tui::run().await,

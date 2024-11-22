@@ -201,3 +201,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <div align="center">
 Made for making learning sh*t less annoying.
 </div>
+
+
+# NOTES:
+```
+# General search
+learner search "quantum computing"
+
+# Detailed output
+learner search "quantum" --detailed
+
+# Author search
+learner search "quantum" --author "Feynman"
+
+# Source filter
+learner search "quantum" --source arxiv
+
+# Date filter
+learner search "quantum" --before 2023-01-01
+
+# Scope limitation
+learner search "quantum" --title-only
+```

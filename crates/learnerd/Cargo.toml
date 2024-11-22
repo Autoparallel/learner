@@ -30,6 +30,7 @@ tokio              = { workspace = true }
 tracing            = { workspace = true }
 tracing-appender   = { workspace = true }
 tracing-subscriber = { workspace = true }
+chrono             = { workspace = true }
 
 # TUI dependencies (optional)
 crossterm = { workspace = true, optional = true }

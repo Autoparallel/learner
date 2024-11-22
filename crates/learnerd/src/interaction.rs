@@ -10,12 +10,12 @@ pub static SUCCESS: Emoji<'_, '_> = Emoji("✨ ", "");
 pub static INFO: Emoji<'_, '_> = Emoji("ℹ️  ", "");
 
 #[derive(Debug)]
-pub enum ResponseContent {
-  Paper(Paper, bool),
-  Papers(Vec<Paper>),
-  Success(String),
+pub enum ResponseContent<'a> {
+  Paper(&'a Paper, bool),
+  Papers(&'a [Paper]),
+  Success(&'a str),
   Error(LearnerdError),
-  Info(String),
+  Info(&'a str),
 }
 
 pub trait UserInteraction {
