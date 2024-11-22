@@ -66,6 +66,7 @@ static WARNING: Emoji<'_, '_> = Emoji("⚠️  ", "");
 static SUCCESS: Emoji<'_, '_> = Emoji("✨ ", "");
 /// Error indicator
 static ERROR: Emoji<'_, '_> = Emoji("❗️ ", "");
+static INFO: Emoji<'_, '_> = Emoji("ℹ️  ", "");
 
 /// Command line interface configuration and argument parsing
 #[derive(Parser)]
@@ -160,6 +161,8 @@ async fn main() -> Result<()> {
     setup_logging(cli.verbose);
   }
 
+  // TODO: In the `reply` interaction, we now hardcode the pdf storage path. That should be passed
+  // into these commands from here. There's work to do to make this all properly configurable.
   // TODO: These commands should be reduced and honestly they should all take in `learner` so this
   // is done cohesively. We could also probably start using `&str` everywhere.
   if let Ok(learner) = Learner::from_path(Config::default_path()?).await {
