@@ -82,7 +82,7 @@ use super::*;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Paper {
   /// The paper's full title
   pub title:             String,
@@ -119,7 +119,7 @@ pub struct Paper {
 ///   email:       Some("alice@example.edu".to_string()),
 /// };
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Author {
   /// Author's full name
   pub name:        String,
