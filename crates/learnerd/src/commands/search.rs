@@ -57,19 +57,3 @@ pub async fn search<I: UserInteraction>(
     }
   }
 }
-
-fn parse_date(date_str: &str) -> Result<DateTime<Utc>> {
-  let parsed = if date_str.len() == 4 {
-    // Just year provided
-    DateTime::parse_from_str(&format!("{}-01-01 00:00:00 +0000", date_str), "%Y-%m-%d %H:%M:%S %z")
-  } else if date_str.len() == 7 {
-    // Year and month provided
-    DateTime::parse_from_str(&format!("{}-01 00:00:00 +0000", date_str), "%Y-%m-%d %H:%M:%S %z")
-  } else {
-    // Full date provided
-    DateTime::parse_from_str(&format!("{} 00:00:00 +0000", date_str), "%Y-%m-%d %H:%M:%S %z")
-  }
-  .map_err(|e| LearnerdError::Interaction(format!("Invalid date format: {}", e)))?;
-
-  Ok(parsed.with_timezone(&Utc))
-}
