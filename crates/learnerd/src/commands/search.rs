@@ -41,18 +41,7 @@ pub async fn search<I: UserInteraction>(
     if detailed {
       // Only show detailed view
       for paper in papers.iter() {
-        interaction.reply(ResponseContent::Paper(paper, true))?;
-
-        // Check PDF status
-        let pdf_path = learner.database.get_storage_path().await?.join(paper.filename());
-        if pdf_path.exists() {
-          interaction.reply(ResponseContent::Info(&format!(
-            "   PDF available at: {}",
-            pdf_path.display()
-          )))?;
-        } else {
-          interaction.reply(ResponseContent::Info("   PDF not downloaded"))?;
-        }
+        interaction.reply(ResponseContent::Paper(paper))?;
       }
     } else {
       // Show summary view

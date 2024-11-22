@@ -3,15 +3,21 @@ use dialoguer::{Confirm, Input};
 
 use super::*;
 
-pub static PAPER: Emoji<'_, '_> = Emoji("📄 ", "");
-pub static ERROR: Emoji<'_, '_> = Emoji("❗️ ", "");
-pub static WARNING: Emoji<'_, '_> = Emoji("⚠️  ", "");
-pub static SUCCESS: Emoji<'_, '_> = Emoji("✨ ", "");
-pub static INFO: Emoji<'_, '_> = Emoji("ℹ️  ", "");
+pub static INFO_PREFIX: &str = "│ "; // Information/status
+pub static SUCCESS_PREFIX: &str = "✓ "; // Success/completion
+pub static ERROR_PREFIX: &str = "✗ "; // Error/failure
+pub static WARNING_PREFIX: &str = "! "; // Warning/caution
+pub static PROMPT_PREFIX: &str = "> "; // User prompt
+pub static ITEM_PREFIX: &str = "├─"; // List item
+pub static LAST_ITEM_PREFIX: &str = "└─"; // Last list item
+pub static CONTINUE_PREFIX: &str = "│  "; // Continuation line
+pub static TREE_VERT: &str = "│";
+pub static TREE_BRANCH: &str = "├";
+pub static TREE_LEAF: &str = "└";
 
 #[derive(Debug)]
 pub enum ResponseContent<'a> {
-  Paper(&'a Paper, bool),
+  Paper(&'a Paper),
   Papers(&'a [Paper]),
   Success(&'a str),
   Error(LearnerdError),

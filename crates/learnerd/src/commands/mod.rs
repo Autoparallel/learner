@@ -63,7 +63,7 @@ pub mod search;
 
 use clap::{arg, Args};
 use dialoguer::{Confirm, Input};
-use interaction::{ResponseContent, UserInteraction, INFO};
+use interaction::*;
 use learner::database::{Add, Query};
 
 pub use self::{add::add, daemon::daemon, init::init, remove::remove, search::search};
@@ -178,70 +178,95 @@ impl UserInteraction for Cli {
 
   fn reply(&self, content: ResponseContent) -> Result<()> {
     match content {
-      ResponseContent::Paper(paper, detailed) => {
-        println!("\n{} Paper details:", style(PAPER).green());
-        println!("   {} {}", style("Title:").green().bold(), style(&paper.title).white());
-        println!(
-          "   {} {}",
-          style("Authors:").green().bold(),
-          style(paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "))
-            .white()
-        );
-
-        if detailed {
-          println!(
-            "   {} {}",
-            style("Abstract:").green().bold(),
-            style(&paper.abstract_text).white()
-          );
-          println!(
-            "   {} {}",
-            style("Published:").green().bold(),
-            style(&paper.publication_date).white()
-          );
-          if let Some(url) = &paper.pdf_url {
-            println!("   {} {}", style("PDF URL:").green().bold(), style(url).blue().underlined());
-          }
-          if let Some(doi) = &paper.doi {
-            println!("   {} {}", style("DOI:").green().bold(), style(doi).blue().underlined());
-          }
-        }
-      },
       ResponseContent::Papers(papers) => {
         if papers.is_empty() {
-          println!("{} No papers found", style(WARNING).yellow());
+          println!("{} {} No papers found", style(TREE_LEAF).cyan(), style(ERROR_PREFIX).red());
           return Ok(());
         }
 
-        println!("\n{} Found {} papers:", style(SUCCESS).green(), style(papers.len()).yellow());
+        // println!("{} Searching for: {}", style(TREE_VERT).cyan(), style(&query).white());
+        println!(
+          "{} {} Found {} papers:",
+          style(TREE_VERT).cyan(),
+          style(SUCCESS_PREFIX).green(),
+          style(papers.len()).yellow()
+        );
+
         for (i, paper) in papers.iter().enumerate() {
-          println!("\n{}. {}", style(i + 1).yellow(), style(&paper.title).white().bold());
+          let prefix = if i == papers.len() - 1 { TREE_LEAF } else { TREE_BRANCH };
+          println!("\n{} {}", style(prefix).cyan(), style(&paper.title).white().bold());
+          println!(
+            "{}   {}: {}",
+            style(TREE_VERT).cyan(),
+            style("Authors").green().bold(),
+            style(&paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "))
+              .white()
+          );
+        }
+      },
+      ResponseContent::Paper(paper) => {
+        println!("{} Paper details:", style(TREE_VERT).cyan());
+        println!("{} {}", style(TREE_LEAF).cyan(), style(&paper.title).white().bold());
+        println!(
+          "{}   {}: {}",
+          style(TREE_VERT).cyan(),
+          style("Authors").green().bold(),
+          style(&paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "))
+            .white()
+        );
 
-          let authors = paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>();
-          let author_display = if authors.is_empty() {
-            style("No authors listed").red().italic().to_string()
+        println!("{}   {}:", style(TREE_VERT).cyan(), style("Abstract").green().bold());
+        println!("{}   {}", style(TREE_VERT).cyan(), style(&paper.abstract_text).white());
+        println!(
+          "{}   {}: {}",
+          style(TREE_VERT).cyan(),
+          style("Published").green().bold(),
+          style(&paper.publication_date).white()
+        );
+
+        // PDF information - show regardless of detailed flag since it's important metadata
+        if let Some(url) = &paper.pdf_url {
+          println!(
+            "{}   {}: {}",
+            style(TREE_VERT).cyan(),
+            style("PDF URL").green().bold(),
+            style(url).blue().underlined()
+          );
+
+          // Check PDF status
+          // TODO (autoparallel): This is not good, we need to modify this to use a path known from
+          // the command
+          let pdf_path = Database::default_storage_path().join(paper.filename());
+          if pdf_path.exists() {
+            println!(
+              "{}   {} PDF available at: {}",
+              style(TREE_VERT).cyan(),
+              style(SUCCESS_PREFIX).green(),
+              style(pdf_path.display()).white()
+            );
           } else {
-            style(authors.join(", ")).white().to_string()
-          };
-          println!("   {} {}", style("Authors:").green(), author_display);
-
-          // Show a preview of the abstract
-          if !paper.abstract_text.is_empty() {
-            let preview = paper.abstract_text.chars().take(100).collect::<String>();
-            let preview =
-              if paper.abstract_text.len() > 100 { format!("{}...", preview) } else { preview };
-            println!("   {} {}", style("Abstract:").green(), style(preview).white().italic());
+            println!(
+              "{}   {} PDF not downloaded",
+              style(TREE_VERT).cyan(),
+              style(ERROR_PREFIX).yellow()
+            );
           }
+        } else {
+          println!(
+            "{}   {} No PDF available",
+            style(TREE_VERT).cyan(),
+            style(ERROR_PREFIX).yellow()
+          );
         }
       },
       ResponseContent::Success(message) => {
-        println!("{} {}", style(SUCCESS).green(), style(message).white());
+        println!("{} {}", style(SUCCESS_PREFIX).green(), style(message).white());
       },
       ResponseContent::Error(error) => {
-        println!("{} {}", style(ERROR).red(), style(error).red());
+        println!("{} {}", style(ERROR_PREFIX).red(), style(error).red());
       },
       ResponseContent::Info(message) => {
-        println!("{} {}", style(INFO).blue(), style(message).white());
+        println!("{} {}", style(INFO_PREFIX).cyan(), style(message).white());
       },
     }
     Ok(())

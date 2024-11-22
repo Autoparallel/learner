@@ -18,7 +18,7 @@ pub async fn add<I: UserInteraction>(
   if papers.is_empty() {
     interaction.reply(ResponseContent::Info(&format!("Fetching paper: {}", identifier)))?;
     let paper = learner.retriever.get_paper(identifier).await?;
-    interaction.reply(ResponseContent::Paper(&paper, false))?;
+    interaction.reply(ResponseContent::Paper(&paper))?;
 
     let with_pdf = paper.pdf_url.is_some() && interaction.confirm("Download PDF?")?;
 
