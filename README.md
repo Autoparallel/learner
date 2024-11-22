@@ -10,7 +10,6 @@
 [![CLI](https://img.shields.io/badge/cli-learnerd-blue)](https://crates.io/crates/learnerd)
 [![Crates.io](https://img.shields.io/crates/v/learnerd)](https://crates.io/crates/learnerd)
 [![CI](https://github.com/autoparallel/learner/actions/workflows/check.yaml/badge.svg)](https://github.com/autoparallel/learner/actions/workflows/check.yaml)
-[![codecov](https://codecov.io/gh/Autoparallel/learner/graph/badge.svg?token=ZU3R1AT5YE)](https://codecov.io/gh/Autoparallel/learner)
 [![License](https://img.shields.io/crates/l/learner)](LICENSE)
 
 <img src="assets/header.svg" alt="learner header" width="600px">
