@@ -10,6 +10,8 @@ pub async fn add<I: UserInteraction>(
   interaction: &I,
   mut learner: Learner,
   identifier: &str,
+  pdf: bool,
+  no_pdf: bool,
 ) -> Result<()> {
   let (source, sanitized_identifier) = learner.retriever.sanitize_identifier(identifier)?;
   let papers =
@@ -20,7 +22,14 @@ pub async fn add<I: UserInteraction>(
     let paper = learner.retriever.get_paper(identifier).await?;
     interaction.reply(ResponseContent::Paper(&paper))?;
 
-    let with_pdf = paper.pdf_url.is_some() && interaction.confirm("Download PDF?")?;
+    let with_pdf = paper.pdf_url.is_some()
+      && if pdf {
+        true
+      } else if no_pdf {
+        false
+      } else {
+        interaction.confirm("Download PDF?")?
+      };
 
     match if with_pdf {
       Add::complete(&paper).execute(&mut learner.database).await
@@ -39,10 +48,22 @@ pub async fn add<I: UserInteraction>(
 
     if pdf_path.exists() {
       interaction.reply(ResponseContent::Info(&format!("PDF exists at: {}", pdf_path.display())))
-    } else if paper.pdf_url.is_some() && interaction.confirm("PDF not found. Download it now?")? {
-      match Add::complete(paper).execute(&mut learner.database).await {
-        Ok(_) => interaction.reply(ResponseContent::Success("PDF downloaded successfully")),
-        Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e))),
+    } else if paper.pdf_url.is_some() {
+      let should_download = if pdf {
+        true
+      } else if no_pdf {
+        false
+      } else {
+        interaction.confirm("PDF not found. Download it now?")?
+      };
+
+      if should_download {
+        match Add::complete(paper).execute(&mut learner.database).await {
+          Ok(_) => interaction.reply(ResponseContent::Success("PDF downloaded successfully")),
+          Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e))),
+        }
+      } else {
+        Ok(())
       }
     } else {
       Ok(())

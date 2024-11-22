@@ -160,29 +160,19 @@ pub struct SearchFilter {
 
 impl UserInteraction for Cli {
   fn confirm(&self, message: &str) -> Result<bool> {
-    // Check if pdf flags are present
-    if let Some(Commands::Add { pdf, no_pdf, .. }) = self.command {
-      return Ok(if pdf {
-        true
-      } else if no_pdf {
-        false
-      } else if self.accept_defaults {
-        false
-      } else {
-        Confirm::new().with_prompt(message).default(false).interact()?
-      });
-    }
+    // Add some visual separation before confirmation prompts
+    println!();
+    println!("{} {}", style(TREE_VERT).cyan(), style(message).yellow().bold());
 
-    // Default behavior for other commands
     if self.accept_defaults {
       return Ok(false);
     }
 
     Confirm::new()
-      .with_prompt(message)
-      .default(false)
-      .interact()
-      .map_err(|e| LearnerdError::Interaction(e.to_string()))
+        .with_prompt("") // Message already shown above
+        .default(false)
+        .interact()
+        .map_err(|e| LearnerdError::Interaction(e.to_string()))
   }
 
   fn prompt(&self, message: &str) -> Result<String> {
@@ -276,13 +266,18 @@ impl UserInteraction for Cli {
         }
       },
       ResponseContent::Success(message) => {
-        println!("{} {}", style(SUCCESS_PREFIX).green(), style(message).white());
+        println!(
+          "{}   {} {}",
+          style(TREE_VERT).cyan(),
+          style(SUCCESS_PREFIX).green(),
+          style(message).white()
+        );
+      },
+      ResponseContent::Info(message) => {
+        println!("{}   {}", style(TREE_VERT).cyan(), style(message).white());
       },
       ResponseContent::Error(error) => {
         println!("{} {}", style(ERROR_PREFIX).red(), style(error).red());
-      },
-      ResponseContent::Info(message) => {
-        println!("{} {}", style(INFO_PREFIX).cyan(), style(message).white());
       },
     }
     Ok(())

@@ -172,7 +172,8 @@ async fn main() -> Result<()> {
   if let Ok(learner) = Learner::from_path(Config::default_path()?).await {
     match command {
       Commands::Init => init(cli).await,
-      Commands::Add { identifier, .. } => add(&cli, learner, &identifier).await,
+      Commands::Add { identifier, pdf, no_pdf } =>
+        add(&cli, learner, &identifier, pdf, no_pdf).await,
       Commands::Remove { query, filter, dry_run, force, remove_pdf, keep_pdf } =>
         remove(&cli, learner, &query, &filter, dry_run, force, remove_pdf, keep_pdf).await,
       Commands::Search { query, filter, detailed } =>
