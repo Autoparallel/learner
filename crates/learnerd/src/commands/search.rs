@@ -1,75 +1,70 @@
 //! Module for abstracting the "search" functionality to the [`learner`] database.
 
+use chrono::{DateTime, Utc};
+
 use super::*;
 
 /// Function for the [`Commands::Search`] in the CLI.
-pub async fn search(cli: Cli, query: String) -> Result<()> {
-  let path = cli.path.unwrap_or_else(|| {
-    let default_path = Database::default_path();
-    println!(
-      "{} Using default database path: {}",
-      style(BOOKS).cyan(),
-      style(default_path.display()).yellow()
-    );
-    default_path
-  });
-  trace!("Using database at: {}", path.display());
-  let mut db = Database::open(&path).await?;
-
-  println!("{} Searching for: {}", style(LOOKING_GLASS).cyan(), style(&query).yellow());
-
-  // Modify query to use FTS5 syntax for better matching
-  let search_query = query.split_whitespace().collect::<Vec<_>>().join(" OR ");
-  debug!("Modified search query: {}", search_query);
-
-  let papers = Query::text(&search_query).execute(&mut db).await?;
-  if papers.is_empty() {
-    println!("{} No papers found matching: {}", style(WARNING).yellow(), style(&query).yellow());
+pub async fn search<I: UserInteraction>(
+  interaction: &I,
+  mut learner: Learner,
+  query: &str,
+  filter: &SearchFilter,
+  detailed: bool,
+) -> Result<()> {
+  // Build appropriate query based on filters
+  let terms: String;
+  let db_query = if let Some(author) = &filter.author {
+    Query::by_author(author)
+  } else if let Some(source) = &filter.source {
+    Query::by_source(source, query)
+  } else if let Some(date) = &filter.before {
+    let date = DateTime::parse_from_str(date, "%Y-%m-%d")
+      .map_err(|e| LearnerdError::Interaction(format!("Invalid date format: {}", e)))?
+      .with_timezone(&Utc);
+    Query::before_date(date)
   } else {
-    println!("\n{} Found {} papers:", style(SUCCESS).green(), style(papers.len()).yellow());
+    // Query::
+    // Build search terms with field restrictions
+    terms = if filter.title_only {
+      // Search only in title
+      format!("title: {}", query)
+    } else if filter.abstract_only {
+      // Search only in abstract
+      format!("abstract_text: {}", query)
+    } else {
+      // Search both with OR
+      query.split_whitespace().map(|term| term.to_string()).collect::<Vec<_>>().join(" OR ")
+    };
+    Query::text(&terms)
+  };
 
-    for (i, paper) in papers.iter().enumerate() {
-      debug!("Paper details: {:?}", paper);
-      println!("\n{}. {}", style(i + 1).yellow(), style(&paper.title).white().bold());
+  interaction.reply(ResponseContent::Info(&format!("Searching for: {}", query)))?;
 
-      let authors = paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>();
+  let papers = db_query.execute(&mut learner.database).await?;
 
-      let author_display = if authors.is_empty() {
-        style("No authors listed").red().italic().to_string()
-      } else {
-        style(authors.join(", ")).white().to_string()
-      };
+  if papers.is_empty() {
+    interaction.reply(ResponseContent::Info(&format!("No papers found matching: {}", query)))
+  } else {
+    // Use ResponseContent::Papers for bulk display
+    interaction.reply(ResponseContent::Papers(&papers))?;
 
-      println!("   {} {}", style("Authors:").green(), author_display);
-
-      if let Some(doi) = &paper.doi {
-        println!("   {} {}", style("DOI:").green(), style(doi).blue().underlined());
-      }
-
-      println!(
-        "   {} {} {}",
-        style("Source:").green(),
-        style(&paper.source).cyan(),
-        style(&paper.source_identifier).yellow()
-      );
-
-      // Show a preview of the abstract
-      if !paper.abstract_text.is_empty() {
-        let preview = paper.abstract_text.chars().take(100).collect::<String>();
-        let preview =
-          if paper.abstract_text.len() > 100 { format!("{}...", preview) } else { preview };
-        println!("   {} {}", style("Abstract:").green(), style(preview).white().italic());
+    // For each paper that needs detailed view
+    if detailed {
+      for paper in papers.iter() {
+        interaction.reply(ResponseContent::Paper(paper, true))?;
       }
     }
 
-    // If we have multiple results, show a tip about refining the search
+    // Show search refinement tip for multiple results
     if papers.len() > 1 {
-      println!(
-        "\n{} Tip: Use quotes for exact phrases, e.g. {}",
-        style("💡").yellow(),
-        style("\"exact phrase\"").yellow().italic()
-      );
+      interaction.reply(ResponseContent::Info(
+        "Tip: Use --author, --source, or --before to refine results. Use quotes for exact \
+         phrases, e.g. \"exact phrase\""
+          .into(),
+      ))
+    } else {
+      Ok(())
     }
   }
-  Ok(())
 }
