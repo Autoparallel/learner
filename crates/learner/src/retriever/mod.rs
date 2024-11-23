@@ -497,7 +497,7 @@ impl Retriever {
   /// # Examples
   ///
   /// ```
-  /// # use learner::Retriever;
+  /// # use learner::retriever::Retriever;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// let retriever = Retriever::new().with_config_dir("config/")?;
   ///
