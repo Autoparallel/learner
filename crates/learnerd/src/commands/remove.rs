@@ -1,9 +1,14 @@
+//! Module for abstracting the "remove" functionality to the [`learner`] database.
+
 use std::fs;
 
 use learner::database::Remove;
 
 use super::*;
 
+// TODO (autoparallel): Address this lint
+#[allow(clippy::too_many_arguments)]
+/// Function for the [`Commands::Remove`] in the CLI.
 pub async fn remove<I: UserInteraction>(
   interaction: &I,
   mut learner: Learner,
@@ -90,15 +95,9 @@ pub async fn remove<I: UserInteraction>(
     if should_remove_pdfs {
       let pdf_path = learner.config.storage_path.join(paper.filename());
       if pdf_path.exists() {
-        if let Err(e) = fs::remove_file(&pdf_path) {
-          interaction.reply(ResponseContent::Error(LearnerdError::Interaction(format!(
-            "Failed to remove PDF for {}: {}",
-            paper.title, e
-          ))))?;
-        } else {
-          interaction
-            .reply(ResponseContent::Success(&format!("Removed PDF: {}", pdf_path.display())))?;
-        }
+        fs::remove_file(&pdf_path)?;
+        interaction
+          .reply(ResponseContent::Success(&format!("Removed PDF: {}", pdf_path.display())))?;
       }
     }
   }

@@ -470,6 +470,70 @@ impl Retriever {
     }
   }
 
+  /// Sanitizes and normalizes a paper identifier using configured retrieval patterns.
+  ///
+  /// This function processes an input string (which could be a URL, DOI, arXiv ID, etc.)
+  /// and attempts to match it against configured paper source patterns to extract a
+  /// standardized source and identifier pair.
+  ///
+  /// # Arguments
+  ///
+  /// * `input` - The input string to sanitize. Can be:
+  ///   - A full URL (e.g., "https://arxiv.org/abs/2301.07041")
+  ///   - A DOI (e.g., "10.1145/1327452.1327492")
+  ///   - An arXiv ID (e.g., "2301.07041" or "math.AG/0601001")
+  ///   - An IACR ID (e.g., "2023/123")
+  ///
+  /// # Returns
+  ///
+  /// Returns a `Result` containing:
+  /// - `Ok((String, String))` - A tuple of (source, identifier) where:
+  ///   - source: The normalized source name (e.g., "arxiv", "doi", "iacr")
+  ///   - identifier: The extracted canonical identifier
+  /// - `Err(LearnerError)` with either:
+  ///   - `InvalidIdentifier` if no configured pattern matches the input
+  ///   - `AmbiguousIdentifier` if multiple patterns match the input
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// # use learner::Retriever;
+  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+  /// let retriever = Retriever::new().with_config_dir("config/")?;
+  ///
+  /// // Sanitize an arXiv URL
+  /// let (source, id) = retriever.sanitize_identifier("https://arxiv.org/abs/2301.07041")?;
+  /// assert_eq!(source, "arxiv");
+  /// assert_eq!(id, "2301.07041");
+  ///
+  /// // Sanitize a bare DOI
+  /// let (source, id) = retriever.sanitize_identifier("10.1145/1327452.1327492")?;
+  /// assert_eq!(source, "doi");
+  /// assert_eq!(id, "10.1145/1327452.1327492");
+  /// # Ok(())
+  /// # }
+  /// ```
+  ///
+  /// # Errors
+  ///
+  /// Will return `LearnerError::InvalidIdentifier` if:
+  /// - The input string doesn't match any configured source patterns
+  /// - The input matches a pattern but the identifier extraction fails
+  ///
+  /// Will return `LearnerError::AmbiguousIdentifier` if:
+  /// - The input matches multiple source patterns
+  /// - Includes the list of matching sources in the error
+  ///
+  /// # Implementation Notes
+  ///
+  /// The function:
+  /// 1. Checks the input against all configured source patterns
+  /// 2. Attempts to extract identifiers from all matching patterns
+  /// 3. Validates that exactly one pattern matched
+  /// 4. Returns the normalized source and identifier
+  ///
+  /// The matching process uses regex patterns defined in the retriever configuration
+  /// files, allowing for flexible addition of new paper sources.
   pub fn sanitize_identifier(&self, input: &str) -> Result<(String, String)> {
     let mut matches = Vec::new();
 

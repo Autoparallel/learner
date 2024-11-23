@@ -1,13 +1,13 @@
 [package]
 authors.workspace    = true
-description          = "A simple daemon for learning stuff"
+description          = "The way to interact and learn stuff"
 edition.workspace    = true
 keywords.workspace   = true
 license.workspace    = true
 name                 = "learnerd"
 readme.workspace     = true
 repository.workspace = true
-version              = "0.1.6"
+version              = "0.2.0"
 
 [[bin]]
 name = "learner"
@@ -18,6 +18,7 @@ default = []
 tui     = ["dep:ratatui", "dep:crossterm"]
 
 [dependencies]
+chrono             = { workspace = true }
 clap               = { workspace = true }
 console            = { workspace = true }
 dialoguer          = { workspace = true }
@@ -30,7 +31,6 @@ tokio              = { workspace = true }
 tracing            = { workspace = true }
 tracing-appender   = { workspace = true }
 tracing-subscriber = { workspace = true }
-chrono             = { workspace = true }
 
 # TUI dependencies (optional)
 crossterm = { workspace = true, optional = true }

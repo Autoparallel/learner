@@ -62,10 +62,11 @@ pub enum LearnerdError {
   #[error(transparent)]
   TracingInit(#[from] tracing_appender::rolling::InitError),
 
-  /// Daemon-specific errors
+  /// Daemon-specific errors.
   #[error("Daemon error: {0}")]
   Daemon(String),
 
-  #[error("Interaction error: {0}")]
-  Interaction(String),
+  /// Error parsing a datetime format.
+  #[error(transparent)]
+  ChronoParse(#[from] chrono::format::ParseError),
 }

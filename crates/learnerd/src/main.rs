@@ -35,10 +35,10 @@
 use std::{path::PathBuf, str::FromStr};
 
 use clap::{builder::ArgAction, Parser, Subcommand};
-use console::{style, Emoji};
+use console::style;
 use error::LearnerdError;
 use learner::{database::Database, error::LearnerError, paper::Paper, prelude::*, Config, Learner};
-use tracing::{debug, trace};
+use tracing::trace;
 use tracing_subscriber::EnvFilter;
 
 pub mod commands;
@@ -49,24 +49,24 @@ pub mod interaction;
 
 use crate::{commands::*, daemon::*, error::*};
 
-// Emoji constants for prettier output
-/// Search operation indicator
-static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍 ", "");
-/// Database/library operations indicator
-static BOOKS: Emoji<'_, '_> = Emoji("📚 ", "");
-/// Initialization/startup indicator
-static ROCKET: Emoji<'_, '_> = Emoji("🚀 ", "");
-/// Paper details indicator
-static PAPER: Emoji<'_, '_> = Emoji("📄 ", "");
-/// Save operation indicator
-static SAVE: Emoji<'_, '_> = Emoji("💾 ", "");
-/// Warning indicator
-static WARNING: Emoji<'_, '_> = Emoji("⚠️  ", "");
-/// Success indicator
-static SUCCESS: Emoji<'_, '_> = Emoji("✨ ", "");
-/// Error indicator
-static ERROR: Emoji<'_, '_> = Emoji("❗️ ", "");
-static INFO: Emoji<'_, '_> = Emoji("ℹ️  ", "");
+/// Prefix for information messages
+static INFO_PREFIX: &str = "ℹ ";
+/// Prefix for success messages
+static SUCCESS_PREFIX: &str = "✓ ";
+/// Prefix for warning messages
+static WARNING_PREFIX: &str = "⚠️ ";
+/// Prefix for error messages
+static ERROR_PREFIX: &str = "✗ ";
+/// Prefix for user prompts
+static PROMPT_PREFIX: &str = "❯ ";
+/// Continuation line for tree structure
+static CONTINUE_PREFIX: &str = "│  ";
+/// Vertical line for tree structure
+static TREE_VERT: &str = "│";
+/// Branch character for tree structure
+static TREE_BRANCH: &str = "├";
+/// Leaf character for tree structure (end of branch)
+static TREE_LEAF: &str = "└";
 
 /// Command line interface configuration and argument parsing
 #[derive(Parser)]
@@ -186,7 +186,7 @@ async fn main() -> Result<()> {
     // TODO (autoparallel): May as well ask if the user wants to run `init`
     eprintln!(
       "{} Failed to open Learner config! Please run `learner init` to set up a config!",
-      style(ERROR).red(),
+      style(ERROR_PREFIX).red(),
     );
     Err(LearnerdError::from(LearnerError::Config(
       "Configuration not initialized. Run 'learner init' first.".to_string(),

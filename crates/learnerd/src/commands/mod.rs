@@ -1,55 +1,49 @@
-//! Command implementations for the learner CLI and TUI.
+//! Command line interface implementations and user interactions.
 //!
-//! This module organizes all available commands for managing academic papers and the
-//! learner system. It provides functionality for:
+//! This module organizes all available commands for managing academic papers and provides
+//! a consistent interface for user interactions. It provides functionality for:
 //!
 //! - Paper Management
 //!   - Adding papers from various sources (arXiv, DOI, IACR)
-//!   - Retrieving paper details
-//!   - Searching across papers
+//!   - Searching and filtering papers
 //!   - Removing papers
 //!
 //! - PDF Management
-//!   - Downloading PDFs
-//!   - Managing PDF storage
+//!   - Configurable PDF downloading
+//!   - PDF cleanup during paper removal
 //!
 //! - System Management
 //!   - Database initialization
-//!   - Database cleanup
 //!   - Daemon control
 //!
 //! # Usage
-//!
-//! Commands can be used both from the CLI and the TUI (when enabled):
 //!
 //! ```bash
 //! # Initialize database
 //! learner init
 //!
-//! # Add a paper
-//! learner add 2301.07041
+//! # Add a paper with PDF
+//! learner add 2301.07041 --pdf
 //!
-//! # Search papers
-//! learner search "quantum computing"
+//! # Search papers with filters
+//! learner search "quantum" --author "Alice" --before 2023
 //!
-//! # Get paper details
-//! learner get arxiv 2301.07041
+//! # Remove papers with confirmation
+//! learner remove "quantum computing"
+//!
+//! # Remove papers without confirmation
+//! learner remove "quantum computing" --force --remove-pdf
 //! ```
-//!
-//! When the TUI feature is enabled, running `learner` with no commands launches
-//! the interactive terminal interface.
 //!
 //! # Command Organization
 //!
-//! Each command is implemented in its own module, with the main command enum
-//! [`Commands`] providing the interface between the CLI parser and the individual
-//! implementations. Commands are designed to be usable both from the CLI and
-//! the TUI contexts.
+//! The module is structured around two main components:
 //!
-//! # Feature Flags
+//! - [`Commands`]: The main command enum providing the interface for CLI parsing
+//! - [`UserInteraction`]: Trait implementation for consistent terminal output and user prompts
 //!
-//! - `tui`: Enables the Terminal User Interface and makes it the default when no command is
-//!   specified.
+//! All output uses a consistent visual style with tree structures and color-coded indicators
+//! for better readability and user experience.
 
 use super::*;
 
@@ -69,13 +63,12 @@ use learner::database::{Add, Query};
 
 pub use self::{add::add, daemon::daemon, init::init, remove::remove, search::search};
 
-// TODO: Make these take `&str` and hold a lifetime here?
 /// Available commands for the CLI
 #[derive(Subcommand, Clone)]
 pub enum Commands {
   /// Launch the Terminal User Interface (default when no command specified)
   #[cfg(feature = "tui")]
-  #[clap(hide = true)] // Hide from help since it's the default
+  #[clap(hide = true)]
   Tui,
 
   /// Initialize a new learner database
@@ -83,9 +76,12 @@ pub enum Commands {
 
   /// Add a paper to the database by its identifier
   Add {
+    /// Paper identifier (arXiv ID, DOI, IACR ID)
     identifier: String,
+    /// Force PDF download
     #[arg(long, group = "pdf_behavior")]
     pdf:        bool,
+    /// Skip PDF download
     #[arg(long, group = "pdf_behavior")]
     no_pdf:     bool,
   },
@@ -95,6 +91,7 @@ pub enum Commands {
     /// Paper identifier or search terms
     query: String,
 
+    /// Search filters
     #[command(flatten)]
     filter: SearchFilter,
 
@@ -106,7 +103,7 @@ pub enum Commands {
     #[arg(long)]
     force: bool,
 
-    /// PDF handling
+    /// Remove associated PDFs
     #[arg(long, group = "pdf_behavior")]
     remove_pdf: bool,
 
@@ -115,6 +112,7 @@ pub enum Commands {
     keep_pdf: bool,
   },
 
+  /// Search for papers in the database
   Search {
     /// Search query - supports full text search
     query: String,
@@ -123,18 +121,20 @@ pub enum Commands {
     #[arg(long)]
     detailed: bool,
 
+    /// Search filters
     #[command(flatten)]
     filter: SearchFilter,
   },
 
   /// Manage the learnerd daemon
   Daemon {
-    /// The set of commands specifically for managing the [`Daemon`].
+    /// Commands for managing the daemon
     #[command(subcommand)]
     cmd: DaemonCommands,
   },
 }
 
+/// Filter options for paper searches
 #[derive(Args, Clone)]
 pub struct SearchFilter {
   /// Filter by author name
@@ -159,30 +159,35 @@ pub struct SearchFilter {
 }
 
 impl UserInteraction for Cli {
+  /// Request confirmation from the user
+  ///
+  /// Displays a yes/no prompt with the given message and returns the user's choice.
+  /// If `accept_defaults` is true, automatically returns false without prompting.
   fn confirm(&self, message: &str) -> Result<bool> {
-    println!("\n{} {}", style(INFO_PREFIX).yellow(), style(message).yellow().bold());
+    println!("\n{} {}", style(PROMPT_PREFIX).yellow(), style(message).yellow().bold());
 
     if self.accept_defaults {
       return Ok(false);
     }
 
     let theme = dialoguer::theme::ColorfulTheme::default();
-    Confirm::with_theme(&theme)
-      .with_prompt("")
-      .default(false)
-      .interact()
-      .map_err(|e| LearnerdError::Interaction(e.to_string()))
+    Ok(Confirm::with_theme(&theme).with_prompt("").default(false).interact()?)
   }
 
+  /// Request text input from the user
+  ///
+  /// Displays a prompt for free-form text input and returns the user's response.
   fn prompt(&self, message: &str) -> Result<String> {
     let theme = dialoguer::theme::ColorfulTheme::default();
-    Input::with_theme(&theme)
-      .with_prompt(message)
-      .interact_text()
-      .map_err(|e| LearnerdError::Interaction(e.to_string()))
+    Ok(Input::with_theme(&theme).with_prompt(message).interact_text()?)
   }
 
-  // Terminal drawing characters - keep the same but ensure we use BULLET consistently
+  /// Display content to the user
+  ///
+  /// Handles different types of content with appropriate formatting:
+  /// - Paper listings with tree structure
+  /// - Detailed paper information
+  /// - Success/error/info messages
   fn reply(&self, content: ResponseContent) -> Result<()> {
     match content {
       ResponseContent::Papers(papers) => {
@@ -274,15 +279,10 @@ impl UserInteraction for Cli {
         }
       },
       ResponseContent::Success(message) => {
-        println!(
-          "{} {} {}",
-          style(TREE_VERT).cyan(),
-          style(SUCCESS_PREFIX).green(),
-          style(message).white()
-        );
+        println!("{} {}", style(SUCCESS_PREFIX).green(), style(message).white());
       },
       ResponseContent::Info(message) => {
-        println!("{} {}", style(WORKING_PREFIX).green(), style(message).white());
+        println!("{} {}", style(INFO_PREFIX).green(), style(message).white());
       },
       ResponseContent::Error(error) => {
         println!("{} {}", style(ERROR_PREFIX).red(), style(error).red());
@@ -292,6 +292,21 @@ impl UserInteraction for Cli {
   }
 }
 
+/// Parse a date string into a UTC DateTime
+///
+/// Supports multiple date formats:
+/// - Year only (YYYY)
+/// - Year and month (YYYY-MM)
+/// - Full date (YYYY-MM-DD)
+///
+/// # Arguments
+///
+/// * `date_str` - Date string to parse
+///
+/// # Returns
+///
+/// Returns a Result containing either the parsed UTC DateTime or an error
+/// if the date format is invalid.
 fn parse_date(date_str: &str) -> Result<DateTime<Utc>> {
   let parsed = if date_str.len() == 4 {
     // Just year provided
@@ -302,8 +317,7 @@ fn parse_date(date_str: &str) -> Result<DateTime<Utc>> {
   } else {
     // Full date provided
     DateTime::parse_from_str(&format!("{} 00:00:00 +0000", date_str), "%Y-%m-%d %H:%M:%S %z")
-  }
-  .map_err(|e| LearnerdError::Interaction(format!("Invalid date format: {}", e)))?;
+  }?;
 
   Ok(parsed.with_timezone(&Utc))
 }
