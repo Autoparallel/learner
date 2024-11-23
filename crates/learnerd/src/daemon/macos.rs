@@ -100,7 +100,7 @@ pub fn uninstall_system_daemon() -> Result<()> {
 /// - Service control operations
 /// - Important file paths
 pub fn daemon_install_prompt(daemon: &Daemon) {
-  println!("{} Daemon service installed", style(SUCCESS).green());
+  println!("{} Daemon service installed", style(SUCCESS_PREFIX).green());
 
   println!("\n{} To activate the service:", style("Next steps").blue());
   println!(

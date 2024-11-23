@@ -8,7 +8,7 @@ pub async fn init(cli: Cli) -> Result<()> {
     let default_path = Database::default_path();
     println!(
       "{} Using default database path: {}",
-      style(BOOKS).cyan(),
+      style(INFO_PREFIX).cyan(),
       style(default_path.display()).yellow()
     );
     default_path
@@ -17,7 +17,7 @@ pub async fn init(cli: Cli) -> Result<()> {
   if db_path.exists() {
     println!(
       "{} Database already exists at: {}",
-      style(WARNING).yellow(),
+      style(ERROR_PREFIX).yellow(),
       style(db_path.display()).yellow()
     );
 
@@ -43,7 +43,7 @@ pub async fn init(cli: Cli) -> Result<()> {
       let input = dialoguer::Input::<String>::new()
         .with_prompt(format!(
           "{} Type {} to confirm reinitialization",
-          style("⚠️").red(),
+          style(WARNING_PREFIX).red(),
           style("INIT").red().bold()
         ))
         .interact_text()?;
@@ -56,7 +56,7 @@ pub async fn init(cli: Cli) -> Result<()> {
     }
 
     // Remove existing database
-    println!("{} Removing existing database", style(WARNING).yellow());
+    println!("{} Removing existing database", style(WARNING_PREFIX).yellow());
     std::fs::remove_file(&db_path)?;
 
     // Also remove any FTS auxiliary files
@@ -74,7 +74,7 @@ pub async fn init(cli: Cli) -> Result<()> {
 
   println!(
     "{} Initializing database at: {}",
-    style(ROCKET).cyan(),
+    style(INFO_PREFIX).cyan(),
     style(db_path.display()).yellow()
   );
 
@@ -84,7 +84,7 @@ pub async fn init(cli: Cli) -> Result<()> {
   let pdf_dir = Database::default_storage_path();
   println!(
     "\n{} PDF files will be stored in: {}",
-    style(PAPER).cyan(),
+    style(INFO_PREFIX).cyan(),
     style(pdf_dir.display()).yellow()
   );
 
@@ -108,6 +108,6 @@ pub async fn init(cli: Cli) -> Result<()> {
   std::fs::create_dir_all(&pdf_dir)?;
   db.set_storage_path(&pdf_dir.to_string_lossy().to_string()).await?;
 
-  println!("{} Database initialized successfully!", style(SUCCESS).green());
+  println!("{} Database initialized successfully!", style(SUCCESS_PREFIX).green());
   Ok(())
 }

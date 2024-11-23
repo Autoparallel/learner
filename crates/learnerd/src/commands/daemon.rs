@@ -8,53 +8,61 @@ pub async fn daemon(cmd: DaemonCommands) -> Result<()> {
 
   match cmd {
     DaemonCommands::Start => {
-      println!("{} Starting daemon...", style(ROCKET).cyan());
+      println!("{} Starting daemon...", style(INFO_PREFIX).cyan());
       match daemon.start() {
-        Ok(_) => println!("{} Daemon started successfully", style(SUCCESS).green()),
+        Ok(_) => println!("{} Daemon started successfully", style(SUCCESS_PREFIX).green()),
         Err(e) => {
-          println!("{} Failed to start daemon: {}", style(WARNING).yellow(), style(&e).red());
+          println!("{} Failed to start daemon: {}", style(ERROR_PREFIX).yellow(), style(&e).red());
           return Err(e);
         },
       }
     },
     DaemonCommands::Stop => {
-      println!("{} Stopping daemon...", style(WARNING).yellow());
+      println!("{} Stopping daemon...", style(WARNING_PREFIX).yellow());
       match daemon.stop() {
-        Ok(_) => println!("{} Daemon stopped", style(SUCCESS).green()),
+        Ok(_) => println!("{} Daemon stopped", style(SUCCESS_PREFIX).green()),
         Err(e) => {
-          println!("{} Failed to stop daemon: {}", style(WARNING).yellow(), style(&e).red());
+          println!("{} Failed to stop daemon: {}", style(ERROR_PREFIX).yellow(), style(&e).red());
           return Err(e);
         },
       }
     },
     DaemonCommands::Restart => {
-      println!("{} Restarting daemon...", style(ROCKET).cyan());
+      println!("{} Restarting daemon...", style(INFO_PREFIX).cyan());
       match daemon.restart() {
-        Ok(_) => println!("{} Daemon restarted successfully", style(SUCCESS).green()),
+        Ok(_) => println!("{} Daemon restarted successfully", style(SUCCESS_PREFIX).green()),
         Err(e) => {
-          println!("{} Failed to restart daemon: {}", style(WARNING).yellow(), style(&e).red());
+          println!(
+            "{} Failed to restart daemon: {}",
+            style(WARNING_PREFIX).yellow(),
+            style(&e).red()
+          );
           return Err(e);
         },
       }
     },
     DaemonCommands::Install => {
-      println!("{} Installing daemon service...", style(ROCKET).cyan());
+      println!("{} Installing daemon service...", style(INFO_PREFIX).cyan());
       match daemon.install() {
         Ok(_) => {
-          println!("{} Daemon service installed", style(SUCCESS).green());
+          println!("{} Daemon service installed", style(SUCCESS_PREFIX).green());
           daemon_install_prompt(&daemon);
         },
         Err(e) => {
-          println!("{} Failed to install daemon: {}", style(WARNING).yellow(), style(&e).red());
+          println!(
+            "{} Failed to install daemon: {}",
+            style(WARNING_PREFIX).yellow(),
+            style(&e).red()
+          );
           return Err(e);
         },
       }
     },
     DaemonCommands::Uninstall => {
-      println!("{} Removing daemon service...", style(WARNING).yellow());
+      println!("{} Removing daemon service...", style(WARNING_PREFIX).yellow());
       match daemon.uninstall() {
         Ok(_) => {
-          println!("{} Daemon service removed", style(SUCCESS).green());
+          println!("{} Daemon service removed", style(SUCCESS_PREFIX).green());
 
           #[cfg(target_os = "linux")]
           println!(
@@ -64,7 +72,11 @@ pub async fn daemon(cmd: DaemonCommands) -> Result<()> {
           );
         },
         Err(e) => {
-          println!("{} Failed to uninstall daemon: {}", style(WARNING).yellow(), style(&e).red());
+          println!(
+            "{} Failed to uninstall daemon: {}",
+            style(WARNING_PREFIX).yellow(),
+            style(&e).red()
+          );
           return Err(e);
         },
       }
@@ -72,7 +84,11 @@ pub async fn daemon(cmd: DaemonCommands) -> Result<()> {
     DaemonCommands::Status => {
       if let Ok(pid) = std::fs::read_to_string(&daemon.pid_file) {
         let pid = pid.trim();
-        println!("{} Daemon is running with PID: {}", style(SUCCESS).green(), style(pid).yellow());
+        println!(
+          "{} Daemon is running with PID: {}",
+          style(SUCCESS_PREFIX).green(),
+          style(pid).yellow()
+        );
 
         // Show log file location
         println!("\n{} Log files:", style("📄").cyan());
@@ -95,7 +111,7 @@ pub async fn daemon(cmd: DaemonCommands) -> Result<()> {
           style("sudo launchctl list | grep learnerd").yellow()
         );
       } else {
-        println!("{} Daemon is not running", style(WARNING).yellow());
+        println!("{} Daemon is not running", style(WARNING_PREFIX).yellow());
       }
     },
   }

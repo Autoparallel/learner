@@ -96,7 +96,7 @@ pub fn uninstall_system_daemon() -> Result<()> {
 /// - Log access instructions
 /// - Important systemd paths
 pub fn daemon_install_prompt(daemon: &Daemon) {
-  println!("{} Daemon service installed", style(SUCCESS).green());
+  println!("{} Daemon service installed", style(SUCCESS_PREFIX).green());
 
   println!("\n{} To activate the service:", style("Next steps").blue());
   println!("   1. Reload:   {}", style("sudo systemctl daemon-reload").yellow());

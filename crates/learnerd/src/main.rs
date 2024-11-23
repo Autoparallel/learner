@@ -35,36 +35,38 @@
 use std::{path::PathBuf, str::FromStr};
 
 use clap::{builder::ArgAction, Parser, Subcommand};
-use console::{style, Emoji};
+use console::style;
 use error::LearnerdError;
 use learner::{database::Database, error::LearnerError, paper::Paper, prelude::*, Config, Learner};
-use tracing::{debug, trace};
+use tracing::trace;
 use tracing_subscriber::EnvFilter;
 
 pub mod commands;
 pub mod daemon;
 pub mod error;
+pub mod interaction;
 #[cfg(feature = "tui")] pub mod tui;
 
 use crate::{commands::*, daemon::*, error::*};
 
-// Emoji constants for prettier output
-/// Search operation indicator
-static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍 ", "");
-/// Database/library operations indicator
-static BOOKS: Emoji<'_, '_> = Emoji("📚 ", "");
-/// Initialization/startup indicator
-static ROCKET: Emoji<'_, '_> = Emoji("🚀 ", "");
-/// Paper details indicator
-static PAPER: Emoji<'_, '_> = Emoji("📄 ", "");
-/// Save operation indicator
-static SAVE: Emoji<'_, '_> = Emoji("💾 ", "");
-/// Warning indicator
-static WARNING: Emoji<'_, '_> = Emoji("⚠️  ", "");
-/// Success indicator
-static SUCCESS: Emoji<'_, '_> = Emoji("✨ ", "");
-/// Error indicator
-static ERROR: Emoji<'_, '_> = Emoji("❗️ ", "");
+/// Prefix for information messages
+static INFO_PREFIX: &str = "ℹ ";
+/// Prefix for success messages
+static SUCCESS_PREFIX: &str = "✓ ";
+/// Prefix for warning messages
+static WARNING_PREFIX: &str = "⚠️ ";
+/// Prefix for error messages
+static ERROR_PREFIX: &str = "✗ ";
+/// Prefix for user prompts
+static PROMPT_PREFIX: &str = "❯ ";
+/// Continuation line for tree structure
+static CONTINUE_PREFIX: &str = "│  ";
+/// Vertical line for tree structure
+static TREE_VERT: &str = "│";
+/// Branch character for tree structure
+static TREE_BRANCH: &str = "├";
+/// Leaf character for tree structure (end of branch)
+static TREE_LEAF: &str = "└";
 
 /// Command line interface configuration and argument parsing
 #[derive(Parser)]
@@ -159,17 +161,23 @@ async fn main() -> Result<()> {
     setup_logging(cli.verbose);
   }
 
-  // TODO: These commands should be reduced and honestly they should all take in `learner` so this
+  // TODO: This is messy, we don't really need to do all this unwinding of structs here for sure.
+  // The methods should just take cli and learner, then yield out the command inside.
+  //  TODO: In the
+  // `reply` interaction, we now hardcode the pdf storage path. That should be passed into these
+  // commands from here. There's work to do to make this all properly configurable.
+  // TODO: These
+  // commands should be reduced and honestly they should all take in `learner` so this
   // is done cohesively. We could also probably start using `&str` everywhere.
   if let Ok(learner) = Learner::from_path(Config::default_path()?).await {
     match command {
       Commands::Init => init(cli).await,
-      Commands::Add { identifier, no_pdf } => add(learner, cli, identifier, no_pdf).await,
-      Commands::Remove { source, identifier } => remove(cli, source, identifier).await,
-      Commands::Get { source, identifier } => get(cli, source, identifier).await,
-      Commands::Search { query } => search(cli, query).await,
-      Commands::Clean => clean(cli).await,
-      Commands::Download { source, identifier } => download(cli, source, identifier).await,
+      Commands::Add { identifier, pdf, no_pdf } =>
+        add(&cli, learner, &identifier, pdf, no_pdf).await,
+      Commands::Remove { query, filter, dry_run, force, remove_pdf, keep_pdf } =>
+        remove(&cli, learner, &query, &filter, dry_run, force, remove_pdf, keep_pdf).await,
+      Commands::Search { query, filter, detailed } =>
+        search(&cli, learner, &query, &filter, detailed).await,
       Commands::Daemon { cmd } => daemon(cmd).await,
       #[cfg(feature = "tui")]
       Commands::Tui => tui::run().await,
@@ -178,7 +186,7 @@ async fn main() -> Result<()> {
     // TODO (autoparallel): May as well ask if the user wants to run `init`
     eprintln!(
       "{} Failed to open Learner config! Please run `learner init` to set up a config!",
-      style(ERROR).red(),
+      style(ERROR_PREFIX).red(),
     );
     Err(LearnerdError::from(LearnerError::Config(
       "Configuration not initialized. Run 'learner init' first.".to_string(),

@@ -1104,7 +1104,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "learner"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1131,10 +1131,11 @@ dependencies = [
 
 [[package]]
 name = "learnerd"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
+ "chrono",
  "clap",
  "console",
  "crossterm",
