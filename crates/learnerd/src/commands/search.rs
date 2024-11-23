@@ -1,5 +1,7 @@
 //! Module for abstracting the "search" functionality to the [`learner`] database.
 
+use chrono::{DateTime, Utc};
+
 use super::*;
 
 /// Function for the [`Commands::Search`] in the CLI.

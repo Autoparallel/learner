@@ -1,5 +1,3 @@
-//! Module for abstracting the "remove" functionality to the [`learner`] database.
-
 use std::fs;
 
 use learner::database::Remove;
