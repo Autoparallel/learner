@@ -32,13 +32,12 @@
 
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use clap::{builder::ArgAction, Parser, Subcommand};
 use console::style;
 use error::LearnerdError;
 use learner::{database::Database, error::LearnerError, paper::Paper, prelude::*, Config, Learner};
-use tracing::trace;
 use tracing_subscriber::EnvFilter;
 
 pub mod commands;
@@ -171,13 +170,10 @@ async fn main() -> Result<()> {
   // is done cohesively. We could also probably start using `&str` everywhere.
   if let Ok(learner) = Learner::from_path(Config::default_path()?).await {
     match command {
-      Commands::Init => init(cli).await,
-      Commands::Add { identifier, pdf, no_pdf } =>
-        add(&cli, learner, &identifier, pdf, no_pdf).await,
-      Commands::Remove { query, filter, dry_run, force, remove_pdf, keep_pdf } =>
-        remove(&cli, learner, &query, &filter, dry_run, force, remove_pdf, keep_pdf).await,
-      Commands::Search { query, filter, detailed } =>
-        search(&cli, learner, &query, &filter, detailed).await,
+      Commands::Init(init_options) => init(&cli, init_options).await,
+      Commands::Add(add_options) => add(&cli, learner, add_options).await,
+      Commands::Remove(remove_options) => remove(&cli, learner, remove_options).await,
+      Commands::Search(search_options) => search(&cli, learner, search_options).await,
       Commands::Daemon { cmd } => daemon(cmd).await,
       #[cfg(feature = "tui")]
       Commands::Tui => tui::run().await,

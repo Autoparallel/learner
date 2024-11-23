@@ -5,21 +5,36 @@ use super::*;
 // TODO (autoparallel): This could probably be made even more streamlined if we use the result/error
 // type from `learner` more cleverly
 
+/// Arguments that can be used for the [`Commands::Add`]
+#[derive(Args, Clone)]
+pub struct AddArgs {
+  /// Paper identifier (arXiv ID, DOI, IACR ID)
+  pub identifier: String,
+
+  /// Force PDF download
+  #[arg(long, group = "pdf_behavior")]
+  pub pdf: bool,
+
+  /// Skip PDF download
+  #[arg(long, group = "pdf_behavior")]
+  pub no_pdf: bool,
+}
+
 /// Function for the [`Commands::Add`] in the CLI.
 pub async fn add<I: UserInteraction>(
   interaction: &I,
   mut learner: Learner,
-  identifier: &str,
-  pdf: bool,
-  no_pdf: bool,
+  add_options: AddArgs,
 ) -> Result<()> {
-  let (source, sanitized_identifier) = learner.retriever.sanitize_identifier(identifier)?;
+  let AddArgs { identifier, pdf, no_pdf } = add_options;
+
+  let (source, sanitized_identifier) = learner.retriever.sanitize_identifier(&identifier)?;
   let papers =
     Query::by_source(&source, &sanitized_identifier).execute(&mut learner.database).await?;
 
   if papers.is_empty() {
     interaction.reply(ResponseContent::Info(&format!("Fetching paper: {}", identifier)))?;
-    let paper = learner.retriever.get_paper(identifier).await?;
+    let paper = learner.retriever.get_paper(&identifier).await?;
     interaction.reply(ResponseContent::Paper(&paper))?;
 
     let with_pdf = paper.pdf_url.is_some()

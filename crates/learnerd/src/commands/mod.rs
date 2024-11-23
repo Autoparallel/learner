@@ -61,7 +61,7 @@ use dialoguer::{Confirm, Input};
 use interaction::*;
 use learner::database::{Add, Query};
 
-pub use self::{add::add, daemon::daemon, init::init, remove::remove, search::search};
+pub use self::{add::*, daemon::*, init::*, remove::*, search::*};
 
 /// Available commands for the CLI
 #[derive(Subcommand, Clone)]
@@ -72,59 +72,16 @@ pub enum Commands {
   Tui,
 
   /// Initialize a new learner database
-  Init,
+  Init(InitArgs),
 
   /// Add a paper to the database by its identifier
-  Add {
-    /// Paper identifier (arXiv ID, DOI, IACR ID)
-    identifier: String,
-    /// Force PDF download
-    #[arg(long, group = "pdf_behavior")]
-    pdf:        bool,
-    /// Skip PDF download
-    #[arg(long, group = "pdf_behavior")]
-    no_pdf:     bool,
-  },
+  Add(AddArgs),
 
   /// Remove papers from the database
-  Remove {
-    /// Paper identifier or search terms
-    query: String,
-
-    /// Search filters
-    #[command(flatten)]
-    filter: SearchFilter,
-
-    /// Show what would be removed without actually removing
-    #[arg(long)]
-    dry_run: bool,
-
-    /// Skip confirmation prompts
-    #[arg(long)]
-    force: bool,
-
-    /// Remove associated PDFs
-    #[arg(long, group = "pdf_behavior")]
-    remove_pdf: bool,
-
-    /// Keep PDFs when removing papers
-    #[arg(long, group = "pdf_behavior")]
-    keep_pdf: bool,
-  },
+  Remove(RemoveArgs),
 
   /// Search for papers in the database
-  Search {
-    /// Search query - supports full text search
-    query: String,
-
-    /// Show detailed paper information
-    #[arg(long)]
-    detailed: bool,
-
-    /// Search filters
-    #[command(flatten)]
-    filter: SearchFilter,
-  },
+  Search(SearchArgs),
 
   /// Manage the learnerd daemon
   Daemon {
@@ -132,30 +89,6 @@ pub enum Commands {
     #[command(subcommand)]
     cmd: DaemonCommands,
   },
-}
-
-/// Filter options for paper searches
-#[derive(Args, Clone)]
-pub struct SearchFilter {
-  /// Filter by author name
-  #[arg(long)]
-  author: Option<String>,
-
-  /// Filter by paper source (arxiv, doi, iacr)
-  #[arg(long)]
-  source: Option<String>,
-
-  /// Filter by publication date (YYYY-MM-DD)
-  #[arg(long)]
-  before: Option<String>,
-  // TODO (autoparallel): Allow for proper scoped searches
-  // /// Search only titles
-  // #[arg(long, group = "search_scope")]
-  // title_only: bool,
-
-  // /// Search only abstracts
-  // #[arg(long, group = "search_scope")]
-  // abstract_only: bool,
 }
 
 impl UserInteraction for Cli {

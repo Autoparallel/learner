@@ -2,16 +2,55 @@
 
 use super::*;
 
+/// Arguments that can be used for the [`Commands::Search`]
+#[derive(Args, Clone)]
+pub struct SearchArgs {
+  /// Search query - supports full text search
+  pub query: String,
+
+  /// Show detailed paper information
+  #[arg(long)]
+  pub detailed: bool,
+
+  /// Search filters
+  #[command(flatten)]
+  pub filter: SearchFilter,
+}
+
+/// Filter options for paper searches
+#[derive(Args, Clone)]
+pub struct SearchFilter {
+  /// Filter by author name
+  #[arg(long)]
+  pub author: Option<String>,
+
+  /// Filter by paper source (arxiv, doi, iacr)
+  #[arg(long)]
+  pub source: Option<String>,
+
+  /// Filter by publication date (YYYY-MM-DD)
+  #[arg(long)]
+  pub before: Option<String>,
+  // TODO (autoparallel): Allow for proper scoped searches
+  // /// Search only titles
+  // #[arg(long, group = "search_scope")]
+  // title_only: bool,
+
+  // /// Search only abstracts
+  // #[arg(long, group = "search_scope")]
+  // abstract_only: bool,
+}
+
 /// Function for the [`Commands::Search`] in the CLI.
 pub async fn search<I: UserInteraction>(
   interaction: &I,
   mut learner: Learner,
-  query: &str,
-  filter: &SearchFilter,
-  detailed: bool,
+  search_options: SearchArgs,
 ) -> Result<()> {
+  let SearchArgs { query, detailed, filter } = search_options;
+
   // Get initial result set from text search
-  let mut papers = Query::text(query).execute(&mut learner.database).await?;
+  let mut papers = Query::text(&query).execute(&mut learner.database).await?;
 
   // Filter by author if specified
   if let Some(author) = &filter.author {
