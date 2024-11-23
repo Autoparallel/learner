@@ -160,121 +160,129 @@ pub struct SearchFilter {
 
 impl UserInteraction for Cli {
   fn confirm(&self, message: &str) -> Result<bool> {
-    // Add some visual separation before confirmation prompts
-    println!();
-    println!("{} {}", style(TREE_VERT).cyan(), style(message).yellow().bold());
+    println!("\n{} {}", style(INFO_PREFIX).yellow(), style(message).yellow().bold());
 
     if self.accept_defaults {
       return Ok(false);
     }
 
-    Confirm::new()
-        .with_prompt("") // Message already shown above
-        .default(false)
-        .interact()
-        .map_err(|e| LearnerdError::Interaction(e.to_string()))
+    let theme = dialoguer::theme::ColorfulTheme::default();
+    Confirm::with_theme(&theme)
+      .with_prompt("")
+      .default(false)
+      .interact()
+      .map_err(|e| LearnerdError::Interaction(e.to_string()))
   }
 
   fn prompt(&self, message: &str) -> Result<String> {
-    Input::new()
+    let theme = dialoguer::theme::ColorfulTheme::default();
+    Input::with_theme(&theme)
       .with_prompt(message)
       .interact_text()
       .map_err(|e| LearnerdError::Interaction(e.to_string()))
   }
 
+  // Terminal drawing characters - keep the same but ensure we use BULLET consistently
   fn reply(&self, content: ResponseContent) -> Result<()> {
     match content {
       ResponseContent::Papers(papers) => {
         if papers.is_empty() {
-          println!("{} {} No papers found", style(TREE_LEAF).cyan(), style(ERROR_PREFIX).red());
+          println!("{} No papers found", style(ERROR_PREFIX).red());
           return Ok(());
         }
 
-        // println!("{} Searching for: {}", style(TREE_VERT).cyan(), style(&query).white());
         println!(
-          "{} {} Found {} papers:",
-          style(TREE_VERT).cyan(),
+          "{} Found {} papers:",
           style(SUCCESS_PREFIX).green(),
           style(papers.len()).yellow()
         );
 
         for (i, paper) in papers.iter().enumerate() {
-          let prefix = if i == papers.len() - 1 { TREE_LEAF } else { TREE_BRANCH };
-          println!("\n{} {}", style(prefix).cyan(), style(&paper.title).white().bold());
+          let is_last = i == papers.len() - 1;
+          let prefix = if is_last { TREE_LEAF } else { TREE_BRANCH };
+
+          println!("{} {}", style(prefix).cyan(), style(&paper.title).white().bold());
+
+          let continuation = if is_last { "   " } else { CONTINUE_PREFIX };
           println!(
-            "{}   {}: {}",
-            style(TREE_VERT).cyan(),
-            style("Authors").green().bold(),
+            "{}Authors: {}",
+            style(continuation).cyan(),
             style(&paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "))
               .white()
           );
         }
+
+        // Only show tip once for multiple results, without tree line
+        if papers.len() > 1 {
+          println!("\nTip: Use --author, --source, or --before together to further refine results");
+        }
       },
       ResponseContent::Paper(paper) => {
         println!("{} Paper details:", style(TREE_VERT).cyan());
-        println!("{} {}", style(TREE_LEAF).cyan(), style(&paper.title).white().bold());
+        println!("{} {}", style(TREE_BRANCH).cyan(), style(&paper.title).white().bold());
+
         println!(
-          "{}   {}: {}",
-          style(TREE_VERT).cyan(),
-          style("Authors").green().bold(),
+          "{}   Authors: {}",
+          style(TREE_BRANCH).cyan(),
           style(&paper.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "))
             .white()
         );
 
-        println!("{}   {}:", style(TREE_VERT).cyan(), style("Abstract").green().bold());
-        println!("{}   {}", style(TREE_VERT).cyan(), style(&paper.abstract_text).white());
+        println!("{}   Abstract:", style(TREE_BRANCH).cyan());
+
+        let width = 80;
+        let mut current_line = String::new();
+        for word in paper.abstract_text.split_whitespace() {
+          if current_line.len() + word.len() + 1 > width {
+            println!("{}   {}", style(TREE_VERT).cyan(), style(&current_line).white());
+            current_line.clear();
+          }
+          if !current_line.is_empty() {
+            current_line.push(' ');
+          }
+          current_line.push_str(word);
+        }
+        if !current_line.is_empty() {
+          println!("{}   {}", style(TREE_VERT).cyan(), style(&current_line).white());
+        }
+
         println!(
-          "{}   {}: {}",
-          style(TREE_VERT).cyan(),
-          style("Published").green().bold(),
+          "{}   Published: {}",
+          style(TREE_BRANCH).cyan(), // Changed to TREE_LEAF
           style(&paper.publication_date).white()
         );
 
-        // PDF information - show regardless of detailed flag since it's important metadata
+        // The following don't use tree characters
         if let Some(url) = &paper.pdf_url {
-          println!(
-            "{}   {}: {}",
-            style(TREE_VERT).cyan(),
-            style("PDF URL").green().bold(),
-            style(url).blue().underlined()
-          );
+          println!("{}   PDF URL: {}", style(TREE_BRANCH).cyan(), style(url).blue().underlined());
 
-          // Check PDF status
-          // TODO (autoparallel): This is not good, we need to modify this to use a path known from
-          // the command
           let pdf_path = Database::default_storage_path().join(paper.filename());
           if pdf_path.exists() {
             println!(
-              "{}   {} PDF available at: {}",
-              style(TREE_VERT).cyan(),
-              style(SUCCESS_PREFIX).green(),
-              style(pdf_path.display()).white()
+              "{}   {} PDF available at:",
+              style(TREE_LEAF).cyan(),
+              style(SUCCESS_PREFIX).green()
             );
+            println!("      {}", style(pdf_path.display()).white());
           } else {
             println!(
               "{}   {} PDF not downloaded",
-              style(TREE_VERT).cyan(),
+              style(TREE_LEAF).cyan(),
               style(ERROR_PREFIX).yellow()
             );
           }
-        } else {
-          println!(
-            "{}   {} No PDF available",
-            style(TREE_VERT).cyan(),
-            style(ERROR_PREFIX).yellow()
-          );
         }
       },
       ResponseContent::Success(message) => {
         println!(
-          "{}   {} {}",
+          "{} {} {}",
           style(TREE_VERT).cyan(),
           style(SUCCESS_PREFIX).green(),
           style(message).white()
         );
       },
       ResponseContent::Info(message) => {
-        println!("{}   {}", style(TREE_VERT).cyan(), style(message).white());
+        println!("{} {}", style(WORKING_PREFIX).green(), style(message).white());
       },
       ResponseContent::Error(error) => {
         println!("{} {}", style(ERROR_PREFIX).red(), style(error).red());
