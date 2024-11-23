@@ -3,17 +3,20 @@ use dialoguer::{Confirm, Input};
 
 use super::*;
 
-pub static INFO_PREFIX: &str = "│ "; // Information/status
-pub static SUCCESS_PREFIX: &str = "✓ "; // Success/completion
-pub static ERROR_PREFIX: &str = "✗ "; // Error/failure
-pub static WARNING_PREFIX: &str = "! "; // Warning/caution
-pub static PROMPT_PREFIX: &str = "> "; // User prompt
-pub static ITEM_PREFIX: &str = "├─"; // List item
-pub static LAST_ITEM_PREFIX: &str = "└─"; // Last list item
-pub static CONTINUE_PREFIX: &str = "│  "; // Continuation line
+pub static INFO_PREFIX: &str = "ℹ ";
+pub static WORKING_PREFIX: &str = "» ";
+pub static SUCCESS_PREFIX: &str = "✓ ";
+pub static ERROR_PREFIX: &str = "✗ ";
+pub static WARNING_PREFIX: &str = "! ";
+pub static PROMPT_PREFIX: &str = "❯ "; // Changed to a nicer prompt character
+pub static ITEM_PREFIX: &str = "├─";
+pub static LAST_ITEM_PREFIX: &str = "└─";
+pub static CONTINUE_PREFIX: &str = "│  ";
 pub static TREE_VERT: &str = "│";
 pub static TREE_BRANCH: &str = "├";
 pub static TREE_LEAF: &str = "└";
+pub static BULLET: &str = "•"; // Added for lists
+pub static ARROW: &str = "→"; // Added for relationships/flows
 
 #[derive(Debug)]
 pub enum ResponseContent<'a> {

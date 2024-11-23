@@ -47,13 +47,6 @@ pub async fn search<I: UserInteraction>(
       // Show summary view
       interaction.reply(ResponseContent::Papers(&papers))?;
     }
-
-    if papers.len() > 1 {
-      interaction.reply(ResponseContent::Info(
-        "Tip: Use --author, --source, or --before together to further refine results",
-      ))
-    } else {
-      Ok(())
-    }
+    Ok(())
   }
 }
