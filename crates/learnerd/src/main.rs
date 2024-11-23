@@ -32,13 +32,12 @@
 
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use clap::{builder::ArgAction, Parser, Subcommand};
 use console::style;
 use error::LearnerdError;
 use learner::{database::Database, error::LearnerError, paper::Paper, prelude::*, Config, Learner};
-use tracing::trace;
 use tracing_subscriber::EnvFilter;
 
 pub mod commands;

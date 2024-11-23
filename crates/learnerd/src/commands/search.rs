@@ -2,8 +2,9 @@
 
 use super::*;
 
+/// Arguments that can be used for the [`Commands::Search`]
 #[derive(Args, Clone)]
-pub struct SearchOptions {
+pub struct SearchArgs {
   /// Search query - supports full text search
   pub query: String,
 
@@ -44,9 +45,9 @@ pub struct SearchFilter {
 pub async fn search<I: UserInteraction>(
   interaction: &I,
   mut learner: Learner,
-  search_options: SearchOptions,
+  search_options: SearchArgs,
 ) -> Result<()> {
-  let SearchOptions { query, detailed, filter } = search_options;
+  let SearchArgs { query, detailed, filter } = search_options;
 
   // Get initial result set from text search
   let mut papers = Query::text(&query).execute(&mut learner.database).await?;

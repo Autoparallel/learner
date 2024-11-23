@@ -6,8 +6,9 @@ use learner::database::Remove;
 
 use super::*;
 
+/// Arguments that can be used for the [`Commands::Remove`]
 #[derive(Args, Clone)]
-pub struct RemoveOptions {
+pub struct RemoveArgs {
   /// Paper identifier or search terms
   pub query: String,
 
@@ -38,9 +39,9 @@ pub struct RemoveOptions {
 pub async fn remove<I: UserInteraction>(
   interaction: &I,
   mut learner: Learner,
-  remove_options: RemoveOptions,
+  remove_options: RemoveArgs,
 ) -> Result<()> {
-  let RemoveOptions { query, filter, dry_run, force, remove_pdf, keep_pdf } = remove_options;
+  let RemoveArgs { query, filter, dry_run, force, remove_pdf, keep_pdf } = remove_options;
 
   // First find matching papers
   let mut papers = Query::text(&query).execute(&mut learner.database).await?;

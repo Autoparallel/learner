@@ -72,16 +72,16 @@ pub enum Commands {
   Tui,
 
   /// Initialize a new learner database
-  Init(InitOptions),
+  Init(InitArgs),
 
   /// Add a paper to the database by its identifier
-  Add(AddOptions),
+  Add(AddArgs),
 
   /// Remove papers from the database
-  Remove(RemoveOptions),
+  Remove(RemoveArgs),
 
   /// Search for papers in the database
-  Search(SearchOptions),
+  Search(SearchArgs),
 
   /// Manage the learnerd daemon
   Daemon {

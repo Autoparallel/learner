@@ -2,19 +2,28 @@
 
 use super::*;
 
+/// Arguments that can be used for the [`Commands::Add`]
 #[derive(Args, Clone)]
-pub struct InitOptions {
+pub struct InitArgs {
+  /// Path to use to store [`Database`].
+  /// Defaults to [`Database::default_path`].
   #[arg(long)]
-  pub db_path:            Option<PathBuf>,
+  pub db_path: Option<PathBuf>,
+
+  /// Path to use to store documents.
+  /// Defaults to [`Database::default_storage_path`].
   #[arg(long)]
-  pub storage_path:       Option<PathBuf>,
+  pub storage_path: Option<PathBuf>,
+
+  /// Whether to use the default set of retrievier configurations.
+  /// Defaults to `true`.
   #[arg(long, action=ArgAction::SetTrue)]
   pub default_retrievers: bool,
 }
 
 /// Function for the [`Commands::Init`] in the CLI.
-pub async fn init<I: UserInteraction>(interaction: &I, init_options: InitOptions) -> Result<()> {
-  let InitOptions { db_path, storage_path, default_retrievers } = init_options;
+pub async fn init<I: UserInteraction>(interaction: &I, init_options: InitArgs) -> Result<()> {
+  let InitArgs { db_path, storage_path, default_retrievers } = init_options;
   // Throughout, assume we are using default config path (`~/.learner`)
 
   // Set database storage location
