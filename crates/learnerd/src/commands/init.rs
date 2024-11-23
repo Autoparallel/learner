@@ -5,70 +5,76 @@ use super::*;
 #[derive(Args, Clone)]
 pub struct InitOptions {
   #[arg(long)]
-  db_path:            Option<PathBuf>,
+  pub db_path:            Option<PathBuf>,
   #[arg(long)]
-  storage_path:       Option<PathBuf>,
-  #[arg(long)]
-  default_retrievers: bool,
+  pub storage_path:       Option<PathBuf>,
+  #[arg(long, action=ArgAction::SetTrue)]
+  pub default_retrievers: bool,
 }
 
 /// Function for the [`Commands::Init`] in the CLI.
-pub async fn init<I: UserInteraction>(
-  interaction: &I,
-  mut learner: Learner,
-  init_options: InitOptions,
-) -> Result<()> {
-  todo!();
-  // if papers.is_empty() {
-  //   interaction.reply(ResponseContent::Info(&format!("Fetching paper: {}", identifier)))?;
-  //   let paper = learner.retriever.get_paper(identifier).await?;
-  //   interaction.reply(ResponseContent::Paper(&paper))?;
+pub async fn init<I: UserInteraction>(interaction: &I, init_options: InitOptions) -> Result<()> {
+  let InitOptions { db_path, storage_path, default_retrievers } = init_options;
+  // Throughout, assume we are using default config path (`~/.learner`)
 
-  //   let with_pdf = paper.pdf_url.is_some()
-  //     && if pdf {
-  //       true
-  //     } else if no_pdf {
-  //       false
-  //     } else {
-  //       interaction.confirm("Download PDF?")?
-  //     };
+  // Set database storage location
+  let config = if let Some(db_path) = db_path {
+    Config::default().with_database_path(&db_path)
+  } else if !interaction.confirm(&format!(
+    "Would you like to use the default path {:?} for storing the Learner database?",
+    Database::default_path(),
+  ))? {
+    interaction.reply(ResponseContent::Info(
+      "Please pass in your intended database storage path using --db-path",
+    ))?;
+    return Ok(());
+  } else {
+    Config::default()
+  };
 
-  //   match if with_pdf {
-  //     Add::complete(&paper).execute(&mut learner.database).await
-  //   } else {
-  //     Add::paper(&paper).execute(&mut learner.database).await
-  //   } {
-  //     Ok(_) => interaction.reply(ResponseContent::Success("Paper added successfully")),
-  //     Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e))),
-  //   }
-  // } else {
-  //   let paper = &papers[0];
-  //   interaction.reply(ResponseContent::Info("Paper already exists in database"))?;
+  if config.database_path.exists()
+    && !interaction.confirm(
+      "Database already exists at this location, do you want to overwrite this database?",
+    )?
+  {
+    interaction.reply(ResponseContent::Info(
+      "Please choose a different location for this new Learner database using --db-path",
+    ))?;
+    return Ok(());
+  }
 
-  //   let pdf_dir = learner.database.get_storage_path().await?;
-  //   let pdf_path = pdf_dir.join(paper.filename());
+  // Set document storage location
+  let config = if let Some(storage_path) = storage_path {
+    config.with_storage_path(&storage_path)
+  } else if !interaction.confirm(&format!(
+    "Would you like to use the default path {:?} for storing documents?",
+    Database::default_storage_path(),
+  ))? {
+    interaction.reply(ResponseContent::Info(
+      "Please pass in your intended database storage path using --storage-path",
+    ))?;
+    return Ok(());
+  } else {
+    config
+  };
 
-  //   if pdf_path.exists() {
-  //     interaction.reply(ResponseContent::Info(&format!("PDF exists at: {}", pdf_path.display())))
-  //   } else if paper.pdf_url.is_some() {
-  //     let should_download = if pdf {
-  //       true
-  //     } else if no_pdf {
-  //       false
-  //     } else {
-  //       interaction.confirm("PDF not found. Download it now?")?
-  //     };
+  // Create learner with this configuration and with the default retrievers (arXiv and DOI)
+  if default_retrievers {
+    interaction
+      .reply(ResponseContent::Info("Using the default set of retrievers (arXiv and DOI)."))?;
+    const ARXIV_CONFIG: &str = include_str!("../../../learner/config/retrievers/arxiv.toml");
+    const DOI_CONFIG: &str = include_str!("../../../learner/config/retrievers/doi.toml");
 
-  //     if should_download {
-  //       match Add::complete(paper).execute(&mut learner.database).await {
-  //         Ok(_) => interaction.reply(ResponseContent::Success("PDF downloaded successfully")),
-  //         Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e))),
-  //       }
-  //     } else {
-  //       Ok(())
-  //     }
-  //   } else {
-  //     Ok(())
-  //   }
-  // }
+    std::fs::write(config.retrievers_path.join("arxiv.toml"), ARXIV_CONFIG)?;
+    std::fs::write(config.retrievers_path.join("doi.toml"), DOI_CONFIG)?;
+  }
+  Learner::builder().with_config(config.clone()).build().await?;
+  interaction.reply(ResponseContent::Success(&format!(
+    "Created Learner configuration with\nConfig path: {:?}\nDatabase path: {:?}\nDocument storage \
+     path: {:?}",
+    Config::default_path(),
+    config.database_path,
+    config.storage_path,
+  )))?;
+  Ok(())
 }

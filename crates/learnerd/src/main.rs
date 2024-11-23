@@ -171,7 +171,7 @@ async fn main() -> Result<()> {
   // is done cohesively. We could also probably start using `&str` everywhere.
   if let Ok(learner) = Learner::from_path(Config::default_path()?).await {
     match command {
-      Commands::Init(init_options) => init(&cli, learner, init_options).await,
+      Commands::Init(init_options) => init(&cli, init_options).await,
       Commands::Add(add_options) => add(&cli, learner, add_options).await,
       Commands::Remove(remove_options) => remove(&cli, learner, remove_options).await,
       Commands::Search(search_options) => search(&cli, learner, search_options).await,
