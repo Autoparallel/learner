@@ -6,21 +6,44 @@ use learner::database::Remove;
 
 use super::*;
 
+#[derive(Args, Clone)]
+pub struct RemoveOptions {
+  /// Paper identifier or search terms
+  pub query: String,
+
+  /// Search filters
+  #[command(flatten)]
+  pub filter: SearchFilter,
+
+  /// Show what would be removed without actually removing
+  #[arg(long)]
+  pub dry_run: bool,
+
+  /// Skip confirmation prompts
+  #[arg(long)]
+  pub force: bool,
+
+  /// Remove associated PDFs
+  #[arg(long, group = "pdf_behavior")]
+  pub remove_pdf: bool,
+
+  /// Keep PDFs when removing papers
+  #[arg(long, group = "pdf_behavior")]
+  pub keep_pdf: bool,
+}
+
 // TODO (autoparallel): Address this lint
 #[allow(clippy::too_many_arguments)]
 /// Function for the [`Commands::Remove`] in the CLI.
 pub async fn remove<I: UserInteraction>(
   interaction: &I,
   mut learner: Learner,
-  query: &str,
-  filter: &SearchFilter,
-  dry_run: bool,
-  force: bool,
-  remove_pdf: bool,
-  keep_pdf: bool,
+  remove_options: RemoveOptions,
 ) -> Result<()> {
+  let RemoveOptions { query, filter, dry_run, force, remove_pdf, keep_pdf } = remove_options;
+
   // First find matching papers
-  let mut papers = Query::text(query).execute(&mut learner.database).await?;
+  let mut papers = Query::text(&query).execute(&mut learner.database).await?;
 
   // Apply filters
   if let Some(author) = &filter.author {

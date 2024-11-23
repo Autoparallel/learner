@@ -1,113 +1,74 @@
-//! Module for abstracting the "init" functionality to the [`learner`] database.
+//! Module for setting up a [`learner`] environment
 
 use super::*;
 
+#[derive(Args, Clone)]
+pub struct InitOptions {
+  #[arg(long)]
+  db_path:            Option<PathBuf>,
+  #[arg(long)]
+  storage_path:       Option<PathBuf>,
+  #[arg(long)]
+  default_retrievers: bool,
+}
+
 /// Function for the [`Commands::Init`] in the CLI.
-pub async fn init(cli: Cli) -> Result<()> {
-  let db_path = cli.path.unwrap_or_else(|| {
-    let default_path = Database::default_path();
-    println!(
-      "{} Using default database path: {}",
-      style(INFO_PREFIX).cyan(),
-      style(default_path.display()).yellow()
-    );
-    default_path
-  });
+pub async fn init<I: UserInteraction>(
+  interaction: &I,
+  mut learner: Learner,
+  init_options: InitOptions,
+) -> Result<()> {
+  todo!();
+  // if papers.is_empty() {
+  //   interaction.reply(ResponseContent::Info(&format!("Fetching paper: {}", identifier)))?;
+  //   let paper = learner.retriever.get_paper(identifier).await?;
+  //   interaction.reply(ResponseContent::Paper(&paper))?;
 
-  if db_path.exists() {
-    println!(
-      "{} Database already exists at: {}",
-      style(ERROR_PREFIX).yellow(),
-      style(db_path.display()).yellow()
-    );
+  //   let with_pdf = paper.pdf_url.is_some()
+  //     && if pdf {
+  //       true
+  //     } else if no_pdf {
+  //       false
+  //     } else {
+  //       interaction.confirm("Download PDF?")?
+  //     };
 
-    // Handle reinitialize confirmation
-    let should_reinit = if cli.accept_defaults {
-      false // Default to not reinitializing in automated mode
-    } else {
-      dialoguer::Confirm::new()
-        .with_prompt("Do you want to reinitialize this database? This will erase all existing data")
-        .default(false)
-        .interact()?
-    };
+  //   match if with_pdf {
+  //     Add::complete(&paper).execute(&mut learner.database).await
+  //   } else {
+  //     Add::paper(&paper).execute(&mut learner.database).await
+  //   } {
+  //     Ok(_) => interaction.reply(ResponseContent::Success("Paper added successfully")),
+  //     Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e))),
+  //   }
+  // } else {
+  //   let paper = &papers[0];
+  //   interaction.reply(ResponseContent::Info("Paper already exists in database"))?;
 
-    if !should_reinit {
-      println!("{} Keeping existing database", style("ℹ").blue());
-      return Ok(());
-    }
+  //   let pdf_dir = learner.database.get_storage_path().await?;
+  //   let pdf_path = pdf_dir.join(paper.filename());
 
-    // Handle INIT confirmation
-    let should_proceed = if cli.accept_defaults {
-      false // Default to not proceeding in automated mode
-    } else {
-      let input = dialoguer::Input::<String>::new()
-        .with_prompt(format!(
-          "{} Type {} to confirm reinitialization",
-          style(WARNING_PREFIX).red(),
-          style("INIT").red().bold()
-        ))
-        .interact_text()?;
-      input == "INIT"
-    };
+  //   if pdf_path.exists() {
+  //     interaction.reply(ResponseContent::Info(&format!("PDF exists at: {}", pdf_path.display())))
+  //   } else if paper.pdf_url.is_some() {
+  //     let should_download = if pdf {
+  //       true
+  //     } else if no_pdf {
+  //       false
+  //     } else {
+  //       interaction.confirm("PDF not found. Download it now?")?
+  //     };
 
-    if !should_proceed {
-      println!("{} Operation cancelled, keeping existing database", style("ℹ").blue());
-      return Ok(());
-    }
-
-    // Remove existing database
-    println!("{} Removing existing database", style(WARNING_PREFIX).yellow());
-    std::fs::remove_file(&db_path)?;
-
-    // Also remove any FTS auxiliary files
-    let fts_files = glob::glob(&format!("{}*", db_path.display()))?;
-    for file in fts_files.flatten() {
-      std::fs::remove_file(file)?;
-    }
-  }
-
-  // Create parent directories if they don't exist
-  if let Some(parent) = db_path.parent() {
-    trace!("Creating parent directories: {}", parent.display());
-    std::fs::create_dir_all(parent)?;
-  }
-
-  println!(
-    "{} Initializing database at: {}",
-    style(INFO_PREFIX).cyan(),
-    style(db_path.display()).yellow()
-  );
-
-  let db = Database::open(&db_path).await?;
-
-  // Set up PDF directory
-  let pdf_dir = Database::default_storage_path();
-  println!(
-    "\n{} PDF files will be stored in: {}",
-    style(INFO_PREFIX).cyan(),
-    style(pdf_dir.display()).yellow()
-  );
-
-  // TODO (autoparallel): I think we need this `allow` because though the returns are the same,
-  // the initial `if` bypasses interaction
-  #[allow(clippy::if_same_then_else)]
-  let pdf_dir = if cli.accept_defaults {
-    pdf_dir // Use default in automated mode
-  } else if dialoguer::Confirm::new()
-    .with_prompt("Use this location for PDF storage?")
-    .default(true)
-    .interact()?
-  {
-    pdf_dir
-  } else {
-    let input: String =
-      dialoguer::Input::new().with_prompt("Enter path for PDF storage").interact_text()?;
-    PathBuf::from_str(&input).unwrap() // TODO (autoparallel): fix this unwrap
-  };
-
-  std::fs::create_dir_all(&pdf_dir)?;
-  db.set_storage_path(&pdf_dir.to_string_lossy().to_string()).await?;
-
-  println!("{} Database initialized successfully!", style(SUCCESS_PREFIX).green());
-  Ok(())
+  //     if should_download {
+  //       match Add::complete(paper).execute(&mut learner.database).await {
+  //         Ok(_) => interaction.reply(ResponseContent::Success("PDF downloaded successfully")),
+  //         Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e))),
+  //       }
+  //     } else {
+  //       Ok(())
+  //     }
+  //   } else {
+  //     Ok(())
+  //   }
+  // }
 }
