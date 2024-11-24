@@ -11,6 +11,7 @@
 //! and view updates through a clean state transition system.
 
 use crossterm::event::KeyCode;
+use event::KeyModifiers;
 use ratatui::widgets::ListState;
 
 use super::*;
@@ -38,9 +39,7 @@ pub enum DialogType {
   ExitConfirm,
   /// Showing the PDF not found error dialog
   PDFNotFound,
-  CommandInput {
-    input: String,
-  },
+  CommandInput,
 }
 
 /// Represents which mode the TUI is currently in
@@ -72,6 +71,7 @@ pub struct UIState {
   pub mode:            Mode,
   /// Status message to display
   pub status_message:  Option<String>,
+  pub command_buffer:  CommandBuffer,
 }
 
 impl UIState {
@@ -89,6 +89,7 @@ impl UIState {
       needs_redraw: true,
       mode: Mode::Normal,
       status_message: None,
+      command_buffer: CommandBuffer::new(),
     }
   }
 
@@ -112,38 +113,61 @@ impl UIState {
     self.selected.selected().map(|i| &self.papers[i])
   }
 
-  pub fn handle_input(&mut self, key: KeyCode) -> bool {
+  pub fn handle_input(&mut self, key: KeyCode, modifiers: KeyModifiers) -> bool {
     match &self.dialog {
       DialogType::ExitConfirm => self.handle_exit_dialog(key),
       DialogType::PDFNotFound => self.handle_pdf_not_found_dialog(key),
-      DialogType::CommandInput { .. } => self.handle_command_input(key),
+      DialogType::CommandInput { .. } => self.handle_command_input(key, modifiers),
       DialogType::None => self.handle_normal_input(key),
     }
   }
 
-  fn handle_command_input(&mut self, key: KeyCode) -> bool {
-    match key {
-      KeyCode::Esc => {
-        self.dialog = DialogType::None;
+  fn handle_command_input(&mut self, key: KeyCode, modifiers: KeyModifiers) -> bool {
+    match (key, modifiers) {
+      (key, KeyModifiers::NONE) => match key {
+        KeyCode::Esc => {
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        KeyCode::Enter => {
+          // TODO: Handle command execution
+          self.command_buffer.add_to_history();
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        KeyCode::Char(c) => {
+          self.command_buffer.insert_char(c);
+          self.needs_redraw = true;
+        },
+        KeyCode::Backspace => {
+          self.command_buffer.backspace();
+          self.needs_redraw = true;
+        },
+        KeyCode::Left => {
+          self.command_buffer.move_cursor_left();
+          self.needs_redraw = true;
+        },
+        KeyCode::Right => {
+          self.command_buffer.move_cursor_right();
+          self.needs_redraw = true;
+        },
+        KeyCode::Up => {
+          self.command_buffer.previous_history();
+          self.needs_redraw = true;
+        },
+        KeyCode::Down => {
+          self.command_buffer.next_history();
+          self.needs_redraw = true;
+        },
+        _ => {},
+      },
+      (KeyCode::Char('w'), KeyModifiers::CONTROL) => {
+        self.command_buffer.delete_word();
         self.needs_redraw = true;
-        false
       },
-      KeyCode::Char(c) => {
-        if let DialogType::CommandInput { input } = &mut self.dialog {
-          input.push(c);
-          self.needs_redraw = true;
-        }
-        false
-      },
-      KeyCode::Backspace => {
-        if let DialogType::CommandInput { input } = &mut self.dialog {
-          input.pop();
-          self.needs_redraw = true;
-        }
-        false
-      },
-      _ => false,
+      _ => {},
     }
+    false
   }
 
   /// Handles input while the exit confirmation dialog is active.
@@ -214,7 +238,7 @@ impl UIState {
         false
       },
       KeyCode::Char(':') => {
-        self.dialog = DialogType::CommandInput { input: String::new() };
+        self.dialog = DialogType::CommandInput;
         self.needs_redraw = true;
         false
       },
@@ -306,5 +330,119 @@ impl UIState {
   #[cfg(target_os = "linux")]
   fn open_pdf_with_system_viewer(&self, path: &str) {
     let _ = std::process::Command::new("xdg-open").arg(path).spawn();
+  }
+}
+
+#[derive(Default, Debug)]
+pub struct CommandBuffer {
+  /// Current command text
+  pub input:            String,
+  /// Cursor position within the text
+  pub cursor_position:  usize,
+  /// Command history
+  pub history:          Vec<String>,
+  /// Current position when navigating history (-1 means current input)
+  pub history_position: isize,
+  /// Saves current input when navigating history
+  pub current_input:    String,
+}
+
+impl CommandBuffer {
+  pub fn new() -> Self {
+    Self {
+      input:            String::new(),
+      cursor_position:  0,
+      history:          Vec::new(),
+      history_position: -1,
+      current_input:    String::new(),
+    }
+  }
+
+  /// Insert character at current cursor position
+  pub fn insert_char(&mut self, c: char) {
+    self.input.insert(self.cursor_position, c);
+    self.cursor_position += 1;
+  }
+
+  /// Delete character before cursor
+  pub fn backspace(&mut self) {
+    if self.cursor_position > 0 {
+      self.cursor_position -= 1;
+      self.input.remove(self.cursor_position);
+    }
+  }
+
+  /// Move cursor left
+  pub fn move_cursor_left(&mut self) {
+    if self.cursor_position > 0 {
+      self.cursor_position -= 1;
+    }
+  }
+
+  /// Move cursor right
+  pub fn move_cursor_right(&mut self) {
+    if self.cursor_position < self.input.len() {
+      self.cursor_position += 1;
+    }
+  }
+
+  /// Delete word before cursor (Ctrl+W)
+  pub fn delete_word(&mut self) {
+    // Find the start of the current word
+    let mut word_start = self.cursor_position;
+    while word_start > 0 && !self.input[..word_start].chars().last().unwrap().is_whitespace() {
+      word_start -= 1;
+    }
+    // Remove from word start to cursor
+    self.input.replace_range(word_start..self.cursor_position, "");
+    self.cursor_position = word_start;
+  }
+
+  /// Navigate to previous command in history
+  pub fn previous_history(&mut self) {
+    if self.history.is_empty() {
+      return;
+    }
+
+    // Save current input if just starting history navigation
+    if self.history_position == -1 {
+      self.current_input = self.input.clone();
+    }
+
+    // Move up in history if possible
+    if self.history_position < (self.history.len() as isize - 1) {
+      self.history_position += 1;
+      self.input = self.history[self.history.len() - 1 - self.history_position as usize].clone();
+      self.cursor_position = self.input.len();
+    }
+  }
+
+  /// Navigate to next command in history
+  pub fn next_history(&mut self) {
+    if self.history_position >= 0 {
+      self.history_position -= 1;
+      if self.history_position == -1 {
+        self.input = self.current_input.clone();
+      } else {
+        self.input = self.history[self.history.len() - 1 - self.history_position as usize].clone();
+      }
+      self.cursor_position = self.input.len();
+    }
+  }
+
+  /// Add command to history
+  pub fn add_to_history(&mut self) {
+    if !self.input.trim().is_empty() {
+      self.history.push(self.input.clone());
+    }
+    self.reset();
+  }
+
+  /// Reset input state
+  pub fn reset(&mut self) {
+    self.input.clear();
+    self.cursor_position = 0;
+    self.history_position = -1;
+    self.current_input.clear();
   }
 }

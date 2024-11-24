@@ -86,7 +86,7 @@ impl Tui {
       if event::poll(std::time::Duration::from_millis(5))? {
         match event::read()? {
           Event::Key(key) =>
-            if self.state.handle_input(key.code) {
+            if self.state.handle_input(key.code, key.modifiers) {
               break;
             },
           Event::Resize(..) => self.state.needs_redraw = true,

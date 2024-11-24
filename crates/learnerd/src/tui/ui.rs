@@ -14,11 +14,12 @@
 use learner::format::format_title;
 use ratatui::{
   layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
-  style::{Color, Style},
+  style::{Color, Modifier, Style},
   text::{Line, Span},
   widgets::{Block, Borders, Clear, List, ListItem, Padding, Paragraph, Wrap},
   Frame,
 };
+use state::CommandBuffer;
 
 use super::{
   state::{DialogType, FocusedPane, UIState},
@@ -71,15 +72,14 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     match &self.state.dialog {
       DialogType::ExitConfirm => self.draw_exit_dialog(),
       DialogType::PDFNotFound => self.draw_pdf_not_found_dialog(),
-      DialogType::CommandInput { input } => self.draw_command_input(&input.clone()),
+      DialogType::CommandInput => self.draw_command_input(),
       DialogType::None => {},
     }
 
     self.state.needs_redraw = false;
   }
 
-  fn draw_command_input(&mut self, input: &str) {
-    // Create an area at the bottom of the screen for command input
+  fn draw_command_input(&mut self) {
     let area = Rect {
       x:      0,
       y:      self.frame.area().height - 1,
@@ -87,13 +87,42 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
       height: 1,
     };
 
-    let command_text = format!(":{}", input);
-    let command_line = Paragraph::new(command_text)
-      .style(Style::default().fg(Color::Yellow))
-      .block(Block::default());
+    // Construct the display string with cursor
+    let before_cursor =
+      &self.state.command_buffer.input[..self.state.command_buffer.cursor_position];
+    let after_cursor =
+      &self.state.command_buffer.input[self.state.command_buffer.cursor_position..];
+    let cursor_char =
+      if self.state.command_buffer.cursor_position < self.state.command_buffer.input.len() {
+        &self.state.command_buffer.input[self.state.command_buffer.cursor_position..]
+          .chars()
+          .next()
+          .unwrap()
+          .to_string()
+      } else {
+        " "
+      };
 
+    let command_line = Line::from(vec![
+      Span::styled(":", Style::default().fg(Color::Yellow)),
+      Span::styled(before_cursor, Style::default().fg(Color::Yellow)),
+      Span::styled(
+        cursor_char,
+        Style::default().fg(Color::Yellow).bg(Color::DarkGray).add_modifier(Modifier::BOLD),
+      ),
+      Span::styled(
+        if self.state.command_buffer.cursor_position < self.state.command_buffer.input.len() {
+          &after_cursor[1..]
+        } else {
+          ""
+        },
+        Style::default().fg(Color::Yellow),
+      ),
+    ]);
+
+    let command_text = Paragraph::new(command_line);
     self.frame.render_widget(Clear, area);
-    self.frame.render_widget(command_line, area);
+    self.frame.render_widget(command_text, area);
   }
 
   /// Splits the main layout into left and right panes.
