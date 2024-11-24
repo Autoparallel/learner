@@ -37,7 +37,7 @@ pub struct RemoveArgs {
 #[allow(clippy::too_many_arguments)]
 /// Function for the [`Commands::Remove`] in the CLI.
 pub async fn remove<I: UserInteraction>(
-  interaction: &I,
+  interaction: &mut I,
   mut learner: Learner,
   remove_options: RemoveArgs,
 ) -> Result<()> {

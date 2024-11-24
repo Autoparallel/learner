@@ -22,7 +22,7 @@ pub struct InitArgs {
 }
 
 /// Function for the [`Commands::Init`] in the CLI.
-pub async fn init<I: UserInteraction>(interaction: &I, init_options: InitArgs) -> Result<()> {
+pub async fn init<I: UserInteraction>(interaction: &mut I, init_options: InitArgs) -> Result<()> {
   let InitArgs { db_path, storage_path, default_retrievers } = init_options;
   // Throughout, assume we are using default config path (`~/.learner`)
 

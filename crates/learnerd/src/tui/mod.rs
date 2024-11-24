@@ -8,6 +8,7 @@
 //! - Real-time paper information display
 //! - PDF availability status and opening
 //! - Vim-style navigation controls
+//! - Command mode for paper management
 //!
 //! # Navigation
 //!
@@ -16,29 +17,11 @@
 //! - `↓`/`j`: Move selection down
 //! - `←`/`h`: Focus left pane
 //! - `→`/`l`: Focus right pane
+//! - `:`: Enter command mode
 //! - `o`: Open PDF (if available)
 //! - `q`: Quit application
-//!
-//! # Layout
-//!
-//! The interface is divided into two main sections:
-//! - Left: List of papers with title and count
-//! - Right: Detailed view of the selected paper including:
-//!   - Title
-//!   - Authors
-//!   - Source information
-//!   - Abstract (scrollable)
-//!   - PDF status
-//!
-//! # Implementation Notes
-//!
-//! The UI is built using a modular approach with:
-//! - State management ([`state::UIState`])
-//! - Consistent styling ([`styles`])
-//! - Drawing logic ([`ui::UIDrawer`])
-//!
-//! This separation allows for clear responsibility boundaries and easier maintenance.
-use std::io;
+
+use std::io::{self, Stdout};
 
 use crossterm::{
   event::{self, DisableMouseCapture, EnableMouseCapture, Event},
@@ -48,6 +31,7 @@ use crossterm::{
 use learner::{
   database::{OrderField, Query},
   format::format_title,
+  Config, Learner,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 
@@ -57,85 +41,102 @@ mod state;
 mod styles;
 mod ui;
 
+use interaction::{ResponseContent, UserInteraction};
 use state::UIState;
 use ui::UIDrawer;
 
-/// Runs the Terminal User Interface.
-///
-/// This function initializes the terminal, sets up the display, and manages the main event loop.
-/// It handles:
-/// - Terminal setup and cleanup
-/// - State initialization
-/// - Event processing
-/// - Screen rendering
-///
-/// The interface is restored to its original state when the function returns,
-/// regardless of how it exits.
-///
-/// # Terminal Setup
-///
-/// The function configures the terminal for full-screen operation by:
-/// - Enabling raw mode for direct input handling
-/// - Entering alternate screen to preserve the original terminal content
-/// - Setting up mouse capture for potential future mouse support
-///
-/// # Event Loop
-///
-/// The main loop handles:
-/// - Redraw requests through `needs_redraw` flag
-/// - Input events (keyboard, resize)
-/// - Graceful shutdown on quit command
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Database operations fail
-/// - Terminal initialization fails
-/// - Event handling fails
-/// - Screen drawing fails
-///
-/// # Cleanup
-///
-/// On exit (either through error or normal termination), the function:
-/// - Disables raw mode
-/// - Restores the original screen
-/// - Shows the cursor
-/// - Disables mouse capture
-pub async fn run() -> Result<()> {
-  // Initialize state
-  let mut db = Database::open(Database::default_path()).await?;
-  let papers = Query::list_all().order_by(OrderField::Title).execute(&mut db).await?;
-  let mut state = UIState::new(papers);
+/// Main TUI application struct that handles the interface and interactions
+pub struct Tui {
+  /// Terminal interface handler
+  terminal: Terminal<CrosstermBackend<Stdout>>,
+  /// Application state
+  state:    UIState,
+  /// Learner instance for paper management
+  learner:  Learner,
+}
 
-  // Setup terminal
-  enable_raw_mode()?;
-  let mut stdout = io::stdout();
-  execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-  let backend = CrosstermBackend::new(stdout);
-  let mut terminal = Terminal::new(backend)?;
+impl Tui {
+  /// Creates a new TUI instance
+  pub async fn new() -> Result<Self> {
+    // Initialize learner
+    let mut learner = Learner::from_path(Config::default_path()?).await?;
 
-  // Event loop
-  loop {
-    if state.needs_redraw {
-      terminal.draw(|f| UIDrawer::new(f, &mut state).draw())?;
-    }
+    // Get initial paper list
+    let papers =
+      Query::list_all().order_by(OrderField::Title).execute(&mut learner.database).await?;
 
-    if event::poll(std::time::Duration::from_millis(5))? {
-      match event::read()? {
-        Event::Key(key) =>
-          if state.handle_input(key.code) {
-            break;
-          },
-        Event::Resize(..) => state.needs_redraw = true,
-        _ => {},
-      }
-    }
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let terminal = Terminal::new(CrosstermBackend::new(stdout))?;
+
+    Ok(Self { terminal, state: UIState::new(papers), learner })
   }
 
-  // Cleanup
-  disable_raw_mode()?;
-  execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
-  terminal.show_cursor()?;
+  /// Runs the TUI main loop
+  pub async fn run(&mut self) -> Result<()> {
+    loop {
+      // Draw UI if needed
+      if self.state.needs_redraw {
+        self.terminal.draw(|f| UIDrawer::new(f, &mut self.state).draw())?;
+      }
 
-  Ok(())
+      // Handle events
+      if event::poll(std::time::Duration::from_millis(5))? {
+        match event::read()? {
+          Event::Key(key) =>
+            if self.state.handle_input(key.code) {
+              break;
+            },
+          Event::Resize(..) => self.state.needs_redraw = true,
+          _ => {},
+        }
+      }
+    }
+
+    // Cleanup and restore terminal
+    self.cleanup()?;
+    Ok(())
+  }
+
+  /// Cleans up the terminal state
+  fn cleanup(&mut self) -> Result<()> {
+    disable_raw_mode()?;
+    execute!(self.terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+    self.terminal.show_cursor()?;
+    Ok(())
+  }
+}
+
+impl UserInteraction for Tui {
+  fn confirm(&mut self, message: &str) -> Result<bool> {
+    // For now, default to true - we'll implement proper UI confirmation later
+    Ok(true)
+  }
+
+  fn prompt(&mut self, message: &str) -> Result<String> {
+    // For now, return empty string - we'll implement proper UI prompting later
+    Ok(String::new())
+  }
+
+  fn reply(&mut self, content: ResponseContent) -> Result<()> {
+    // For now, just set a status message - we'll improve feedback later
+    match content {
+      ResponseContent::Success(msg) | ResponseContent::Info(msg) => {
+        self.state.set_status_message(msg.to_string());
+      },
+      ResponseContent::Error(e) => {
+        self.state.set_status_message(format!("Error: {}", e));
+      },
+      _ => {}, // Ignore Paper/Papers content for now
+    }
+    Ok(())
+  }
+}
+
+/// Runs the Terminal User Interface.
+pub async fn run() -> Result<()> {
+  let mut tui = Tui::new().await?;
+  tui.run().await
 }

@@ -49,7 +49,7 @@ pub trait UserInteraction {
   ///
   /// Returns `Ok(true)` if the user confirms, `Ok(false)` if they decline,
   /// or an error if the interaction fails.
-  fn confirm(&self, message: &str) -> Result<bool>;
+  fn confirm(&mut self, message: &str) -> Result<bool>;
 
   /// Request text input from the user.
   ///
@@ -60,7 +60,7 @@ pub trait UserInteraction {
   /// # Returns
   ///
   /// Returns the user's input as a String, or an error if the interaction fails.
-  fn prompt(&self, message: &str) -> Result<String>;
+  fn prompt(&mut self, message: &str) -> Result<String>;
 
   /// Display content to the user.
   ///
@@ -75,5 +75,5 @@ pub trait UserInteraction {
   ///
   /// Returns `Ok(())` if the content was displayed successfully, or an error
   /// if the display operation fails.
-  fn reply(&self, content: ResponseContent) -> Result<()>;
+  fn reply(&mut self, content: ResponseContent) -> Result<()>;
 }

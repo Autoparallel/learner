@@ -22,7 +22,7 @@ pub struct AddArgs {
 
 /// Function for the [`Commands::Add`] in the CLI.
 pub async fn add<I: UserInteraction>(
-  interaction: &I,
+  interaction: &mut I,
   mut learner: Learner,
   add_options: AddArgs,
 ) -> Result<()> {

@@ -64,18 +64,36 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     let (left_area, right_area) = self.split_layout(frame_size);
 
     self.draw_paper_list(left_area);
-    // TODO (autoparallel): prefer not to clone if we can.
     if let Some(paper) = self.state.selected_paper().cloned() {
       self.draw_paper_details(&paper, right_area);
     }
 
-    match self.state.dialog {
+    match &self.state.dialog {
       DialogType::ExitConfirm => self.draw_exit_dialog(),
       DialogType::PDFNotFound => self.draw_pdf_not_found_dialog(),
+      DialogType::CommandInput { input } => self.draw_command_input(&input.clone()),
       DialogType::None => {},
     }
 
     self.state.needs_redraw = false;
+  }
+
+  fn draw_command_input(&mut self, input: &str) {
+    // Create an area at the bottom of the screen for command input
+    let area = Rect {
+      x:      0,
+      y:      self.frame.area().height - 1,
+      width:  self.frame.area().width,
+      height: 1,
+    };
+
+    let command_text = format!(":{}", input);
+    let command_line = Paragraph::new(command_text)
+      .style(Style::default().fg(Color::Yellow))
+      .block(Block::default());
+
+    self.frame.render_widget(Clear, area);
+    self.frame.render_widget(command_line, area);
   }
 
   /// Splits the main layout into left and right panes.
@@ -134,6 +152,9 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
       Span::styled(" • ", Style::default().fg(Color::Blue)),
       Span::styled("o", styles::KEY_HIGHLIGHT.add_modifier(ratatui::style::Modifier::BOLD)),
       Span::styled(":open", styles::HELP),
+      Span::styled(" • ", Style::default().fg(Color::Blue)),
+      Span::styled(":", styles::KEY_HIGHLIGHT.add_modifier(ratatui::style::Modifier::BOLD)),
+      Span::styled(":command", styles::HELP),
       Span::styled(" • ", Style::default().fg(Color::Blue)),
       Span::styled("q", styles::KEY_HIGHLIGHT.add_modifier(ratatui::style::Modifier::BOLD)),
       Span::styled(":quit", styles::HELP),

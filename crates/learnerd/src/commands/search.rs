@@ -43,7 +43,7 @@ pub struct SearchFilter {
 
 /// Function for the [`Commands::Search`] in the CLI.
 pub async fn search<I: UserInteraction>(
-  interaction: &I,
+  interaction: &mut I,
   mut learner: Learner,
   search_options: SearchArgs,
 ) -> Result<()> {

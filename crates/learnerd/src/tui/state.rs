@@ -38,13 +38,21 @@ pub enum DialogType {
   ExitConfirm,
   /// Showing the PDF not found error dialog
   PDFNotFound,
+  CommandInput {
+    input: String,
+  },
+}
+
+/// Represents which mode the TUI is currently in
+#[derive(Debug, PartialEq)]
+pub enum Mode {
+  /// Normal mode for navigation and viewing
+  Normal,
+  /// Command mode for entering commands
+  Command,
 }
 
 /// Maintains the complete state of the terminal interface.
-///
-/// This struct is the single source of truth for the UI state,
-/// managing everything from the list of papers to scroll positions
-/// and dialog states.
 pub struct UIState {
   /// List of papers from the database
   pub papers:          Vec<Paper>,
@@ -60,17 +68,14 @@ pub struct UIState {
   pub max_scroll:      Option<usize>,
   /// Whether the UI needs to be redrawn
   pub needs_redraw:    bool,
+  /// Current UI mode
+  pub mode:            Mode,
+  /// Status message to display
+  pub status_message:  Option<String>,
 }
 
 impl UIState {
   /// Creates a new UI state with the given papers.
-  ///
-  /// Initializes with default values:
-  /// - First paper selected
-  /// - List pane focused
-  /// - No active dialog
-  /// - Scroll position at 0
-  /// - Needs initial draw
   pub fn new(papers: Vec<Paper>) -> Self {
     let mut selected = ListState::default();
     selected.select(Some(0));
@@ -82,7 +87,21 @@ impl UIState {
       scroll_position: 0,
       max_scroll: None,
       needs_redraw: true,
+      mode: Mode::Normal,
+      status_message: None,
     }
+  }
+
+  /// Sets a status message to display
+  pub fn set_status_message(&mut self, message: String) {
+    self.status_message = Some(message);
+    self.needs_redraw = true;
+  }
+
+  /// Clears the current status message
+  pub fn clear_status_message(&mut self) {
+    self.status_message = None;
+    self.needs_redraw = true;
   }
 
   /// Returns a reference to the currently selected paper.
@@ -93,19 +112,37 @@ impl UIState {
     self.selected.selected().map(|i| &self.papers[i])
   }
 
-  /// Handles all keyboard input based on current state.
-  ///
-  /// Returns true if the application should exit, false otherwise.
-  ///
-  /// Input handling varies based on:
-  /// - Current active dialog
-  /// - Focused pane
-  /// - Current scroll position
   pub fn handle_input(&mut self, key: KeyCode) -> bool {
-    match self.dialog {
+    match &self.dialog {
       DialogType::ExitConfirm => self.handle_exit_dialog(key),
       DialogType::PDFNotFound => self.handle_pdf_not_found_dialog(key),
+      DialogType::CommandInput { .. } => self.handle_command_input(key),
       DialogType::None => self.handle_normal_input(key),
+    }
+  }
+
+  fn handle_command_input(&mut self, key: KeyCode) -> bool {
+    match key {
+      KeyCode::Esc => {
+        self.dialog = DialogType::None;
+        self.needs_redraw = true;
+        false
+      },
+      KeyCode::Char(c) => {
+        if let DialogType::CommandInput { input } = &mut self.dialog {
+          input.push(c);
+          self.needs_redraw = true;
+        }
+        false
+      },
+      KeyCode::Backspace => {
+        if let DialogType::CommandInput { input } = &mut self.dialog {
+          input.pop();
+          self.needs_redraw = true;
+        }
+        false
+      },
+      _ => false,
     }
   }
 
@@ -174,6 +211,11 @@ impl UIState {
       },
       KeyCode::Char('o') => {
         self.handle_open_pdf();
+        false
+      },
+      KeyCode::Char(':') => {
+        self.dialog = DialogType::CommandInput { input: String::new() };
+        self.needs_redraw = true;
         false
       },
       _ => false,

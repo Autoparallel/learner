@@ -96,7 +96,7 @@ impl UserInteraction for Cli {
   ///
   /// Displays a yes/no prompt with the given message and returns the user's choice.
   /// If `accept_defaults` is true, automatically returns false without prompting.
-  fn confirm(&self, message: &str) -> Result<bool> {
+  fn confirm(&mut self, message: &str) -> Result<bool> {
     println!("\n{} {}", style(PROMPT_PREFIX).yellow(), style(message).yellow().bold());
 
     if self.accept_defaults {
@@ -110,7 +110,7 @@ impl UserInteraction for Cli {
   /// Request text input from the user
   ///
   /// Displays a prompt for free-form text input and returns the user's response.
-  fn prompt(&self, message: &str) -> Result<String> {
+  fn prompt(&mut self, message: &str) -> Result<String> {
     let theme = dialoguer::theme::ColorfulTheme::default();
     Ok(Input::with_theme(&theme).with_prompt(message).interact_text()?)
   }
@@ -121,7 +121,7 @@ impl UserInteraction for Cli {
   /// - Paper listings with tree structure
   /// - Detailed paper information
   /// - Success/error/info messages
-  fn reply(&self, content: ResponseContent) -> Result<()> {
+  fn reply(&mut self, content: ResponseContent) -> Result<()> {
     match content {
       ResponseContent::Papers(papers) => {
         if papers.is_empty() {
