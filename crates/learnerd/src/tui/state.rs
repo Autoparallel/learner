@@ -126,13 +126,15 @@ impl UIState {
     match (key, modifiers) {
       (key, KeyModifiers::NONE) => match key {
         KeyCode::Esc => {
+          self.command_buffer.reset();
           self.dialog = DialogType::None;
           self.needs_redraw = true;
         },
         KeyCode::Enter => {
-          // TODO: Handle command execution
-          self.command_buffer.add_to_history();
-          self.dialog = DialogType::None;
+          if let Some(cmd) = self.command_buffer.try_execute() {
+            // TODO: Execute command and set status message
+            self.dialog = DialogType::None;
+          }
           self.needs_redraw = true;
         },
         KeyCode::Char(c) => {
@@ -159,12 +161,33 @@ impl UIState {
           self.command_buffer.next_history();
           self.needs_redraw = true;
         },
+        KeyCode::Tab => {
+          // Get completions
+          let completions = self.command_buffer.get_completions();
+          if completions.len() == 1 {
+            // Single completion - use it
+            let parts: Vec<&str> = self.command_buffer.input.split_whitespace().collect();
+            let new_input = if parts.len() <= 1 {
+              // Completing command
+              format!("{} ", completions[0])
+            } else {
+              // Completing flag
+              let base =
+                &self.command_buffer.input[..self.command_buffer.input.rfind(' ').unwrap() + 1];
+              format!("{}{} ", base, completions[0])
+            };
+            self.command_buffer.input = new_input;
+            self.command_buffer.cursor_position = self.command_buffer.input.len();
+          }
+          self.needs_redraw = true;
+        },
         _ => {},
       },
       (KeyCode::Char('w'), KeyModifiers::CONTROL) => {
         self.command_buffer.delete_word();
         self.needs_redraw = true;
       },
+
       _ => {},
     }
     false
@@ -345,6 +368,8 @@ pub struct CommandBuffer {
   pub history_position: isize,
   /// Saves current input when navigating history
   pub current_input:    String,
+  /// Current error message, if any
+  pub error:            Option<String>,
 }
 
 impl CommandBuffer {
@@ -355,17 +380,82 @@ impl CommandBuffer {
       history:          Vec::new(),
       history_position: -1,
       current_input:    String::new(),
+      error:            None,
+    }
+  }
+
+  /// Try to execute the current command
+  pub fn try_execute(&mut self) -> Option<Commands> {
+    self.error = None;
+
+    // Trim the input to remove any leading/trailing whitespace
+    let input = self.input.trim();
+
+    // Skip empty commands
+    if input.is_empty() {
+      return None;
+    }
+
+    // Parse the command
+    match Commands::from_str(input) {
+      Ok(cmd) => {
+        // Add to history only if successful
+        if !input.is_empty() {
+          self.history.push(input.to_string());
+        }
+        self.reset();
+        Some(cmd)
+      },
+      Err(e) => {
+        self.error = Some(e);
+        None
+      },
+    }
+  }
+
+  /// Try to get command completion suggestions
+  pub fn get_completions(&self) -> Vec<String> {
+    let input = self.input.trim();
+
+    // No input - show all commands
+    if input.is_empty() {
+      return Commands::command_list().iter().map(|&s| s.to_string()).collect();
+    }
+
+    // Split into command and current word
+    let parts: Vec<&str> = input.split_whitespace().collect();
+
+    match parts.get(0) {
+      // If we just have a partial command, complete the command
+      Some(&cmd) if parts.len() == 1 => Commands::command_list()
+        .iter()
+        .filter(|c| c.starts_with(cmd))
+        .map(|&s| s.to_string())
+        .collect(),
+      // If we have a command and are starting a flag
+      Some(&cmd) if parts.last().unwrap().starts_with("--") => {
+        let current = parts.last().unwrap();
+        Commands::flags_for_command(cmd)
+          .iter()
+          .filter(|f| f.starts_with(current))
+          .map(|&s| s.to_string())
+          .collect()
+      },
+      // Otherwise no completions
+      _ => Vec::new(),
     }
   }
 
   /// Insert character at current cursor position
   pub fn insert_char(&mut self, c: char) {
+    self.error = None;
     self.input.insert(self.cursor_position, c);
     self.cursor_position += 1;
   }
 
   /// Delete character before cursor
   pub fn backspace(&mut self) {
+    self.error = None;
     if self.cursor_position > 0 {
       self.cursor_position -= 1;
       self.input.remove(self.cursor_position);
@@ -386,8 +476,9 @@ impl CommandBuffer {
     }
   }
 
-  /// Delete word before cursor (Ctrl+W)
+  /// Delete word before cursor
   pub fn delete_word(&mut self) {
+    self.error = None;
     // Find the start of the current word
     let mut word_start = self.cursor_position;
     while word_start > 0 && !self.input[..word_start].chars().last().unwrap().is_whitespace() {
@@ -396,6 +487,14 @@ impl CommandBuffer {
     // Remove from word start to cursor
     self.input.replace_range(word_start..self.cursor_position, "");
     self.cursor_position = word_start;
+  }
+
+  /// Add command to history
+  pub fn add_to_history(&mut self) {
+    if !self.input.trim().is_empty() {
+      self.history.push(self.input.clone());
+    }
+    self.reset();
   }
 
   /// Navigate to previous command in history
@@ -430,19 +529,12 @@ impl CommandBuffer {
     }
   }
 
-  /// Add command to history
-  pub fn add_to_history(&mut self) {
-    if !self.input.trim().is_empty() {
-      self.history.push(self.input.clone());
-    }
-    self.reset();
-  }
-
-  /// Reset input state
+  /// Reset the command buffer
   pub fn reset(&mut self) {
     self.input.clear();
     self.cursor_position = 0;
     self.history_position = -1;
     self.current_input.clear();
+    self.error = None;
   }
 }

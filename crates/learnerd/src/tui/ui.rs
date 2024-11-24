@@ -53,13 +53,6 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   /// Creates a new drawer instance.
   pub fn new(frame: &'a mut Frame<'b>, state: &'a mut UIState) -> Self { Self { frame, state } }
 
-  /// Main drawing entry point, handles the entire UI render.
-  ///
-  /// This method:
-  /// 1. Splits the layout into main sections
-  /// 2. Draws the paper list and details
-  /// 3. Handles any active dialogs
-  /// 4. Updates the redraw state
   pub fn draw(&mut self) {
     let frame_size = self.frame.area();
     let (left_area, right_area) = self.split_layout(frame_size);
@@ -69,7 +62,10 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
       self.draw_paper_details(&paper, right_area);
     }
 
-    match &self.state.dialog {
+    // Draw status message if any
+    self.draw_status_message();
+
+    match self.state.dialog {
       DialogType::ExitConfirm => self.draw_exit_dialog(),
       DialogType::PDFNotFound => self.draw_pdf_not_found_dialog(),
       DialogType::CommandInput => self.draw_command_input(),
@@ -82,47 +78,94 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   fn draw_command_input(&mut self) {
     let area = Rect {
       x:      0,
-      y:      self.frame.area().height - 1,
-      width:  self.frame.area().width,
+      y:      self.frame.size().height - 1,
+      width:  self.frame.size().width,
       height: 1,
     };
 
     // Construct the display string with cursor
-    let before_cursor =
-      &self.state.command_buffer.input[..self.state.command_buffer.cursor_position];
-    let after_cursor =
-      &self.state.command_buffer.input[self.state.command_buffer.cursor_position..];
-    let cursor_char =
-      if self.state.command_buffer.cursor_position < self.state.command_buffer.input.len() {
-        &self.state.command_buffer.input[self.state.command_buffer.cursor_position..]
-          .chars()
-          .next()
-          .unwrap()
-          .to_string()
-      } else {
-        " "
-      };
+    let buffer = &self.state.command_buffer;
+    let before_cursor = &buffer.input[..buffer.cursor_position];
+    let after_cursor = &buffer.input[buffer.cursor_position..];
+    let cursor_char = if buffer.cursor_position < buffer.input.len() {
+      &buffer.input[buffer.cursor_position..].chars().next().unwrap().to_string()
+    } else {
+      " "
+    };
 
-    let command_line = Line::from(vec![
-      Span::styled(":", Style::default().fg(Color::Yellow)),
-      Span::styled(before_cursor, Style::default().fg(Color::Yellow)),
-      Span::styled(
+    // Show error or completions if any
+    let mut command_content = Vec::new();
+    if let Some(error) = &buffer.error {
+      command_content.push(Span::styled(":", Style::default().fg(Color::Yellow)));
+      command_content.push(Span::styled(before_cursor, Style::default().fg(Color::Yellow)));
+      command_content.push(Span::styled(
         cursor_char,
         Style::default().fg(Color::Yellow).bg(Color::DarkGray).add_modifier(Modifier::BOLD),
-      ),
-      Span::styled(
-        if self.state.command_buffer.cursor_position < self.state.command_buffer.input.len() {
-          &after_cursor[1..]
-        } else {
-          ""
-        },
+      ));
+      command_content.push(Span::styled(
+        if buffer.cursor_position < buffer.input.len() { &after_cursor[1..] } else { "" },
         Style::default().fg(Color::Yellow),
-      ),
-    ]);
+      ));
 
-    let command_text = Paragraph::new(command_line);
+      // Draw error message above command line
+      let error_area = Rect { x: 0, y: area.y - 1, width: area.width, height: 1 };
+      let error_text = Paragraph::new(Line::from(vec![
+        Span::styled("Error: ", Style::default().fg(Color::Red)),
+        Span::styled(error, Style::default().fg(Color::Red)),
+      ]));
+      self.frame.render_widget(Clear, error_area);
+      self.frame.render_widget(error_text, error_area);
+    } else {
+      // Show completions if we're at the end of the input
+      let completions = buffer.get_completions();
+      if !completions.is_empty() && buffer.cursor_position == buffer.input.len() {
+        let completions_area =
+          Rect { x: 0, y: area.y - 1, width: area.width, height: 1 };
+        let completion_text = Paragraph::new(Line::from(vec![
+          Span::styled("Completions: ", Style::default().fg(Color::Blue)),
+          Span::styled(completions.join(" "), Style::default().fg(Color::White)),
+        ]));
+        self.frame.render_widget(Clear, completions_area);
+        self.frame.render_widget(completion_text, completions_area);
+      }
+
+      command_content.push(Span::styled(":", Style::default().fg(Color::Yellow)));
+      command_content.push(Span::styled(before_cursor, Style::default().fg(Color::Yellow)));
+      command_content.push(Span::styled(
+        cursor_char,
+        Style::default().fg(Color::Yellow).bg(Color::DarkGray).add_modifier(Modifier::BOLD),
+      ));
+      command_content.push(Span::styled(
+        if buffer.cursor_position < buffer.input.len() { &after_cursor[1..] } else { "" },
+        Style::default().fg(Color::Yellow),
+      ));
+    }
+
+    let command_line = Paragraph::new(Line::from(command_content));
     self.frame.render_widget(Clear, area);
-    self.frame.render_widget(command_text, area);
+    self.frame.render_widget(command_line, area);
+  }
+
+  fn draw_status_message(&mut self) {
+    if let Some(msg) = &self.state.status_message {
+      let area = Rect {
+        x:      0,
+        y:      self.frame.size().height - 2,
+        width:  self.frame.size().width,
+        height: 1,
+      };
+
+      let style = if msg.starts_with("Error:") {
+        Style::default().fg(Color::Red)
+      } else {
+        Style::default().fg(Color::Green)
+      };
+
+      let message = Paragraph::new(Line::from(vec![Span::styled(msg, style)]));
+
+      self.frame.render_widget(Clear, area);
+      self.frame.render_widget(message, area);
+    }
   }
 
   /// Splits the main layout into left and right panes.
