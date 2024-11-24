@@ -16,7 +16,7 @@ use ratatui::{
   layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
   style::{Color, Modifier, Style},
   text::{Line, Span},
-  widgets::{Block, Borders, Clear, List, ListItem, Padding, Paragraph, Wrap},
+  widgets::{Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph, Wrap},
   Frame,
 };
 use state::CommandBuffer;
@@ -62,24 +62,164 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
       self.draw_paper_details(&paper, right_area);
     }
 
-    // Draw status message if any
-    self.draw_status_message();
-
-    match self.state.dialog {
+    match &self.state.dialog {
       DialogType::ExitConfirm => self.draw_exit_dialog(),
       DialogType::PDFNotFound => self.draw_pdf_not_found_dialog(),
       DialogType::CommandInput => self.draw_command_input(),
+      DialogType::RemoveConfirm { papers, query, .. } =>
+        self.draw_remove_confirm_dialog(&papers.clone(), &query.clone()),
+      DialogType::SearchResults { papers, query, selected } =>
+        self.draw_search_results(&papers.clone(), &query.clone(), &selected.clone()),
+      DialogType::PDFConfirm { paper } => self.draw_pdf_confirm_dialog(&paper.clone()),
+      DialogType::Success { message } => self.draw_success_dialog(&message.clone()),
       DialogType::None => {},
     }
 
     self.state.needs_redraw = false;
   }
 
+  fn draw_search_results(&mut self, papers: &[Paper], query: &str, selected: &ListState) {
+    // Calculate dialog size based on content
+    let width = 60u16.min(self.frame.size().width.saturating_sub(4));
+    let height = 20u16.min(self.frame.size().height.saturating_sub(4));
+
+    let area = centered_rect(width, height, self.frame.size());
+
+    // Create the outer box
+    let block = Block::default()
+      .title(Line::from(vec![
+        Span::styled("Search Results: ", styles::TITLE),
+        Span::styled(format!("\"{}\"", query), Style::default().fg(Color::Yellow)),
+        Span::styled(format!(" ({} found)", papers.len()), Style::default().fg(Color::DarkGray)),
+      ]))
+      .borders(Borders::ALL)
+      .border_style(Style::default().fg(Color::Blue));
+
+    self.frame.render_widget(Clear, area);
+    self.frame.render_widget(block.clone(), area);
+
+    // Create list items for papers
+    let items: Vec<ListItem> = papers
+      .iter()
+      .map(|p| {
+        ListItem::new(vec![
+          Line::from(vec![Span::styled(&p.title, Style::default().fg(Color::White))]),
+          Line::from(vec![Span::styled(
+            format!(
+              "Authors: {}",
+              p.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", ")
+            ),
+            Style::default().fg(Color::DarkGray),
+          )]),
+          Line::from(""),
+        ])
+      })
+      .collect();
+
+    let inner_area = area.inner(Margin { vertical: 1, horizontal: 1 });
+
+    let list = List::new(items)
+      .highlight_style(
+        Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD),
+      )
+      .highlight_symbol("➜ ");
+
+    self.frame.render_stateful_widget(list, inner_area, &mut selected.clone());
+
+    // Draw help text at bottom
+    let help_text = Line::from(vec![
+      Span::styled("↑↓", styles::KEY_HIGHLIGHT),
+      Span::styled(": navigate • ", styles::HELP),
+      Span::styled("Enter", styles::KEY_HIGHLIGHT),
+      Span::styled(": select • ", styles::HELP),
+      Span::styled("Esc", styles::KEY_HIGHLIGHT),
+      Span::styled(": cancel", styles::HELP),
+    ]);
+
+    let help_area =
+      Rect { x: area.x, y: area.y + area.height - 2, width: area.width, height: 1 };
+
+    self.frame.render_widget(Paragraph::new(help_text).alignment(Alignment::Center), help_area);
+  }
+
+  fn draw_remove_confirm_dialog(&mut self, papers: &[Paper], query: &str) {
+    let mut content = vec![
+      Line::from(vec![
+        Span::styled(
+          format!("Remove {} paper(s) matching ", papers.len()),
+          Style::default().fg(Color::White),
+        ),
+        Span::styled(format!("\"{}\"", query), Style::default().fg(Color::Yellow)),
+        Span::styled("?", Style::default().fg(Color::White)),
+      ]),
+      Line::from(""),
+    ];
+
+    // Show list of papers to be removed
+    for paper in papers.iter().take(5) {
+      content.push(Line::from(vec![
+        Span::styled("• ", Style::default().fg(Color::Red)),
+        Span::styled(&paper.title, Style::default().fg(Color::White)),
+      ]));
+    }
+
+    if papers.len() > 5 {
+      content.push(Line::from(vec![Span::styled(
+        format!("  ... and {} more", papers.len() - 5),
+        Style::default().fg(Color::DarkGray),
+      )]));
+    }
+
+    content.push(Line::from(""));
+    content.push(Line::from(vec![
+      Span::styled("Press ", styles::HELP),
+      Span::styled("y", styles::KEY_HIGHLIGHT.add_modifier(Modifier::BOLD)),
+      Span::styled(" to confirm, ", styles::HELP),
+      Span::styled("n", styles::KEY_HIGHLIGHT.add_modifier(Modifier::BOLD)),
+      Span::styled(" to cancel", styles::HELP),
+    ]));
+
+    self.draw_dialog("Confirm Remove", &content, Color::Red);
+  }
+
+  fn draw_pdf_confirm_dialog(&mut self, paper: &Paper) {
+    let content = vec![
+      Line::from(Span::styled(
+        format!("Download PDF for paper: {}", paper.title),
+        Style::default().fg(Color::White),
+      )),
+      Line::from(""),
+      Line::from(vec![
+        Span::styled("Press ", styles::HELP),
+        Span::styled("y", styles::KEY_HIGHLIGHT.add_modifier(Modifier::BOLD)),
+        Span::styled(" to download, ", styles::HELP),
+        Span::styled("n", styles::KEY_HIGHLIGHT.add_modifier(Modifier::BOLD)),
+        Span::styled(" to skip", styles::HELP),
+      ]),
+    ];
+
+    self.draw_dialog("Download PDF?", &content, Color::Blue);
+  }
+
+  fn draw_success_dialog(&mut self, message: &str) {
+    let content = vec![
+      Line::from(Span::styled(message, Style::default().fg(Color::White))),
+      Line::from(""),
+      Line::from(vec![
+        Span::styled("Press ", styles::HELP),
+        Span::styled("Enter", styles::KEY_HIGHLIGHT.add_modifier(Modifier::BOLD)),
+        Span::styled(" to continue", styles::HELP),
+      ]),
+    ];
+
+    self.draw_dialog("Success", &content, Color::Green);
+  }
+
   fn draw_command_input(&mut self) {
     let area = Rect {
       x:      0,
-      y:      self.frame.size().height - 1,
-      width:  self.frame.size().width,
+      y:      self.frame.area().height - 1,
+      width:  self.frame.area().width,
       height: 1,
     };
 
@@ -575,4 +715,16 @@ fn calculate_abstract_lines(text: &str, area: Rect) -> usize {
       wrapped_lines
     })
     .count()
+}
+
+fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
+  let x = (r.width.saturating_sub(width)) / 2;
+  let y = (r.height.saturating_sub(height)) / 2;
+
+  Rect {
+    x:      r.x + x,
+    y:      r.y + y,
+    width:  width.min(r.width),
+    height: height.min(r.height),
+  }
 }

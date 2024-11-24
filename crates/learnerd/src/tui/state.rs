@@ -40,6 +40,22 @@ pub enum DialogType {
   /// Showing the PDF not found error dialog
   PDFNotFound,
   CommandInput,
+  PDFConfirm {
+    paper: Paper,
+  },
+  RemoveConfirm {
+    query:  String,
+    papers: Vec<Paper>,
+    args:   RemoveArgs,
+  },
+  SearchResults {
+    query:    String,
+    papers:   Vec<Paper>,
+    selected: ListState,
+  },
+  Success {
+    message: String,
+  },
 }
 
 /// Represents which mode the TUI is currently in
@@ -120,8 +136,88 @@ impl UIState {
       DialogType::ExitConfirm => self.handle_exit_dialog(key),
       DialogType::PDFNotFound => self.handle_pdf_not_found_dialog(key),
       DialogType::CommandInput { .. } => self.handle_command_input(key, modifiers),
+      DialogType::RemoveConfirm { .. } => self.handle_remove_confirm(key),
+      DialogType::SearchResults { .. } => self.handle_search_results(key),
+      DialogType::PDFConfirm { .. } => self.handle_pdf_confirm(key),
+      DialogType::Success { .. } => {
+        if matches!(key, KeyCode::Enter | KeyCode::Esc) {
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        }
+        false
+      },
       DialogType::None => self.handle_normal_input(key),
     }
+  }
+
+  fn handle_search_results(&mut self, key: KeyCode) -> bool {
+    if let DialogType::SearchResults { papers, selected, .. } = &mut self.dialog {
+      match key {
+        KeyCode::Up | KeyCode::Char('k') => {
+          // Move selection up
+          if let Some(i) = selected.selected() {
+            if i > 0 {
+              selected.select(Some(i - 1));
+              self.needs_redraw = true;
+            }
+          }
+        },
+        KeyCode::Down | KeyCode::Char('j') => {
+          // Move selection down
+          if let Some(i) = selected.selected() {
+            if i < papers.len() - 1 {
+              selected.select(Some(i + 1));
+              self.needs_redraw = true;
+            }
+          }
+        },
+        KeyCode::Enter => {
+          // Find the selected paper in the main list and focus on it
+          if let Some(selected_idx) = selected.selected() {
+            let selected_paper = &papers[selected_idx];
+
+            // Find this paper in the main list
+            if let Some(main_idx) = self.papers.iter().position(|p| {
+              p.source == selected_paper.source
+                && p.source_identifier == selected_paper.source_identifier
+            }) {
+              // Focus on the paper in the main list
+              self.selected.select(Some(main_idx));
+            }
+          }
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        KeyCode::Esc => {
+          // Cancel search
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        _ => {},
+      }
+    }
+    false
+  }
+
+  fn handle_remove_confirm(&mut self, key: KeyCode) -> bool {
+    if let DialogType::RemoveConfirm { args, .. } = &self.dialog {
+      match key {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+          // Clone args and set force to true to bypass further confirmations
+          let mut confirmed_args = args.clone();
+          confirmed_args.force = true;
+          self.pending_command = Some(Commands::Remove(confirmed_args));
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        _ => {},
+      }
+    }
+    false
   }
 
   fn handle_command_input(&mut self, key: KeyCode, modifiers: KeyModifiers) -> bool {
@@ -193,6 +289,29 @@ impl UIState {
       },
 
       _ => {},
+    }
+    false
+  }
+
+  fn handle_pdf_confirm(&mut self, key: KeyCode) -> bool {
+    if let DialogType::PDFConfirm { paper } = &self.dialog {
+      match key {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+          // Store paper for command execution
+          self.pending_command = Some(Commands::Add(AddArgs {
+            identifier: paper.source_identifier.clone(),
+            pdf:        true,
+            no_pdf:     false,
+          }));
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        _ => {},
+      }
     }
     false
   }

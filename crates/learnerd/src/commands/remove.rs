@@ -7,7 +7,7 @@ use learner::database::Remove;
 use super::*;
 
 /// Arguments that can be used for the [`Commands::Remove`]
-#[derive(Args, Clone)]
+#[derive(Args, Clone, Debug)]
 pub struct RemoveArgs {
   /// Paper identifier or search terms
   pub query: String,

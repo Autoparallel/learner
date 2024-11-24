@@ -33,7 +33,7 @@ use learner::{
   format::format_title,
   Config, Learner,
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{backend::CrosstermBackend, widgets::ListState, Terminal};
 
 use super::*;
 
@@ -42,7 +42,7 @@ mod styles;
 mod ui;
 
 use interaction::{ResponseContent, UserInteraction};
-use state::UIState;
+use state::{DialogType, UIState};
 use ui::UIDrawer;
 
 /// Main TUI application struct that handles the interface and interactions
@@ -110,21 +110,95 @@ impl Tui {
     Ok(())
   }
 
+  // TODO (autoparallel): This is definitely just replicating what these commands do to an extent.
+  // This abstraction isn't good.
   pub async fn execute_command(&mut self, command: Commands) -> Result<()> {
     match command {
       Commands::Add(args) => {
-        add(self, args).await?;
-        // Refresh paper list after add
+        // If PDF flag not specified, show confirmation dialog
+        if !args.pdf && !args.no_pdf {
+          // First add without PDF
+          let paper = add(self, AddArgs { no_pdf: true, ..args }).await?;
+          self.state.dialog = DialogType::PDFConfirm { paper };
+        } else {
+          // Execute with specified flags
+          add(self, args).await?;
+          // Show success dialog
+          self.state.dialog =
+            DialogType::Success { message: "Paper added successfully".to_string() };
+        }
         self.refresh_papers().await?;
       },
       Commands::Remove(args) => {
-        remove(self, args).await?;
-        // Refresh paper list after remove
-        self.refresh_papers().await?;
+        // If not forced, show confirmation first
+        if !args.force {
+          // Find matching papers
+          let mut matching_papers = Vec::new();
+
+          // Get papers matching query
+          let papers = Query::text(&args.query).execute(&mut self.learner.database).await?;
+
+          // Apply filters if any
+          for paper in papers {
+            if let Some(author) = &args.filter.author {
+              if !paper.authors.iter().any(|a| a.name.contains(author)) {
+                continue;
+              }
+            }
+            if let Some(source) = &args.filter.source {
+              if paper.source.to_string() != *source {
+                continue;
+              }
+            }
+            if let Some(before) = &args.filter.before {
+              if !paper.publication_date.to_string().starts_with(before) {
+                continue;
+              }
+            }
+            matching_papers.push(paper);
+          }
+
+          if matching_papers.is_empty() {
+            self.state.set_status_message("No papers found matching criteria".to_string());
+          } else {
+            // Show confirmation dialog
+            self.state.dialog = DialogType::RemoveConfirm {
+              query: args.query.clone(),
+              papers: matching_papers,
+              args,
+            };
+          }
+        } else {
+          // Execute removal and show success
+          remove(self, args).await?;
+          self.state.dialog =
+            DialogType::Success { message: "Papers removed successfully".to_string() };
+          self.refresh_papers().await?;
+        }
       },
       Commands::Search(args) => {
-        search(self, args).await?;
-        // Don't refresh papers for search - it just shows results
+        // Perform the search
+        let mut papers = Query::text(&args.query).execute(&mut self.learner.database).await?;
+
+        // Apply filters if any
+        if let Some(author) = &args.filter.author {
+          papers.retain(|p| p.authors.iter().any(|a| a.name.contains(author)));
+        }
+        if let Some(source) = &args.filter.source {
+          papers.retain(|p| p.source.to_string() == *source);
+        }
+        if let Some(before) = &args.filter.before {
+          papers.retain(|p| p.publication_date.to_string().starts_with(before));
+        }
+
+        if papers.is_empty() {
+          self.state.set_status_message("No papers found matching criteria".to_string());
+        } else {
+          // Show search results dialog
+          let mut selected = ListState::default();
+          selected.select(Some(0));
+          self.state.dialog = DialogType::SearchResults { query: args.query, papers, selected };
+        }
       },
       _ => return Err(LearnerdError::Daemon("Command not supported in TUI mode".to_string())),
     }

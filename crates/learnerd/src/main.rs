@@ -173,7 +173,10 @@ async fn main() -> Result<()> {
 
   match command {
     Commands::Init(init_options) => init(&mut cli, init_options).await,
-    Commands::Add(add_options) => add(&mut cli, add_options).await,
+    Commands::Add(add_options) => {
+      add(&mut cli, add_options).await?;
+      Ok(())
+    },
     Commands::Remove(remove_options) => remove(&mut cli, remove_options).await,
     Commands::Search(search_options) => search(&mut cli, search_options).await,
     Commands::Daemon { cmd } => daemon(cmd).await,

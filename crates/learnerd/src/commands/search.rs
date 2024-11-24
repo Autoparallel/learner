@@ -18,7 +18,7 @@ pub struct SearchArgs {
 }
 
 /// Filter options for paper searches
-#[derive(Args, Clone)]
+#[derive(Args, Clone, Debug)]
 pub struct SearchFilter {
   /// Filter by author name
   #[arg(long)]

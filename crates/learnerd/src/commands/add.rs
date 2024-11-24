@@ -21,7 +21,7 @@ pub struct AddArgs {
 }
 
 /// Function for the [`Commands::Add`] in the CLI.
-pub async fn add<I: UserInteraction>(interaction: &mut I, add_args: AddArgs) -> Result<()> {
+pub async fn add<I: UserInteraction>(interaction: &mut I, add_args: AddArgs) -> Result<Paper> {
   let AddArgs { identifier, pdf, no_pdf } = add_args;
 
   let (source, sanitized_identifier) =
@@ -49,18 +49,19 @@ pub async fn add<I: UserInteraction>(interaction: &mut I, add_args: AddArgs) -> 
     } else {
       Add::paper(&paper).execute(&mut interaction.learner().database).await
     } {
-      Ok(_) => interaction.reply(ResponseContent::Success("Paper added successfully")),
-      Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e))),
+      Ok(_) => interaction.reply(ResponseContent::Success("Paper added successfully"))?,
+      Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e)))?,
     }
+    Ok(paper)
   } else {
-    let paper = &papers[0];
+    let paper = papers[0].clone();
     interaction.reply(ResponseContent::Info("Paper already exists in database"))?;
 
     let pdf_dir = interaction.learner().database.get_storage_path().await?;
     let pdf_path = pdf_dir.join(paper.filename());
 
     if pdf_path.exists() {
-      interaction.reply(ResponseContent::Info(&format!("PDF exists at: {}", pdf_path.display())))
+      interaction.reply(ResponseContent::Info(&format!("PDF exists at: {}", pdf_path.display())))?
     } else if paper.pdf_url.is_some() {
       let should_download = if pdf {
         true
@@ -71,15 +72,12 @@ pub async fn add<I: UserInteraction>(interaction: &mut I, add_args: AddArgs) -> 
       };
 
       if should_download {
-        match Add::complete(paper).execute(&mut interaction.learner().database).await {
-          Ok(_) => interaction.reply(ResponseContent::Success("PDF downloaded successfully")),
-          Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e))),
+        match Add::complete(&paper).execute(&mut interaction.learner().database).await {
+          Ok(_) => interaction.reply(ResponseContent::Success("PDF downloaded successfully"))?,
+          Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e)))?,
         }
-      } else {
-        Ok(())
       }
-    } else {
-      Ok(())
     }
+    Ok(paper)
   }
 }
