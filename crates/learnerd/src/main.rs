@@ -70,7 +70,7 @@ static TREE_LEAF: &str = "└";
 /// Command line interface configuration and argument parsing
 #[derive(Parser)]
 #[command(author, version, about = "Daemon and CLI for the learner paper management system")]
-pub struct Cli {
+pub struct CliArgs {
   /// Verbose mode (-v, -vv, -vvv) for different levels of logging detail
   #[arg(
         short,
@@ -93,6 +93,11 @@ pub struct Cli {
   /// Skip all prompts and accept defaults (mostly for testing)
   #[arg(long, hide = true, global = true)]
   accept_defaults: bool,
+}
+
+pub struct Cli {
+  args:    CliArgs,
+  learner: Option<Learner>,
 }
 
 /// Configures the logging system based on the verbosity level
@@ -141,10 +146,10 @@ fn setup_logging(verbosity: u8) {
 /// - User interaction errors
 #[tokio::main]
 async fn main() -> Result<()> {
-  let mut cli = Cli::parse();
+  let args = CliArgs::parse();
 
   // Handle the command, using TUI as default when enabled
-  let command = cli.command.clone().unwrap_or_else(|| {
+  let command = args.command.clone().unwrap_or_else(|| {
     #[cfg(feature = "tui")]
     return Commands::Tui;
 
@@ -157,35 +162,27 @@ async fn main() -> Result<()> {
 
   if let Commands::Daemon { .. } = command {
   } else {
-    setup_logging(cli.verbose);
+    setup_logging(args.verbose);
   }
 
-  // TODO: This is messy, we don't really need to do all this unwinding of structs here for sure.
-  // The methods should just take cli and learner, then yield out the command inside.
-  //  TODO: In the
-  // `reply` interaction, we now hardcode the pdf storage path. That should be passed into these
-  // commands from here. There's work to do to make this all properly configurable.
-  // TODO: These
-  // commands should be reduced and honestly they should all take in `learner` so this
-  // is done cohesively. We could also probably start using `&str` everywhere.
-  if let Ok(learner) = Learner::from_path(Config::default_path()?).await {
-    match command {
-      Commands::Init(init_options) => init(&mut cli, init_options).await,
-      Commands::Add(add_options) => add(&mut cli, learner, add_options).await,
-      Commands::Remove(remove_options) => remove(&mut cli, learner, remove_options).await,
-      Commands::Search(search_options) => search(&mut cli, learner, search_options).await,
-      Commands::Daemon { cmd } => daemon(cmd).await,
-      #[cfg(feature = "tui")]
-      Commands::Tui => tui::run().await,
-    }
-  } else {
-    // TODO (autoparallel): May as well ask if the user wants to run `init`
-    eprintln!(
-      "{} Failed to open Learner config! Please run `learner init` to set up a config!",
-      style(ERROR_PREFIX).red(),
-    );
-    Err(LearnerdError::from(LearnerError::Config(
-      "Configuration not initialized. Run 'learner init' first.".to_string(),
-    )))
+  let mut cli = Cli { args, learner: None };
+  // Initialize learner unless it's an init command
+  if !matches!(command, Commands::Init(_)) {
+    cli.learner = Some(Learner::from_path(Config::default_path()?).await?);
+  }
+
+  match command {
+    Commands::Init(init_options) => init(&mut cli, init_options).await,
+    Commands::Add(add_options) => add(&mut cli, add_options).await,
+    Commands::Remove(remove_options) => remove(&mut cli, remove_options).await,
+    Commands::Search(search_options) => search(&mut cli, search_options).await,
+    Commands::Daemon { cmd } => daemon(cmd).await,
+    #[cfg(feature = "tui")]
+    Commands::Tui =>
+      if let Some(learner) = cli.learner.take() {
+        tui::run(learner).await
+      } else {
+        Err(LearnerdError::from(LearnerError::Config("Failed to initialize learner".to_string())))
+      },
   }
 }

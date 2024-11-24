@@ -263,7 +263,7 @@ pub struct Config {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Learner {
   /// Active configuration
   pub config:    Config,

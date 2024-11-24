@@ -72,6 +72,7 @@ pub struct UIState {
   /// Status message to display
   pub status_message:  Option<String>,
   pub command_buffer:  CommandBuffer,
+  pub pending_command: Option<Commands>,
 }
 
 impl UIState {
@@ -90,6 +91,7 @@ impl UIState {
       mode: Mode::Normal,
       status_message: None,
       command_buffer: CommandBuffer::new(),
+      pending_command: None,
     }
   }
 
@@ -132,7 +134,9 @@ impl UIState {
         },
         KeyCode::Enter => {
           if let Some(cmd) = self.command_buffer.try_execute() {
-            // TODO: Execute command and set status message
+            // Set the pending command and exit command mode
+            self.pending_command = Some(cmd);
+            self.command_buffer.reset();
             self.dialog = DialogType::None;
           }
           self.needs_redraw = true;

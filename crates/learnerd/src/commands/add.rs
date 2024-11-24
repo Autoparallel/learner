@@ -21,20 +21,18 @@ pub struct AddArgs {
 }
 
 /// Function for the [`Commands::Add`] in the CLI.
-pub async fn add<I: UserInteraction>(
-  interaction: &mut I,
-  mut learner: Learner,
-  add_options: AddArgs,
-) -> Result<()> {
-  let AddArgs { identifier, pdf, no_pdf } = add_options;
+pub async fn add<I: UserInteraction>(interaction: &mut I, add_args: AddArgs) -> Result<()> {
+  let AddArgs { identifier, pdf, no_pdf } = add_args;
 
-  let (source, sanitized_identifier) = learner.retriever.sanitize_identifier(&identifier)?;
-  let papers =
-    Query::by_source(&source, &sanitized_identifier).execute(&mut learner.database).await?;
+  let (source, sanitized_identifier) =
+    interaction.learner().retriever.sanitize_identifier(&identifier)?;
+  let papers = Query::by_source(&source, &sanitized_identifier)
+    .execute(&mut interaction.learner().database)
+    .await?;
 
   if papers.is_empty() {
     interaction.reply(ResponseContent::Info(&format!("Fetching paper: {}", identifier)))?;
-    let paper = learner.retriever.get_paper(&identifier).await?;
+    let paper = interaction.learner().retriever.get_paper(&identifier).await?;
     interaction.reply(ResponseContent::Paper(&paper))?;
 
     let with_pdf = paper.pdf_url.is_some()
@@ -47,9 +45,9 @@ pub async fn add<I: UserInteraction>(
       };
 
     match if with_pdf {
-      Add::complete(&paper).execute(&mut learner.database).await
+      Add::complete(&paper).execute(&mut interaction.learner().database).await
     } else {
-      Add::paper(&paper).execute(&mut learner.database).await
+      Add::paper(&paper).execute(&mut interaction.learner().database).await
     } {
       Ok(_) => interaction.reply(ResponseContent::Success("Paper added successfully")),
       Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e))),
@@ -58,7 +56,7 @@ pub async fn add<I: UserInteraction>(
     let paper = &papers[0];
     interaction.reply(ResponseContent::Info("Paper already exists in database"))?;
 
-    let pdf_dir = learner.database.get_storage_path().await?;
+    let pdf_dir = interaction.learner().database.get_storage_path().await?;
     let pdf_path = pdf_dir.join(paper.filename());
 
     if pdf_path.exists() {
@@ -73,7 +71,7 @@ pub async fn add<I: UserInteraction>(
       };
 
       if should_download {
-        match Add::complete(paper).execute(&mut learner.database).await {
+        match Add::complete(paper).execute(&mut interaction.learner().database).await {
           Ok(_) => interaction.reply(ResponseContent::Success("PDF downloaded successfully")),
           Err(e) => interaction.reply(ResponseContent::Error(LearnerdError::from(e))),
         }

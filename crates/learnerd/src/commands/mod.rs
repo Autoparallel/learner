@@ -291,6 +291,8 @@ impl Commands {
 }
 
 impl UserInteraction for Cli {
+  fn learner(&mut self) -> &mut Learner { self.learner.as_mut().expect("Learner not initialized") }
+
   /// Request confirmation from the user
   ///
   /// Displays a yes/no prompt with the given message and returns the user's choice.
@@ -298,7 +300,7 @@ impl UserInteraction for Cli {
   fn confirm(&mut self, message: &str) -> Result<bool> {
     println!("\n{} {}", style(PROMPT_PREFIX).yellow(), style(message).yellow().bold());
 
-    if self.accept_defaults {
+    if self.args.accept_defaults {
       return Ok(false);
     }
 
@@ -393,7 +395,7 @@ impl UserInteraction for Cli {
         if let Some(url) = &paper.pdf_url {
           println!("{}   PDF URL: {}", style(TREE_BRANCH).cyan(), style(url).blue().underlined());
 
-          let pdf_path = Database::default_storage_path().join(paper.filename());
+          let pdf_path = self.learner().config.storage_path.join(paper.filename());
           if pdf_path.exists() {
             println!(
               "{}   {} PDF available at:",

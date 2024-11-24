@@ -39,6 +39,7 @@ pub enum ResponseContent<'a> {
 /// - Text input prompts (`prompt`)
 /// - Content display (`reply`)
 pub trait UserInteraction {
+  fn learner(&mut self) -> &mut Learner;
   /// Request confirmation from the user.
   ///
   /// # Arguments

@@ -57,10 +57,7 @@ pub struct Tui {
 
 impl Tui {
   /// Creates a new TUI instance
-  pub async fn new() -> Result<Self> {
-    // Initialize learner
-    let mut learner = Learner::from_path(Config::default_path()?).await?;
-
+  pub async fn new(mut learner: Learner) -> Result<Self> {
     // Get initial paper list
     let papers =
       Query::list_all().order_by(OrderField::Title).execute(&mut learner.database).await?;
@@ -77,6 +74,11 @@ impl Tui {
   /// Runs the TUI main loop
   pub async fn run(&mut self) -> Result<()> {
     loop {
+      if let Some(cmd) = self.state.pending_command.take() {
+        if let Err(e) = self.execute_command(cmd).await {
+          self.state.set_status_message(format!("Error: {}", e));
+        }
+      }
       // Draw UI if needed
       if self.state.needs_redraw {
         self.terminal.draw(|f| UIDrawer::new(f, &mut self.state).draw())?;
@@ -107,36 +109,82 @@ impl Tui {
     self.terminal.show_cursor()?;
     Ok(())
   }
+
+  pub async fn execute_command(&mut self, command: Commands) -> Result<()> {
+    match command {
+      Commands::Add(args) => {
+        add(self, args).await?;
+        // Refresh paper list after add
+        self.refresh_papers().await?;
+      },
+      Commands::Remove(args) => {
+        remove(self, args).await?;
+        // Refresh paper list after remove
+        self.refresh_papers().await?;
+      },
+      Commands::Search(args) => {
+        search(self, args).await?;
+        // Don't refresh papers for search - it just shows results
+      },
+      _ => return Err(LearnerdError::Daemon("Command not supported in TUI mode".to_string())),
+    }
+    Ok(())
+  }
+
+  async fn refresh_papers(&mut self) -> Result<()> {
+    self.state.papers =
+      Query::list_all().order_by(OrderField::Title).execute(&mut self.learner.database).await?;
+    self.state.needs_redraw = true;
+    Ok(())
+  }
 }
 
 impl UserInteraction for Tui {
+  fn learner(&mut self) -> &mut Learner { &mut self.learner }
+
   fn confirm(&mut self, message: &str) -> Result<bool> {
-    // For now, default to true - we'll implement proper UI confirmation later
+    // For now, just show the confirmation message and return true
+    // TODO: Add proper confirmation dialog
+    self.state.set_status_message(format!("Confirm: {}", message));
     Ok(true)
   }
 
   fn prompt(&mut self, message: &str) -> Result<String> {
-    // For now, return empty string - we'll implement proper UI prompting later
+    // For now, just show the prompt message and return empty string
+    // TODO: Add proper prompt dialog
+    self.state.set_status_message(format!("Prompt: {}", message));
     Ok(String::new())
   }
 
   fn reply(&mut self, content: ResponseContent) -> Result<()> {
-    // For now, just set a status message - we'll improve feedback later
     match content {
-      ResponseContent::Success(msg) | ResponseContent::Info(msg) => {
+      ResponseContent::Success(msg) => {
         self.state.set_status_message(msg.to_string());
       },
       ResponseContent::Error(e) => {
         self.state.set_status_message(format!("Error: {}", e));
       },
-      _ => {}, // Ignore Paper/Papers content for now
+      ResponseContent::Info(msg) => {
+        self.state.set_status_message(msg.to_string());
+      },
+      ResponseContent::Paper(paper) => {
+        // For now, just show paper title in status
+        // TODO: Consider showing in a popup or updating the paper list
+        self.state.set_status_message(format!("Paper: {}", paper.title));
+      },
+      ResponseContent::Papers(papers) => {
+        // For now, just show count in status
+        // TODO: Consider updating the paper list view
+        self.state.set_status_message(format!("Found {} papers", papers.len()));
+      },
     }
+    self.state.needs_redraw = true;
     Ok(())
   }
 }
 
 /// Runs the Terminal User Interface.
-pub async fn run() -> Result<()> {
-  let mut tui = Tui::new().await?;
+pub async fn run(learner: Learner) -> Result<()> {
+  let mut tui = Tui::new(learner).await?;
   tui.run().await
 }

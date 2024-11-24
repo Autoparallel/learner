@@ -92,7 +92,7 @@ pub mod xml;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Retriever {
   /// The collection of configurations used for this [`Retriever`].
   configs: HashMap<String, RetrieverConfig>,
