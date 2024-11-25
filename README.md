@@ -28,10 +28,11 @@
   - Configurable document storage
   - Platform-specific defaults
 
-- CLI Tool (`learnerd`)
-  - Paper addition and retrieval
-  - Search functionality
-  - Document management
+- Interactive Interfaces
+  - Terminal User Interface (TUI) with vim-style navigation
+  - Command-line interface (CLI) for scripting and automation
+  - Search, filter, and preview functionality
+  - Document management and viewing
   - Daemon support for background operations
 
 ## Installation
@@ -39,15 +40,19 @@
 ### Library
 
 ```toml
-[dependencies]
+[
+dependencies
+]
 learner = { version = "*" }  # Uses latest version
 ```
+
 ### CLI Tool
 
 ```bash
 cargo install learnerd
 ```
-which will install a binary you can reference with the command `learner`.
+
+This installs both the CLI tool and TUI interface, accessible via the `learner` command.
 
 ## Usage
 
@@ -57,7 +62,7 @@ which will install a binary you can reference with the command `learner`.
 use learner::{Paper, Database};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result> {
     let db = Database::open(Database::default_path()).await?;
     
     // Add papers from various sources
@@ -72,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### CLI Usage
+### Command Line Interface
 
 ```bash
 # Initialize database
@@ -80,16 +85,135 @@ learner init
 
 # Add papers
 learner add 2301.07041
-learner add "https://arxiv.org/abs/2301.07041"
-learner add "10.1145/1327452.1327492"
+learner add "https://arxiv.org/abs/2301.07041" --pdf
+learner add "10.1145/1327452.1327492" --no-pdf
 
-# Manage documents
-learner download arxiv 2301.07041
-learner get arxiv 2301.07041
-learner search "neural networks"
+# Search papers
+learner search "quantum computing"
+learner search "quantum" --author "Feynman" --detailed
+learner search "neural" --source arxiv --before 2023
+
+# Remove papers
+learner remove "outdated paper"
+learner remove "temp" --force --remove-pdf
 ```
 
-### Daemon Management
+### Terminal User Interface
+If you install with
+```
+cargo install learnerd --features tui
+```
+you can get access to a Terminal User Interface (TUI). To launch the interactive TUI just do:
+```bash
+learner
+```
+
+TUI navigation:
+- `↑`/`k`, `↓`/`j`: Navigate papers
+- `←`/`h`, `→`/`l`: Switch panes
+- `:`: Enter command mode
+- `o`: Open selected PDF
+- `q`: Quit
+
+TUI commands:
+```bash
+:add      # Add a paper
+:remove   # Remove paper(s)
+:search   # Search papers
+```
+
+Search within TUI supports all filters:
+```bash
+:search "quantum" --author "Feynman"
+:search "neural" --source arxiv --before 2023
+```
+
+## Configuration
+
+The `learner` system uses a flexible configuration system that allows customization of paper sources, storage paths, and retrieval behavior.
+
+### Default Locations
+
+- **Config**: 
+  - Linux: `~/.config/learner/config.toml`
+  - macOS: `~/Library/Application Support/learner/config.toml`
+  - Windows: `%APPDATA%\learner\config.toml`
+
+- **Database**:
+  - Linux: `~/.local/share/learner/learner.db`
+  - macOS: `~/Library/Application Support/learner/learner.db`
+  - Windows: `%APPDATA%\learner\learner.db`
+
+- **Papers**:
+  - Linux/macOS: `~/Documents/learner/papers`
+  - Windows: `Documents\learner\papers`
+
+### Configuration File
+
+The configuration file (`config.toml`) allows you to customize:
+```toml
+# Base configuration
+[
+config
+]
+database_path = "/custom/path/to/db.sqlite" # Where the datbase itself is stored
+storage_path = "/custom/path/to/papers"     # Where the documents are stored
+retrievers_path = "/custom/path/to/papers"  # Where configuration for retrievers are stored
+```
+
+### Adding Custom Sources
+
+1. Create a source configuration in TOML:
+```toml
+[sources.new_source]
+name = "New Paper Source"
+base_url = "https://api.example.com"
+pattern = "^PREFIX-\\d+$"  # Regex for identifier validation
+endpoint_template = "/api/v1/papers/{identifier}"
+headers = { "API-Key" = "your-key" }  # Optional headers
+
+# For JSON responses
+response_format = { type = "json" }
+field_maps.title = { path = "data.title" }
+field_maps.abstract = { path = "data.description" }
+field_maps.pdf_url = { 
+    path = "data.files.pdf",
+    transform = { type = "url", base = "https://cdn.example.com", suffix = ".pdf" }
+}
+
+# For XML responses
+response_format = { type = "xml" }
+field_maps.title = { path = "paper/title" }
+field_maps.authors = { path = "paper/authors/author" }
+```
+Put this TOML configuration file in your `~/.learner/retrievers/` (or equivalent) directory.
+Examples can be found in `crates/learner/config/retrievers/`.
+
+### Source Requirements
+
+Custom sources must provide:
+1. A unique identifier pattern (regex)
+2. An API endpoint that returns paper metadata
+3. Field mappings for required metadata:
+   - Title
+   - Authors
+   - Abstract
+   - Publication date
+   - Optional: PDF URL, DOI
+
+### Supported Response Formats
+
+- **JSON**: 
+  - Path-based field extraction
+  - Value transformations (dates, URLs)
+  - Array handling for authors/references
+
+- **XML**:
+  - XPath-style field selection
+  - Namespace handling
+  - Multiple value aggregation
+
+### System Daemon Management
 
 `learnerd` can run as a background service for paper monitoring and updates.
 
@@ -131,20 +255,15 @@ Files: `learnerd.log` (main, rotated daily), `stdout.log`, `stderr.log`
 
 ## Roadmap
 
-### Core Features 
-- [x] PDF management
-- [x] Content extraction
-- [x] Paper removal
-- [x] Batch operations
-- [ ] Export functionality
-- [ ] Enhanced search
-- [ ] Custom metadata
-
-### Advanced Features 
-- [x] LLM integration
-- [ ] Version control and annotations
-- [ ] Paper discovery
-- [ ] Citation analysis
+- [ ] Generic LLM integration (similar to the configurable `Retriever` abstraction)
+- [ ] RAG system
+- [ ] Document version control and annotations
+- [ ] Paper discovery and streaming
+- [ ] Configurable daemon process (e.g., watch file system, RSS, automated LLM querying)
+- [ ] REST API and Daemonize so `learner` can be a plugin with/for other apps (e.g., Raycast, Syncthing)
+- [ ] Database improvements (more searchable fields, tags, organization)
+- [ ] TUI improvements (organization, flexibility, in-terminal paper reading)
+- [ ] Citation analysis and related works.
 
 ## Contributing
 
