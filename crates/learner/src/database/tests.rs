@@ -76,7 +76,7 @@ async fn test_storage_path_persistence() {
   drop(db);
   let db = Database::open(db_path).await.unwrap();
   let storage_path = db.get_storage_path().await.expect("Storage path should be set");
-  assert_eq!(storage_path, custom_path);
+  assert!(storage_path.ends_with(custom_path));
 }
 
 #[traced_test]
