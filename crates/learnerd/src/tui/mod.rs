@@ -31,7 +31,7 @@ use crossterm::{
 use learner::{
   database::{OrderField, Query},
   format::format_title,
-  Config, Learner,
+  Learner,
 };
 use ratatui::{backend::CrosstermBackend, widgets::ListState, Terminal};
 
@@ -85,7 +85,7 @@ impl Tui {
       }
 
       // Handle events
-      if event::poll(std::time::Duration::from_millis(5))? {
+      if event::poll(std::time::Duration::from_millis(1))? {
         match event::read()? {
           Event::Key(key) =>
             if self.state.handle_input(key.code, key.modifiers) {
@@ -112,6 +112,7 @@ impl Tui {
 
   // TODO (autoparallel): This is definitely just replicating what these commands do to an extent.
   // This abstraction isn't good.
+  /// Executes a given command from the TUI command prompt
   pub async fn execute_command(&mut self, command: Commands) -> Result<()> {
     match command {
       Commands::Add(args) => {
@@ -146,7 +147,7 @@ impl Tui {
               }
             }
             if let Some(source) = &args.filter.source {
-              if paper.source.to_string() != *source {
+              if &paper.source.to_string() != source {
                 continue;
               }
             }
@@ -162,11 +163,7 @@ impl Tui {
             self.state.set_status_message("No papers found matching criteria".to_string());
           } else {
             // Show confirmation dialog
-            self.state.dialog = DialogType::RemoveConfirm {
-              query: args.query.clone(),
-              papers: matching_papers,
-              args,
-            };
+            self.state.dialog = DialogType::RemoveConfirm { papers: matching_papers, args };
           }
         } else {
           // Execute removal and show success
@@ -185,7 +182,7 @@ impl Tui {
           papers.retain(|p| p.authors.iter().any(|a| a.name.contains(author)));
         }
         if let Some(source) = &args.filter.source {
-          papers.retain(|p| p.source.to_string() == *source);
+          papers.retain(|p| &p.source.to_string() == source);
         }
         if let Some(before) = &args.filter.before {
           papers.retain(|p| p.publication_date.to_string().starts_with(before));
@@ -205,6 +202,7 @@ impl Tui {
     Ok(())
   }
 
+  /// Refreshes the list of papers in the TUI
   async fn refresh_papers(&mut self) -> Result<()> {
     self.state.papers =
       Query::list_all().order_by(OrderField::Title).execute(&mut self.learner.database).await?;

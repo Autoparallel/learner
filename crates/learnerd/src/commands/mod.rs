@@ -91,11 +91,13 @@ pub enum Commands {
   },
 }
 
-impl Commands {
+impl FromStr for Commands {
+  type Err = String;
+
   /// Parse a command string into a Commands variant
-  pub fn from_str(input: &str) -> std::result::Result<Self, String> {
+  fn from_str(input: &str) -> std::result::Result<Self, String> {
     let parts: Vec<&str> = input.split_whitespace().collect();
-    match parts.get(0).map(|s| *s) {
+    match parts.first().copied() {
       Some("add") => Self::parse_add(&parts[1..]),
       Some("remove") => Self::parse_remove(&parts[1..]),
       Some("search") => Self::parse_search(&parts[1..]),
@@ -103,7 +105,9 @@ impl Commands {
       None => Err("No command entered".to_string()),
     }
   }
+}
 
+impl Commands {
   /// Parse arguments for the add command
   fn parse_add(args: &[&str]) -> std::result::Result<Self, String> {
     let mut add_args = AddArgs { identifier: String::new(), pdf: false, no_pdf: false };

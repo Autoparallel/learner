@@ -19,7 +19,6 @@ use ratatui::{
   widgets::{Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph, Wrap},
   Frame,
 };
-use state::CommandBuffer;
 
 use super::{
   state::{DialogType, FocusedPane, UIState},
@@ -53,6 +52,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   /// Creates a new drawer instance.
   pub fn new(frame: &'a mut Frame<'b>, state: &'a mut UIState) -> Self { Self { frame, state } }
 
+  /// Draws the whole TUI
   pub fn draw(&mut self) {
     let frame_size = self.frame.area();
     let (left_area, right_area) = self.split_layout(frame_size);
@@ -62,12 +62,13 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
       self.draw_paper_details(&paper, right_area);
     }
 
+    // TODO (autoparallel): This could definitely be made far more simple
     match &self.state.dialog {
       DialogType::ExitConfirm => self.draw_exit_dialog(),
       DialogType::PDFNotFound => self.draw_pdf_not_found_dialog(),
       DialogType::CommandInput => self.draw_command_input(),
-      DialogType::RemoveConfirm { papers, query, .. } =>
-        self.draw_remove_confirm_dialog(&papers.clone(), &query.clone()),
+      DialogType::RemoveConfirm { papers, args } =>
+        self.draw_remove_confirm_dialog(&papers.clone(), &args.clone()),
       DialogType::SearchResults { papers, query, selected } =>
         self.draw_search_results(&papers.clone(), &query.clone(), &selected.clone()),
       DialogType::PDFConfirm { paper } => self.draw_pdf_confirm_dialog(&paper.clone()),
@@ -78,12 +79,13 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.state.needs_redraw = false;
   }
 
+  /// Draws the pop up with search results
   fn draw_search_results(&mut self, papers: &[Paper], query: &str, selected: &ListState) {
     // Calculate dialog size based on content
-    let width = 60u16.min(self.frame.size().width.saturating_sub(4));
-    let height = 20u16.min(self.frame.size().height.saturating_sub(4));
+    let width = 60u16.min(self.frame.area().width.saturating_sub(4));
+    let height = 20u16.min(self.frame.area().height.saturating_sub(4));
 
-    let area = centered_rect(width, height, self.frame.size());
+    let area = centered_rect(width, height, self.frame.area());
 
     // Create the outer box
     let block = Block::default()
@@ -142,14 +144,15 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.frame.render_widget(Paragraph::new(help_text).alignment(Alignment::Center), help_area);
   }
 
-  fn draw_remove_confirm_dialog(&mut self, papers: &[Paper], query: &str) {
+  /// Draws the pop up for removal
+  fn draw_remove_confirm_dialog(&mut self, papers: &[Paper], remove_args: &RemoveArgs) {
     let mut content = vec![
       Line::from(vec![
         Span::styled(
           format!("Remove {} paper(s) matching ", papers.len()),
           Style::default().fg(Color::White),
         ),
-        Span::styled(format!("\"{}\"", query), Style::default().fg(Color::Yellow)),
+        Span::styled(format!("\"{}\"", remove_args.query), Style::default().fg(Color::Yellow)),
         Span::styled("?", Style::default().fg(Color::White)),
       ]),
       Line::from(""),
@@ -182,6 +185,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.draw_dialog("Confirm Remove", &content, Color::Red);
   }
 
+  /// Draws the download confirm popup
   fn draw_pdf_confirm_dialog(&mut self, paper: &Paper) {
     let content = vec![
       Line::from(Span::styled(
@@ -201,6 +205,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.draw_dialog("Download PDF?", &content, Color::Blue);
   }
 
+  /// Draws the pop up showing success
   fn draw_success_dialog(&mut self, message: &str) {
     let content = vec![
       Line::from(Span::styled(message, Style::default().fg(Color::White))),
@@ -215,6 +220,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     self.draw_dialog("Success", &content, Color::Green);
   }
 
+  /// Draws the command input area
   fn draw_command_input(&mut self) {
     let area = Rect {
       x:      0,
@@ -284,28 +290,6 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
     let command_line = Paragraph::new(Line::from(command_content));
     self.frame.render_widget(Clear, area);
     self.frame.render_widget(command_line, area);
-  }
-
-  fn draw_status_message(&mut self) {
-    if let Some(msg) = &self.state.status_message {
-      let area = Rect {
-        x:      0,
-        y:      self.frame.size().height - 2,
-        width:  self.frame.size().width,
-        height: 1,
-      };
-
-      let style = if msg.starts_with("Error:") {
-        Style::default().fg(Color::Red)
-      } else {
-        Style::default().fg(Color::Green)
-      };
-
-      let message = Paragraph::new(Line::from(vec![Span::styled(msg, style)]));
-
-      self.frame.render_widget(Clear, area);
-      self.frame.render_widget(message, area);
-    }
   }
 
   /// Splits the main layout into left and right panes.
@@ -717,6 +701,7 @@ fn calculate_abstract_lines(text: &str, area: Rect) -> usize {
     .count()
 }
 
+/// Calculates dimensions and position for a centered rectangular box
 fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
   let x = (r.width.saturating_sub(width)) / 2;
   let y = (r.height.saturating_sub(height)) / 2;

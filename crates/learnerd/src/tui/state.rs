@@ -39,32 +39,34 @@ pub enum DialogType {
   ExitConfirm,
   /// Showing the PDF not found error dialog
   PDFNotFound,
+  /// Dialog used when entering a command
   CommandInput,
+  /// Dialog used when confirming a PDF download
   PDFConfirm {
+    /// The paper to download a PDF for
     paper: Paper,
   },
+  /// Dialog used when removing papers
   RemoveConfirm {
-    query:  String,
+    /// The list of papers that will be removed
     papers: Vec<Paper>,
+    /// The additional arguments used for removal
     args:   RemoveArgs,
   },
+  /// The results of search made
   SearchResults {
+    /// The search term used
     query:    String,
+    /// The papers that match the search
     papers:   Vec<Paper>,
+    /// Which paper in the list is currently selected
     selected: ListState,
   },
+  /// Message displayed when an operation has occured successfully
   Success {
+    /// The message to display
     message: String,
   },
-}
-
-/// Represents which mode the TUI is currently in
-#[derive(Debug, PartialEq)]
-pub enum Mode {
-  /// Normal mode for navigation and viewing
-  Normal,
-  /// Command mode for entering commands
-  Command,
 }
 
 /// Maintains the complete state of the terminal interface.
@@ -83,11 +85,11 @@ pub struct UIState {
   pub max_scroll:      Option<usize>,
   /// Whether the UI needs to be redrawn
   pub needs_redraw:    bool,
-  /// Current UI mode
-  pub mode:            Mode,
   /// Status message to display
   pub status_message:  Option<String>,
+  /// Stores the current state of the entered command
   pub command_buffer:  CommandBuffer,
+  /// The command that is to be executed
   pub pending_command: Option<Commands>,
 }
 
@@ -104,7 +106,6 @@ impl UIState {
       scroll_position: 0,
       max_scroll: None,
       needs_redraw: true,
-      mode: Mode::Normal,
       status_message: None,
       command_buffer: CommandBuffer::new(),
       pending_command: None,
@@ -117,12 +118,6 @@ impl UIState {
     self.needs_redraw = true;
   }
 
-  /// Clears the current status message
-  pub fn clear_status_message(&mut self) {
-    self.status_message = None;
-    self.needs_redraw = true;
-  }
-
   /// Returns a reference to the currently selected paper.
   ///
   /// Returns None if no paper is selected (should never happen in practice
@@ -131,6 +126,7 @@ impl UIState {
     self.selected.selected().map(|i| &self.papers[i])
   }
 
+  /// Handles button inputs in the home page
   pub fn handle_input(&mut self, key: KeyCode, modifiers: KeyModifiers) -> bool {
     match &self.dialog {
       DialogType::ExitConfirm => self.handle_exit_dialog(key),
@@ -150,6 +146,7 @@ impl UIState {
     }
   }
 
+  /// Handles the search result pop up
   fn handle_search_results(&mut self, key: KeyCode) -> bool {
     if let DialogType::SearchResults { papers, selected, .. } = &mut self.dialog {
       match key {
@@ -199,6 +196,7 @@ impl UIState {
     false
   }
 
+  /// Handles the remove paper pop up
   fn handle_remove_confirm(&mut self, key: KeyCode) -> bool {
     if let DialogType::RemoveConfirm { args, .. } = &self.dialog {
       match key {
@@ -220,6 +218,7 @@ impl UIState {
     false
   }
 
+  /// Handles inputs when typing a command
   fn handle_command_input(&mut self, key: KeyCode, modifiers: KeyModifiers) -> bool {
     match (key, modifiers) {
       (key, KeyModifiers::NONE) => match key {
@@ -293,6 +292,7 @@ impl UIState {
     false
   }
 
+  /// Handles the confirmation popup when asked to download a PDF
   fn handle_pdf_confirm(&mut self, key: KeyCode) -> bool {
     if let DialogType::PDFConfirm { paper } = &self.dialog {
       match key {
@@ -479,6 +479,7 @@ impl UIState {
   }
 }
 
+/// The buffer for writing commands into
 #[derive(Default, Debug)]
 pub struct CommandBuffer {
   /// Current command text
@@ -496,6 +497,7 @@ pub struct CommandBuffer {
 }
 
 impl CommandBuffer {
+  /// Creates a new buffer for commands ran in the TUI
   pub fn new() -> Self {
     Self {
       input:            String::new(),
@@ -548,7 +550,7 @@ impl CommandBuffer {
     // Split into command and current word
     let parts: Vec<&str> = input.split_whitespace().collect();
 
-    match parts.get(0) {
+    match parts.first() {
       // If we just have a partial command, complete the command
       Some(&cmd) if parts.len() == 1 => Commands::command_list()
         .iter()
@@ -610,14 +612,6 @@ impl CommandBuffer {
     // Remove from word start to cursor
     self.input.replace_range(word_start..self.cursor_position, "");
     self.cursor_position = word_start;
-  }
-
-  /// Add command to history
-  pub fn add_to_history(&mut self) {
-    if !self.input.trim().is_empty() {
-      self.history.push(self.input.clone());
-    }
-    self.reset();
   }
 
   /// Navigate to previous command in history

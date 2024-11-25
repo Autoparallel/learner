@@ -32,7 +32,7 @@
 
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use clap::{builder::ArgAction, Parser, Subcommand};
 use console::style;
@@ -95,8 +95,11 @@ pub struct CliArgs {
   accept_defaults: bool,
 }
 
+/// The command line interface for using `Learner`
 pub struct Cli {
+  /// The arguments to configure the CLI
   args:    CliArgs,
+  /// The `Learner` instance to use for the CLI
   learner: Option<Learner>,
 }
 
