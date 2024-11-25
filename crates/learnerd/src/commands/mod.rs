@@ -49,7 +49,7 @@ use super::*;
 
 pub mod add;
 
-pub mod daemon;
+#[cfg(not(target_os = "windows"))] pub mod daemon;
 
 pub mod init;
 pub mod remove;
@@ -61,7 +61,8 @@ use dialoguer::{Confirm, Input};
 use interaction::*;
 use learner::database::{Add, Query};
 
-pub use self::{add::*, daemon::*, init::*, remove::*, search::*};
+#[cfg(not(target_os = "windows"))] pub use self::daemon::*;
+pub use self::{add::*, init::*, remove::*, search::*};
 
 /// Available commands for the CLI
 #[derive(Subcommand, Clone)]
@@ -83,6 +84,7 @@ pub enum Commands {
   /// Search for papers in the database
   Search(SearchArgs),
 
+  #[cfg(not(target_os = "windows"))]
   /// Manage the learnerd daemon
   Daemon {
     /// Commands for managing the daemon

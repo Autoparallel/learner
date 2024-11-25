@@ -37,22 +37,26 @@ use std::{path::PathBuf, str::FromStr};
 use clap::{builder::ArgAction, Parser, Subcommand};
 use console::style;
 use error::LearnerdError;
-use learner::{database::Database, error::LearnerError, paper::Paper, prelude::*, Config, Learner};
+#[cfg(not(target_os = "windows"))]
+use learner::error::LearnerError;
+use learner::{database::Database, paper::Paper, prelude::*, Config, Learner};
 use tracing_subscriber::EnvFilter;
 
 pub mod commands;
-pub mod daemon;
+#[cfg(not(target_os = "windows"))] pub mod daemon;
 pub mod error;
 pub mod interaction;
 #[cfg(feature = "tui")] pub mod tui;
 
-use crate::{commands::*, daemon::*, error::*};
+#[cfg(not(target_os = "windows"))] use crate::daemon::*;
+use crate::{commands::*, error::*};
 
 /// Prefix for information messages
 static INFO_PREFIX: &str = "ℹ ";
 /// Prefix for success messages
 static SUCCESS_PREFIX: &str = "✓ ";
 /// Prefix for warning messages
+#[cfg(not(target_os = "windows"))]
 static WARNING_PREFIX: &str = "⚠️ ";
 /// Prefix for error messages
 static ERROR_PREFIX: &str = "✗ ";
@@ -163,10 +167,13 @@ async fn main() -> Result<()> {
     }
   });
 
+  #[cfg(not(target_os = "windows"))]
   if let Commands::Daemon { .. } = command {
   } else {
     setup_logging(args.verbose);
   }
+  #[cfg(target_os = "windows")]
+  setup_logging(args.verbose);
 
   let mut cli = Cli { args, learner: None };
   // Initialize learner unless it's an init command
@@ -182,6 +189,7 @@ async fn main() -> Result<()> {
     },
     Commands::Remove(remove_options) => remove(&mut cli, remove_options).await,
     Commands::Search(search_options) => search(&mut cli, search_options).await,
+    #[cfg(not(target_os = "windows"))]
     Commands::Daemon { cmd } => daemon(cmd).await,
     #[cfg(feature = "tui")]
     Commands::Tui =>
