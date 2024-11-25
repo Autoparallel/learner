@@ -7,7 +7,7 @@ use learner::database::Remove;
 use super::*;
 
 /// Arguments that can be used for the [`Commands::Remove`]
-#[derive(Args, Clone)]
+#[derive(Args, Clone, Debug)]
 pub struct RemoveArgs {
   /// Paper identifier or search terms
   pub query: String,
@@ -37,18 +37,18 @@ pub struct RemoveArgs {
 #[allow(clippy::too_many_arguments)]
 /// Function for the [`Commands::Remove`] in the CLI.
 pub async fn remove<I: UserInteraction>(
-  interaction: &I,
-  mut learner: Learner,
-  remove_options: RemoveArgs,
+  interaction: &mut I,
+  remove_args: RemoveArgs,
 ) -> Result<()> {
-  let RemoveArgs { query, filter, dry_run, force, remove_pdf, keep_pdf } = remove_options;
+  let RemoveArgs { query, filter, dry_run, force, remove_pdf, keep_pdf } = remove_args;
 
   // First find matching papers
-  let mut papers = Query::text(&query).execute(&mut learner.database).await?;
+  let mut papers = Query::text(&query).execute(&mut interaction.learner().database).await?;
 
   // Apply filters
   if let Some(author) = &filter.author {
-    let author_papers = Query::by_author(author).execute(&mut learner.database).await?;
+    let author_papers =
+      Query::by_author(author).execute(&mut interaction.learner().database).await?;
     papers.retain(|p| author_papers.contains(p));
   }
 
@@ -97,7 +97,7 @@ pub async fn remove<I: UserInteraction>(
   } else if keep_pdf {
     false
   } else {
-    let storage_path = &learner.config.storage_path;
+    let storage_path = &interaction.learner().config.storage_path;
     let has_pdfs = papers.iter().any(|p| storage_path.join(p.filename()).exists());
     has_pdfs && interaction.confirm("Do you also want to remove associated PDFs?")?
   };
@@ -106,7 +106,7 @@ pub async fn remove<I: UserInteraction>(
   for paper in &papers {
     // Remove paper from database
     if let Err(e) = Remove::by_source(&paper.source, &paper.source_identifier)
-      .execute(&mut learner.database)
+      .execute(&mut interaction.learner().database)
       .await
     {
       interaction.reply(ResponseContent::Error(e.into()))?;
@@ -117,7 +117,7 @@ pub async fn remove<I: UserInteraction>(
 
     // Handle PDF removal if requested
     if should_remove_pdfs {
-      let pdf_path = learner.config.storage_path.join(paper.filename());
+      let pdf_path = interaction.learner().config.storage_path.join(paper.filename());
       if pdf_path.exists() {
         fs::remove_file(&pdf_path)?;
         interaction

@@ -49,7 +49,7 @@ use super::*;
 
 pub mod add;
 
-pub mod daemon;
+#[cfg(not(target_os = "windows"))] pub mod daemon;
 
 pub mod init;
 pub mod remove;
@@ -61,7 +61,8 @@ use dialoguer::{Confirm, Input};
 use interaction::*;
 use learner::database::{Add, Query};
 
-pub use self::{add::*, daemon::*, init::*, remove::*, search::*};
+#[cfg(not(target_os = "windows"))] pub use self::daemon::*;
+pub use self::{add::*, init::*, remove::*, search::*};
 
 /// Available commands for the CLI
 #[derive(Subcommand, Clone)]
@@ -83,6 +84,7 @@ pub enum Commands {
   /// Search for papers in the database
   Search(SearchArgs),
 
+  #[cfg(not(target_os = "windows"))]
   /// Manage the learnerd daemon
   Daemon {
     /// Commands for managing the daemon
@@ -91,15 +93,220 @@ pub enum Commands {
   },
 }
 
+impl FromStr for Commands {
+  type Err = String;
+
+  /// Parse a command string into a Commands variant
+  fn from_str(input: &str) -> std::result::Result<Self, String> {
+    let parts: Vec<&str> = input.split_whitespace().collect();
+    match parts.first().copied() {
+      Some("add") => Self::parse_add(&parts[1..]),
+      Some("remove") => Self::parse_remove(&parts[1..]),
+      Some("search") => Self::parse_search(&parts[1..]),
+      Some(unknown) => Err(format!("Unknown command: {}", unknown)),
+      None => Err("No command entered".to_string()),
+    }
+  }
+}
+
+impl Commands {
+  /// Parse arguments for the add command
+  fn parse_add(args: &[&str]) -> std::result::Result<Self, String> {
+    let mut add_args = AddArgs { identifier: String::new(), pdf: false, no_pdf: false };
+
+    let mut i = 0;
+    while i < args.len() {
+      match args[i] {
+        "--pdf" => {
+          if add_args.no_pdf {
+            return Err("Cannot specify both --pdf and --no-pdf".to_string());
+          }
+          add_args.pdf = true;
+        },
+        "--no-pdf" => {
+          if add_args.pdf {
+            return Err("Cannot specify both --pdf and --no-pdf".to_string());
+          }
+          add_args.no_pdf = true;
+        },
+        s if !s.starts_with("--") => {
+          if !add_args.identifier.is_empty() {
+            return Err("Multiple identifiers specified".to_string());
+          }
+          add_args.identifier = s.to_string();
+        },
+        unknown => return Err(format!("Unknown flag: {}", unknown)),
+      }
+      i += 1;
+    }
+
+    if add_args.identifier.is_empty() {
+      return Err("Missing paper identifier".to_string());
+    }
+
+    Ok(Commands::Add(add_args))
+  }
+
+  /// Parse arguments for the remove command
+  fn parse_remove(args: &[&str]) -> std::result::Result<Self, String> {
+    let mut remove_args = RemoveArgs {
+      query:      String::new(),
+      filter:     SearchFilter { author: None, source: None, before: None },
+      dry_run:    false,
+      force:      false,
+      remove_pdf: false,
+      keep_pdf:   false,
+    };
+
+    let mut i = 0;
+    while i < args.len() {
+      match args[i] {
+        "--dry-run" => remove_args.dry_run = true,
+        "--force" => remove_args.force = true,
+        "--remove-pdf" => {
+          if remove_args.keep_pdf {
+            return Err("Cannot specify both --remove-pdf and --keep-pdf".to_string());
+          }
+          remove_args.remove_pdf = true;
+        },
+        "--keep-pdf" => {
+          if remove_args.remove_pdf {
+            return Err("Cannot specify both --remove-pdf and --keep-pdf".to_string());
+          }
+          remove_args.keep_pdf = true;
+        },
+        "--author" => {
+          i += 1;
+          if i >= args.len() {
+            return Err("Missing value for --author".to_string());
+          }
+          remove_args.filter.author = Some(args[i].to_string());
+        },
+        "--source" => {
+          i += 1;
+          if i >= args.len() {
+            return Err("Missing value for --source".to_string());
+          }
+          remove_args.filter.source = Some(args[i].to_string());
+        },
+        "--before" => {
+          i += 1;
+          if i >= args.len() {
+            return Err("Missing value for --before".to_string());
+          }
+          remove_args.filter.before = Some(args[i].to_string());
+        },
+        s if !s.starts_with("--") => {
+          if !remove_args.query.is_empty() {
+            return Err("Multiple queries specified".to_string());
+          }
+          remove_args.query = s.to_string();
+        },
+        unknown => return Err(format!("Unknown flag: {}", unknown)),
+      }
+      i += 1;
+    }
+
+    if remove_args.query.is_empty() {
+      return Err("Missing search query".to_string());
+    }
+
+    Ok(Commands::Remove(remove_args))
+  }
+
+  /// Parse arguments for the search command
+  fn parse_search(args: &[&str]) -> std::result::Result<Self, String> {
+    let mut search_args = SearchArgs {
+      query:    String::new(),
+      detailed: false,
+      filter:   SearchFilter { author: None, source: None, before: None },
+    };
+
+    let mut i = 0;
+    while i < args.len() {
+      match args[i] {
+        "--detailed" => search_args.detailed = true,
+        "--author" => {
+          i += 1;
+          if i >= args.len() {
+            return Err("Missing value for --author".to_string());
+          }
+          search_args.filter.author = Some(args[i].to_string());
+        },
+        "--source" => {
+          i += 1;
+          if i >= args.len() {
+            return Err("Missing value for --source".to_string());
+          }
+          search_args.filter.source = Some(args[i].to_string());
+        },
+        "--before" => {
+          i += 1;
+          if i >= args.len() {
+            return Err("Missing value for --before".to_string());
+          }
+          search_args.filter.before = Some(args[i].to_string());
+        },
+        s if !s.starts_with("--") => {
+          if !search_args.query.is_empty() {
+            return Err("Multiple queries specified".to_string());
+          }
+          search_args.query = s.to_string();
+        },
+        unknown => return Err(format!("Unknown flag: {}", unknown)),
+      }
+      i += 1;
+    }
+
+    if search_args.query.is_empty() {
+      return Err("Missing search query".to_string());
+    }
+
+    Ok(Commands::Search(search_args))
+  }
+
+  /// Get help text for this command
+  pub fn help_text(&self) -> &'static str {
+    match self {
+      Commands::Add(_) =>
+        "Usage: add <identifier> [--pdf|--no-pdf]\nAdd a paper to the database by its identifier \
+         (arXiv ID, DOI, or IACR ID)",
+      Commands::Remove(_) =>
+        "Usage: remove <query> [--force] [--dry-run] [--remove-pdf|--keep-pdf] [--author <name>] \
+         [--source <source>] [--before <date>]\nRemove papers matching the query from the database",
+      Commands::Search(_) =>
+        "Usage: search <query> [--detailed] [--author <name>] [--source <source>] [--before \
+         <date>]\nSearch for papers in the database",
+      _ => "Command help not available",
+    }
+  }
+
+  /// Get a list of all available commands
+  pub fn command_list() -> &'static [&'static str] { &["add", "remove", "search"] }
+
+  /// Get a list of all flags for a command
+  pub fn flags_for_command(command: &str) -> &'static [&'static str] {
+    match command {
+      "add" => &["--pdf", "--no-pdf"],
+      "remove" =>
+        &["--force", "--dry-run", "--remove-pdf", "--keep-pdf", "--author", "--source", "--before"],
+      "search" => &["--detailed", "--author", "--source", "--before"],
+      _ => &[],
+    }
+  }
+}
+
 impl UserInteraction for Cli {
+  fn learner(&mut self) -> &mut Learner { self.learner.as_mut().expect("Learner not initialized") }
+
   /// Request confirmation from the user
   ///
   /// Displays a yes/no prompt with the given message and returns the user's choice.
   /// If `accept_defaults` is true, automatically returns false without prompting.
-  fn confirm(&self, message: &str) -> Result<bool> {
+  fn confirm(&mut self, message: &str) -> Result<bool> {
     println!("\n{} {}", style(PROMPT_PREFIX).yellow(), style(message).yellow().bold());
 
-    if self.accept_defaults {
+    if self.args.accept_defaults {
       return Ok(false);
     }
 
@@ -110,7 +317,7 @@ impl UserInteraction for Cli {
   /// Request text input from the user
   ///
   /// Displays a prompt for free-form text input and returns the user's response.
-  fn prompt(&self, message: &str) -> Result<String> {
+  fn prompt(&mut self, message: &str) -> Result<String> {
     let theme = dialoguer::theme::ColorfulTheme::default();
     Ok(Input::with_theme(&theme).with_prompt(message).interact_text()?)
   }
@@ -121,7 +328,7 @@ impl UserInteraction for Cli {
   /// - Paper listings with tree structure
   /// - Detailed paper information
   /// - Success/error/info messages
-  fn reply(&self, content: ResponseContent) -> Result<()> {
+  fn reply(&mut self, content: ResponseContent) -> Result<()> {
     match content {
       ResponseContent::Papers(papers) => {
         if papers.is_empty() {
@@ -194,7 +401,7 @@ impl UserInteraction for Cli {
         if let Some(url) = &paper.pdf_url {
           println!("{}   PDF URL: {}", style(TREE_BRANCH).cyan(), style(url).blue().underlined());
 
-          let pdf_path = Database::default_storage_path().join(paper.filename());
+          let pdf_path = self.learner().config.storage_path.join(paper.filename());
           if pdf_path.exists() {
             println!(
               "{}   {} PDF available at:",

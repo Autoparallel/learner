@@ -19,15 +19,15 @@ install-deps:
     @just header "Installing system dependencies"
     # macOS
     if command -v brew > /dev/null; then \
-        brew install filosottile/musl-cross/musl-cross; \
+        brew install filosottile/musl-cross/musl-cross mingw-w64; \
     fi
     # Linux
     if command -v apt-get > /dev/null; then \
-        sudo apt-get update && sudo apt-get install -y musl-tools; \
+        sudo apt-get update && sudo apt-get install -y musl-tools mingw-w64; \
     elif command -v dnf > /dev/null; then \
-        sudo dnf install -y musl-gcc; \
+        sudo dnf install -y musl-gcc mingw64-gcc; \
     elif command -v pacman > /dev/null; then \
-        sudo pacman -Sy musl; \
+        sudo pacman -Sy musl mingw-w64-gcc; \
     fi
 
 # Install cargo tools
@@ -63,7 +63,7 @@ install-rust-nightly:
 # Install required Rust targets
 install-targets:
     @just header "Installing Rust targets"
-    rustup target add x86_64-unknown-linux-musl aarch64-apple-darwin
+    rustup target add x86_64-unknown-linux-musl aarch64-apple-darwin x86_64-pc-windows-gnu
 
 # Setup complete development environment
 setup: install-deps install-targets install-cargo-tools install-rust-nightly
@@ -75,7 +75,7 @@ build:
     cargo build --workspace --all-targets
 
 # Build with MacOS and Linux targets
-build-all: build-mac build-linux
+build-all: build-mac build-linux build-windows
     @printf "{{success}}{{bold}}All arch builds completed!{{reset}}\n"
 
 # Build just the target
@@ -87,6 +87,11 @@ build-mac:
 build-linux:
     @just header "Building Linux x86_64"
     cargo build --workspace --target x86_64-unknown-linux-musl
+
+# Build the Windows target
+build-windows:
+    @just header "Building Windows x86_64"
+    cargo build --workspace --target x86_64-pc-windows-gnu
 
 # Run the tests on your local OS
 test:
@@ -101,7 +106,7 @@ lint:
     cargo clippy --workspace --all-targets --all-features
 
 # Run clippy for the workspace on MacOS and Linux targets
-lint-all: lint-mac lint-linux
+lint-all: lint-mac lint-linux lint-windows
     @printf "{{success}}{{bold}}All arch lint completed!{{reset}}\n"
 
 # Run clippy for the MacOS target
@@ -113,6 +118,11 @@ lint-mac:
 lint-linux:
     @just header "Checking lint on Linux x86_64"
     cargo clippy --workspace --all-targets --target x86_64-unknown-linux-musl
+
+# Run clippy for the Windows target
+lint-windows:
+    @just header "Checking lint on Windows x86_64"
+    cargo clippy --workspace --all-targets --target x86_64-pc-windows-gnu
 
 # Check for semantic versioning for workspace crates
 semver:
@@ -150,10 +160,12 @@ ci:
     @ERROR=0; \
     just run-single-check "Rust formatting" "cargo fmt --all -- --check" || ERROR=1; \
     just run-single-check "TOML formatting" "taplo fmt --check" || ERROR=1; \
-    just run-single-check "Linux clippy" "cargo clippy --target x86_64-unknown-linux-musl --all-targets --all-features -- --deny warnings" || ERROR=1; \
-    just run-single-check "macOS clippy" "cargo clippy --target aarch64-apple-darwin --all-targets --all-features -- --deny warnings" || ERROR=1; \
     just run-single-check "Linux build" "cargo build --target x86_64-unknown-linux-musl --workspace" || ERROR=1; \
     just run-single-check "macOS build" "cargo build --target aarch64-apple-darwin --workspace" || ERROR=1; \
+    just run-single-check "Windows build" "cargo build --target x86_64-pc-windows-gnu --workspace" || ERROR=1; \
+    just run-single-check "Linux clippy" "cargo clippy --target x86_64-unknown-linux-musl --all-targets --all-features -- --deny warnings" || ERROR=1; \
+    just run-single-check "macOS clippy" "cargo clippy --target aarch64-apple-darwin --all-targets --all-features -- --deny warnings" || ERROR=1; \
+    just run-single-check "Windows clippy" "cargo clippy --target x86_64-pc-windows-gnu --all-targets --all-features -- --deny warnings" || ERROR=1; \
     just run-single-check "Test suite" "cargo test --verbose --workspace" || ERROR=1; \
     just run-single-check "Unused dependencies" "cargo +nightly udeps --workspace" || ERROR=1; \
     just run-single-check "Semver compatibility" "cargo semver-checks check-release --workspace" || ERROR=1; \

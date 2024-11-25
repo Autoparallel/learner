@@ -14,9 +14,9 @@
 use learner::format::format_title;
 use ratatui::{
   layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
-  style::{Color, Style},
+  style::{Color, Modifier, Style},
   text::{Line, Span},
-  widgets::{Block, Borders, Clear, List, ListItem, Padding, Paragraph, Wrap},
+  widgets::{Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph, Wrap},
   Frame,
 };
 
@@ -52,30 +52,244 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   /// Creates a new drawer instance.
   pub fn new(frame: &'a mut Frame<'b>, state: &'a mut UIState) -> Self { Self { frame, state } }
 
-  /// Main drawing entry point, handles the entire UI render.
-  ///
-  /// This method:
-  /// 1. Splits the layout into main sections
-  /// 2. Draws the paper list and details
-  /// 3. Handles any active dialogs
-  /// 4. Updates the redraw state
+  /// Draws the whole TUI
   pub fn draw(&mut self) {
     let frame_size = self.frame.area();
     let (left_area, right_area) = self.split_layout(frame_size);
 
     self.draw_paper_list(left_area);
-    // TODO (autoparallel): prefer not to clone if we can.
     if let Some(paper) = self.state.selected_paper().cloned() {
       self.draw_paper_details(&paper, right_area);
     }
 
-    match self.state.dialog {
+    // TODO (autoparallel): This could definitely be made far more simple
+    match &self.state.dialog {
       DialogType::ExitConfirm => self.draw_exit_dialog(),
       DialogType::PDFNotFound => self.draw_pdf_not_found_dialog(),
+      DialogType::CommandInput => self.draw_command_input(),
+      DialogType::RemoveConfirm { papers, args } =>
+        self.draw_remove_confirm_dialog(&papers.clone(), &args.clone()),
+      DialogType::SearchResults { papers, query, selected } =>
+        self.draw_search_results(&papers.clone(), &query.clone(), &selected.clone()),
+      DialogType::PDFConfirm { paper } => self.draw_pdf_confirm_dialog(&paper.clone()),
+      DialogType::Success { message } => self.draw_success_dialog(&message.clone()),
       DialogType::None => {},
     }
 
     self.state.needs_redraw = false;
+  }
+
+  /// Draws the pop up with search results
+  fn draw_search_results(&mut self, papers: &[Paper], query: &str, selected: &ListState) {
+    // Calculate dialog size based on content
+    let width = 60u16.min(self.frame.area().width.saturating_sub(4));
+    let height = 20u16.min(self.frame.area().height.saturating_sub(4));
+
+    let area = centered_rect(width, height, self.frame.area());
+
+    // Create the outer box
+    let block = Block::default()
+      .title(Line::from(vec![
+        Span::styled("Search Results: ", styles::TITLE),
+        Span::styled(format!("\"{}\"", query), Style::default().fg(Color::Yellow)),
+        Span::styled(format!(" ({} found)", papers.len()), Style::default().fg(Color::DarkGray)),
+      ]))
+      .borders(Borders::ALL)
+      .border_style(Style::default().fg(Color::Blue));
+
+    self.frame.render_widget(Clear, area);
+    self.frame.render_widget(block.clone(), area);
+
+    // Create list items for papers
+    let items: Vec<ListItem> = papers
+      .iter()
+      .map(|p| {
+        ListItem::new(vec![
+          Line::from(vec![Span::styled(&p.title, Style::default().fg(Color::White))]),
+          Line::from(vec![Span::styled(
+            format!(
+              "Authors: {}",
+              p.authors.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", ")
+            ),
+            Style::default().fg(Color::DarkGray),
+          )]),
+          Line::from(""),
+        ])
+      })
+      .collect();
+
+    let inner_area = area.inner(Margin { vertical: 1, horizontal: 1 });
+
+    let list = List::new(items)
+      .highlight_style(
+        Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD),
+      )
+      .highlight_symbol("➜ ");
+
+    self.frame.render_stateful_widget(list, inner_area, &mut selected.clone());
+
+    // Draw help text at bottom
+    let help_text = Line::from(vec![
+      Span::styled("↑↓", styles::KEY_HIGHLIGHT),
+      Span::styled(": navigate • ", styles::HELP),
+      Span::styled("Enter", styles::KEY_HIGHLIGHT),
+      Span::styled(": select • ", styles::HELP),
+      Span::styled("Esc", styles::KEY_HIGHLIGHT),
+      Span::styled(": cancel", styles::HELP),
+    ]);
+
+    let help_area =
+      Rect { x: area.x, y: area.y + area.height - 2, width: area.width, height: 1 };
+
+    self.frame.render_widget(Paragraph::new(help_text).alignment(Alignment::Center), help_area);
+  }
+
+  /// Draws the pop up for removal
+  fn draw_remove_confirm_dialog(&mut self, papers: &[Paper], remove_args: &RemoveArgs) {
+    let mut content = vec![
+      Line::from(vec![
+        Span::styled(
+          format!("Remove {} paper(s) matching ", papers.len()),
+          Style::default().fg(Color::White),
+        ),
+        Span::styled(format!("\"{}\"", remove_args.query), Style::default().fg(Color::Yellow)),
+        Span::styled("?", Style::default().fg(Color::White)),
+      ]),
+      Line::from(""),
+    ];
+
+    // Show list of papers to be removed
+    for paper in papers.iter().take(5) {
+      content.push(Line::from(vec![
+        Span::styled("• ", Style::default().fg(Color::Red)),
+        Span::styled(&paper.title, Style::default().fg(Color::White)),
+      ]));
+    }
+
+    if papers.len() > 5 {
+      content.push(Line::from(vec![Span::styled(
+        format!("  ... and {} more", papers.len() - 5),
+        Style::default().fg(Color::DarkGray),
+      )]));
+    }
+
+    content.push(Line::from(""));
+    content.push(Line::from(vec![
+      Span::styled("Press ", styles::HELP),
+      Span::styled("y", styles::KEY_HIGHLIGHT.add_modifier(Modifier::BOLD)),
+      Span::styled(" to confirm, ", styles::HELP),
+      Span::styled("n", styles::KEY_HIGHLIGHT.add_modifier(Modifier::BOLD)),
+      Span::styled(" to cancel", styles::HELP),
+    ]));
+
+    self.draw_dialog("Confirm Remove", &content, Color::Red);
+  }
+
+  /// Draws the download confirm popup
+  fn draw_pdf_confirm_dialog(&mut self, paper: &Paper) {
+    let content = vec![
+      Line::from(Span::styled(
+        format!("Download PDF for paper: {}", paper.title),
+        Style::default().fg(Color::White),
+      )),
+      Line::from(""),
+      Line::from(vec![
+        Span::styled("Press ", styles::HELP),
+        Span::styled("y", styles::KEY_HIGHLIGHT.add_modifier(Modifier::BOLD)),
+        Span::styled(" to download, ", styles::HELP),
+        Span::styled("n", styles::KEY_HIGHLIGHT.add_modifier(Modifier::BOLD)),
+        Span::styled(" to skip", styles::HELP),
+      ]),
+    ];
+
+    self.draw_dialog("Download PDF?", &content, Color::Blue);
+  }
+
+  /// Draws the pop up showing success
+  fn draw_success_dialog(&mut self, message: &str) {
+    let content = vec![
+      Line::from(Span::styled(message, Style::default().fg(Color::White))),
+      Line::from(""),
+      Line::from(vec![
+        Span::styled("Press ", styles::HELP),
+        Span::styled("Enter", styles::KEY_HIGHLIGHT.add_modifier(Modifier::BOLD)),
+        Span::styled(" to continue", styles::HELP),
+      ]),
+    ];
+
+    self.draw_dialog("Success", &content, Color::Green);
+  }
+
+  /// Draws the command input area
+  fn draw_command_input(&mut self) {
+    let area = Rect {
+      x:      0,
+      y:      self.frame.area().height - 1,
+      width:  self.frame.area().width,
+      height: 1,
+    };
+
+    // Construct the display string with cursor
+    let buffer = &self.state.command_buffer;
+    let before_cursor = &buffer.input[..buffer.cursor_position];
+    let after_cursor = &buffer.input[buffer.cursor_position..];
+    let cursor_char = if buffer.cursor_position < buffer.input.len() {
+      &buffer.input[buffer.cursor_position..].chars().next().unwrap().to_string()
+    } else {
+      " "
+    };
+
+    // Show error or completions if any
+    let mut command_content = Vec::new();
+    if let Some(error) = &buffer.error {
+      command_content.push(Span::styled(":", Style::default().fg(Color::Yellow)));
+      command_content.push(Span::styled(before_cursor, Style::default().fg(Color::Yellow)));
+      command_content.push(Span::styled(
+        cursor_char,
+        Style::default().fg(Color::Yellow).bg(Color::DarkGray).add_modifier(Modifier::BOLD),
+      ));
+      command_content.push(Span::styled(
+        if buffer.cursor_position < buffer.input.len() { &after_cursor[1..] } else { "" },
+        Style::default().fg(Color::Yellow),
+      ));
+
+      // Draw error message above command line
+      let error_area = Rect { x: 0, y: area.y - 1, width: area.width, height: 1 };
+      let error_text = Paragraph::new(Line::from(vec![
+        Span::styled("Error: ", Style::default().fg(Color::Red)),
+        Span::styled(error, Style::default().fg(Color::Red)),
+      ]));
+      self.frame.render_widget(Clear, error_area);
+      self.frame.render_widget(error_text, error_area);
+    } else {
+      // Show completions if we're at the end of the input
+      let completions = buffer.get_completions();
+      if !completions.is_empty() && buffer.cursor_position == buffer.input.len() {
+        let completions_area =
+          Rect { x: 0, y: area.y - 1, width: area.width, height: 1 };
+        let completion_text = Paragraph::new(Line::from(vec![
+          Span::styled("Completions: ", Style::default().fg(Color::Blue)),
+          Span::styled(completions.join(" "), Style::default().fg(Color::White)),
+        ]));
+        self.frame.render_widget(Clear, completions_area);
+        self.frame.render_widget(completion_text, completions_area);
+      }
+
+      command_content.push(Span::styled(":", Style::default().fg(Color::Yellow)));
+      command_content.push(Span::styled(before_cursor, Style::default().fg(Color::Yellow)));
+      command_content.push(Span::styled(
+        cursor_char,
+        Style::default().fg(Color::Yellow).bg(Color::DarkGray).add_modifier(Modifier::BOLD),
+      ));
+      command_content.push(Span::styled(
+        if buffer.cursor_position < buffer.input.len() { &after_cursor[1..] } else { "" },
+        Style::default().fg(Color::Yellow),
+      ));
+    }
+
+    let command_line = Paragraph::new(Line::from(command_content));
+    self.frame.render_widget(Clear, area);
+    self.frame.render_widget(command_line, area);
   }
 
   /// Splits the main layout into left and right panes.
@@ -134,6 +348,9 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
       Span::styled(" • ", Style::default().fg(Color::Blue)),
       Span::styled("o", styles::KEY_HIGHLIGHT.add_modifier(ratatui::style::Modifier::BOLD)),
       Span::styled(":open", styles::HELP),
+      Span::styled(" • ", Style::default().fg(Color::Blue)),
+      Span::styled(":", styles::KEY_HIGHLIGHT.add_modifier(ratatui::style::Modifier::BOLD)),
+      Span::styled(":command", styles::HELP),
       Span::styled(" • ", Style::default().fg(Color::Blue)),
       Span::styled("q", styles::KEY_HIGHLIGHT.add_modifier(ratatui::style::Modifier::BOLD)),
       Span::styled(":quit", styles::HELP),
@@ -482,4 +699,17 @@ fn calculate_abstract_lines(text: &str, area: Rect) -> usize {
       wrapped_lines
     })
     .count()
+}
+
+/// Calculates dimensions and position for a centered rectangular box
+fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
+  let x = (r.width.saturating_sub(width)) / 2;
+  let y = (r.height.saturating_sub(height)) / 2;
+
+  Rect {
+    x:      r.x + x,
+    y:      r.y + y,
+    width:  width.min(r.width),
+    height: height.min(r.height),
+  }
 }

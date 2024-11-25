@@ -18,7 +18,7 @@ pub struct SearchArgs {
 }
 
 /// Filter options for paper searches
-#[derive(Args, Clone)]
+#[derive(Args, Clone, Debug)]
 pub struct SearchFilter {
   /// Filter by author name
   #[arg(long)]
@@ -43,18 +43,18 @@ pub struct SearchFilter {
 
 /// Function for the [`Commands::Search`] in the CLI.
 pub async fn search<I: UserInteraction>(
-  interaction: &I,
-  mut learner: Learner,
-  search_options: SearchArgs,
+  interaction: &mut I,
+  search_args: SearchArgs,
 ) -> Result<()> {
-  let SearchArgs { query, detailed, filter } = search_options;
+  let SearchArgs { query, detailed, filter } = search_args;
 
   // Get initial result set from text search
-  let mut papers = Query::text(&query).execute(&mut learner.database).await?;
+  let mut papers = Query::text(&query).execute(&mut interaction.learner().database).await?;
 
   // Filter by author if specified
   if let Some(author) = &filter.author {
-    let author_papers = Query::by_author(author).execute(&mut learner.database).await?;
+    let author_papers =
+      Query::by_author(author).execute(&mut interaction.learner().database).await?;
     papers.retain(|p| author_papers.contains(p));
   }
 

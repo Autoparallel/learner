@@ -11,6 +11,7 @@
 //! and view updates through a clean state transition system.
 
 use crossterm::event::KeyCode;
+use event::KeyModifiers;
 use ratatui::widgets::ListState;
 
 use super::*;
@@ -38,13 +39,37 @@ pub enum DialogType {
   ExitConfirm,
   /// Showing the PDF not found error dialog
   PDFNotFound,
+  /// Dialog used when entering a command
+  CommandInput,
+  /// Dialog used when confirming a PDF download
+  PDFConfirm {
+    /// The paper to download a PDF for
+    paper: Paper,
+  },
+  /// Dialog used when removing papers
+  RemoveConfirm {
+    /// The list of papers that will be removed
+    papers: Vec<Paper>,
+    /// The additional arguments used for removal
+    args:   RemoveArgs,
+  },
+  /// The results of search made
+  SearchResults {
+    /// The search term used
+    query:    String,
+    /// The papers that match the search
+    papers:   Vec<Paper>,
+    /// Which paper in the list is currently selected
+    selected: ListState,
+  },
+  /// Message displayed when an operation has occured successfully
+  Success {
+    /// The message to display
+    message: String,
+  },
 }
 
 /// Maintains the complete state of the terminal interface.
-///
-/// This struct is the single source of truth for the UI state,
-/// managing everything from the list of papers to scroll positions
-/// and dialog states.
 pub struct UIState {
   /// List of papers from the database
   pub papers:          Vec<Paper>,
@@ -60,17 +85,16 @@ pub struct UIState {
   pub max_scroll:      Option<usize>,
   /// Whether the UI needs to be redrawn
   pub needs_redraw:    bool,
+  /// Status message to display
+  pub status_message:  Option<String>,
+  /// Stores the current state of the entered command
+  pub command_buffer:  CommandBuffer,
+  /// The command that is to be executed
+  pub pending_command: Option<Commands>,
 }
 
 impl UIState {
   /// Creates a new UI state with the given papers.
-  ///
-  /// Initializes with default values:
-  /// - First paper selected
-  /// - List pane focused
-  /// - No active dialog
-  /// - Scroll position at 0
-  /// - Needs initial draw
   pub fn new(papers: Vec<Paper>) -> Self {
     let mut selected = ListState::default();
     selected.select(Some(0));
@@ -82,7 +106,16 @@ impl UIState {
       scroll_position: 0,
       max_scroll: None,
       needs_redraw: true,
+      status_message: None,
+      command_buffer: CommandBuffer::new(),
+      pending_command: None,
     }
+  }
+
+  /// Sets a status message to display
+  pub fn set_status_message(&mut self, message: String) {
+    self.status_message = Some(message);
+    self.needs_redraw = true;
   }
 
   /// Returns a reference to the currently selected paper.
@@ -93,20 +126,194 @@ impl UIState {
     self.selected.selected().map(|i| &self.papers[i])
   }
 
-  /// Handles all keyboard input based on current state.
-  ///
-  /// Returns true if the application should exit, false otherwise.
-  ///
-  /// Input handling varies based on:
-  /// - Current active dialog
-  /// - Focused pane
-  /// - Current scroll position
-  pub fn handle_input(&mut self, key: KeyCode) -> bool {
-    match self.dialog {
+  /// Handles button inputs in the home page
+  pub fn handle_input(&mut self, key: KeyCode, modifiers: KeyModifiers) -> bool {
+    match &self.dialog {
       DialogType::ExitConfirm => self.handle_exit_dialog(key),
       DialogType::PDFNotFound => self.handle_pdf_not_found_dialog(key),
+      DialogType::CommandInput { .. } => self.handle_command_input(key, modifiers),
+      DialogType::RemoveConfirm { .. } => self.handle_remove_confirm(key),
+      DialogType::SearchResults { .. } => self.handle_search_results(key),
+      DialogType::PDFConfirm { .. } => self.handle_pdf_confirm(key),
+      DialogType::Success { .. } => {
+        if matches!(key, KeyCode::Enter | KeyCode::Esc) {
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        }
+        false
+      },
       DialogType::None => self.handle_normal_input(key),
     }
+  }
+
+  /// Handles the search result pop up
+  fn handle_search_results(&mut self, key: KeyCode) -> bool {
+    if let DialogType::SearchResults { papers, selected, .. } = &mut self.dialog {
+      match key {
+        KeyCode::Up | KeyCode::Char('k') => {
+          // Move selection up
+          if let Some(i) = selected.selected() {
+            if i > 0 {
+              selected.select(Some(i - 1));
+              self.needs_redraw = true;
+            }
+          }
+        },
+        KeyCode::Down | KeyCode::Char('j') => {
+          // Move selection down
+          if let Some(i) = selected.selected() {
+            if i < papers.len() - 1 {
+              selected.select(Some(i + 1));
+              self.needs_redraw = true;
+            }
+          }
+        },
+        KeyCode::Enter => {
+          // Find the selected paper in the main list and focus on it
+          if let Some(selected_idx) = selected.selected() {
+            let selected_paper = &papers[selected_idx];
+
+            // Find this paper in the main list
+            if let Some(main_idx) = self.papers.iter().position(|p| {
+              p.source == selected_paper.source
+                && p.source_identifier == selected_paper.source_identifier
+            }) {
+              // Focus on the paper in the main list
+              self.selected.select(Some(main_idx));
+            }
+          }
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        KeyCode::Esc => {
+          // Cancel search
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        _ => {},
+      }
+    }
+    false
+  }
+
+  /// Handles the remove paper pop up
+  fn handle_remove_confirm(&mut self, key: KeyCode) -> bool {
+    if let DialogType::RemoveConfirm { args, .. } = &self.dialog {
+      match key {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+          // Clone args and set force to true to bypass further confirmations
+          let mut confirmed_args = args.clone();
+          confirmed_args.force = true;
+          self.pending_command = Some(Commands::Remove(confirmed_args));
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        _ => {},
+      }
+    }
+    false
+  }
+
+  /// Handles inputs when typing a command
+  fn handle_command_input(&mut self, key: KeyCode, modifiers: KeyModifiers) -> bool {
+    match (key, modifiers) {
+      (key, KeyModifiers::NONE) => match key {
+        KeyCode::Esc => {
+          self.command_buffer.reset();
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        KeyCode::Enter => {
+          if let Some(cmd) = self.command_buffer.try_execute() {
+            // Set the pending command and exit command mode
+            self.pending_command = Some(cmd);
+            self.command_buffer.reset();
+            self.dialog = DialogType::None;
+          }
+          self.needs_redraw = true;
+        },
+        KeyCode::Char(c) => {
+          self.command_buffer.insert_char(c);
+          self.needs_redraw = true;
+        },
+        KeyCode::Backspace => {
+          self.command_buffer.backspace();
+          self.needs_redraw = true;
+        },
+        KeyCode::Left => {
+          self.command_buffer.move_cursor_left();
+          self.needs_redraw = true;
+        },
+        KeyCode::Right => {
+          self.command_buffer.move_cursor_right();
+          self.needs_redraw = true;
+        },
+        KeyCode::Up => {
+          self.command_buffer.previous_history();
+          self.needs_redraw = true;
+        },
+        KeyCode::Down => {
+          self.command_buffer.next_history();
+          self.needs_redraw = true;
+        },
+        KeyCode::Tab => {
+          // Get completions
+          let completions = self.command_buffer.get_completions();
+          if completions.len() == 1 {
+            // Single completion - use it
+            let parts: Vec<&str> = self.command_buffer.input.split_whitespace().collect();
+            let new_input = if parts.len() <= 1 {
+              // Completing command
+              format!("{} ", completions[0])
+            } else {
+              // Completing flag
+              let base =
+                &self.command_buffer.input[..self.command_buffer.input.rfind(' ').unwrap() + 1];
+              format!("{}{} ", base, completions[0])
+            };
+            self.command_buffer.input = new_input;
+            self.command_buffer.cursor_position = self.command_buffer.input.len();
+          }
+          self.needs_redraw = true;
+        },
+        _ => {},
+      },
+      (KeyCode::Char('w'), KeyModifiers::CONTROL) => {
+        self.command_buffer.delete_word();
+        self.needs_redraw = true;
+      },
+
+      _ => {},
+    }
+    false
+  }
+
+  /// Handles the confirmation popup when asked to download a PDF
+  fn handle_pdf_confirm(&mut self, key: KeyCode) -> bool {
+    if let DialogType::PDFConfirm { paper } = &self.dialog {
+      match key {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+          // Store paper for command execution
+          self.pending_command = Some(Commands::Add(AddArgs {
+            identifier: paper.source_identifier.clone(),
+            pdf:        true,
+            no_pdf:     false,
+          }));
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+          self.dialog = DialogType::None;
+          self.needs_redraw = true;
+        },
+        _ => {},
+      }
+    }
+    false
   }
 
   /// Handles input while the exit confirmation dialog is active.
@@ -174,6 +381,11 @@ impl UIState {
       },
       KeyCode::Char('o') => {
         self.handle_open_pdf();
+        false
+      },
+      KeyCode::Char(':') => {
+        self.dialog = DialogType::CommandInput;
+        self.needs_redraw = true;
         false
       },
       _ => false,
@@ -264,5 +476,182 @@ impl UIState {
   #[cfg(target_os = "linux")]
   fn open_pdf_with_system_viewer(&self, path: &str) {
     let _ = std::process::Command::new("xdg-open").arg(path).spawn();
+  }
+}
+
+/// The buffer for writing commands into
+#[derive(Default, Debug)]
+pub struct CommandBuffer {
+  /// Current command text
+  pub input:            String,
+  /// Cursor position within the text
+  pub cursor_position:  usize,
+  /// Command history
+  pub history:          Vec<String>,
+  /// Current position when navigating history (-1 means current input)
+  pub history_position: isize,
+  /// Saves current input when navigating history
+  pub current_input:    String,
+  /// Current error message, if any
+  pub error:            Option<String>,
+}
+
+impl CommandBuffer {
+  /// Creates a new buffer for commands ran in the TUI
+  pub fn new() -> Self {
+    Self {
+      input:            String::new(),
+      cursor_position:  0,
+      history:          Vec::new(),
+      history_position: -1,
+      current_input:    String::new(),
+      error:            None,
+    }
+  }
+
+  /// Try to execute the current command
+  pub fn try_execute(&mut self) -> Option<Commands> {
+    self.error = None;
+
+    // Trim the input to remove any leading/trailing whitespace
+    let input = self.input.trim();
+
+    // Skip empty commands
+    if input.is_empty() {
+      return None;
+    }
+
+    // Parse the command
+    match Commands::from_str(input) {
+      Ok(cmd) => {
+        // Add to history only if successful
+        if !input.is_empty() {
+          self.history.push(input.to_string());
+        }
+        self.reset();
+        Some(cmd)
+      },
+      Err(e) => {
+        self.error = Some(e);
+        None
+      },
+    }
+  }
+
+  /// Try to get command completion suggestions
+  pub fn get_completions(&self) -> Vec<String> {
+    let input = self.input.trim();
+
+    // No input - show all commands
+    if input.is_empty() {
+      return Commands::command_list().iter().map(|&s| s.to_string()).collect();
+    }
+
+    // Split into command and current word
+    let parts: Vec<&str> = input.split_whitespace().collect();
+
+    match parts.first() {
+      // If we just have a partial command, complete the command
+      Some(&cmd) if parts.len() == 1 => Commands::command_list()
+        .iter()
+        .filter(|c| c.starts_with(cmd))
+        .map(|&s| s.to_string())
+        .collect(),
+      // If we have a command and are starting a flag
+      Some(&cmd) if parts.last().unwrap().starts_with("--") => {
+        let current = parts.last().unwrap();
+        Commands::flags_for_command(cmd)
+          .iter()
+          .filter(|f| f.starts_with(current))
+          .map(|&s| s.to_string())
+          .collect()
+      },
+      // Otherwise no completions
+      _ => Vec::new(),
+    }
+  }
+
+  /// Insert character at current cursor position
+  pub fn insert_char(&mut self, c: char) {
+    self.error = None;
+    self.input.insert(self.cursor_position, c);
+    self.cursor_position += 1;
+  }
+
+  /// Delete character before cursor
+  pub fn backspace(&mut self) {
+    self.error = None;
+    if self.cursor_position > 0 {
+      self.cursor_position -= 1;
+      self.input.remove(self.cursor_position);
+    }
+  }
+
+  /// Move cursor left
+  pub fn move_cursor_left(&mut self) {
+    if self.cursor_position > 0 {
+      self.cursor_position -= 1;
+    }
+  }
+
+  /// Move cursor right
+  pub fn move_cursor_right(&mut self) {
+    if self.cursor_position < self.input.len() {
+      self.cursor_position += 1;
+    }
+  }
+
+  /// Delete word before cursor
+  pub fn delete_word(&mut self) {
+    self.error = None;
+    // Find the start of the current word
+    let mut word_start = self.cursor_position;
+    while word_start > 0 && !self.input[..word_start].chars().last().unwrap().is_whitespace() {
+      word_start -= 1;
+    }
+    // Remove from word start to cursor
+    self.input.replace_range(word_start..self.cursor_position, "");
+    self.cursor_position = word_start;
+  }
+
+  /// Navigate to previous command in history
+  pub fn previous_history(&mut self) {
+    if self.history.is_empty() {
+      return;
+    }
+
+    // Save current input if just starting history navigation
+    if self.history_position == -1 {
+      self.current_input = self.input.clone();
+    }
+
+    // Move up in history if possible
+    if self.history_position < (self.history.len() as isize - 1) {
+      self.history_position += 1;
+      self.input = self.history[self.history.len() - 1 - self.history_position as usize].clone();
+      self.cursor_position = self.input.len();
+    }
+  }
+
+  /// Navigate to next command in history
+  pub fn next_history(&mut self) {
+    if self.history_position >= 0 {
+      self.history_position -= 1;
+      if self.history_position == -1 {
+        self.input = self.current_input.clone();
+      } else {
+        self.input = self.history[self.history.len() - 1 - self.history_position as usize].clone();
+      }
+      self.cursor_position = self.input.len();
+    }
+  }
+
+  /// Reset the command buffer
+  pub fn reset(&mut self) {
+    self.input.clear();
+    self.cursor_position = 0;
+    self.history_position = -1;
+    self.current_input.clear();
+    self.error = None;
   }
 }
