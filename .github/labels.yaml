@@ -18,22 +18,13 @@
   color: "5319e7"
   description: "Further information is requested"
 
-- name: "structure 📦"
+- name: "structure 🧱"
   color: "0052cc"
   description: "Structure refactors or changes"
 
 - name: "test ✏️"
   color: "0e8a16"
   description: "Testing improvements"
-
-# Additional labels for your roadmap items
-- name: "phase-1 🎯"
-  color: "0052cc"
-  description: "Core functionality implementation"
-
-- name: "phase-2 🚀"
-  color: "5319e7"
-  description: "Advanced features implementation"
 
 - name: "priority-high 🔥"
   color: "b60205"
