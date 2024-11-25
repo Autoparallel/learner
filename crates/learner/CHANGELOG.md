@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3](https://github.com/Autoparallel/learner/compare/learner-v0.8.2...learner-v0.8.3) - 2024-11-25
+
+### Added
+- tui commands ([#102](https://github.com/Autoparallel/learner/pull/102))
+
 ## [0.8.2](https://github.com/Autoparallel/learner/compare/learner-v0.8.1...learner-v0.8.2) - 2024-11-23
 
 ### Other
