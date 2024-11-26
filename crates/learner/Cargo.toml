@@ -10,8 +10,7 @@ readme.workspace     = true
 repository.workspace = true
 version              = "0.8.3"
 
-build   = "build.rs"
-include = ["../../config/retrievers/*.toml"]
+build = "build.rs"
 
 [dependencies]
 async-trait    = { workspace = true }
