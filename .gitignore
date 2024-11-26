@@ -1,7 +1,5 @@
-# Build generated
 /target
 .env
-crates/**/config/*
 
 # PDFLaTeX stuff
 *.aux

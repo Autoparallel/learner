@@ -174,6 +174,13 @@ pub mod pdf;
 
 use crate::{database::*, error::*, retriever::*};
 
+/// ArXiv default configuration
+pub const ARXIV_CONFIG: &str = include_str!("../config/retrievers/arxiv.toml");
+/// DOI default configuration
+pub const DOI_CONFIG: &str = include_str!("../config/retrievers/doi.toml");
+/// IACR default configuration
+pub const IACR_CONFIG: &str = include_str!("../config/retrievers/iacr.toml");
+
 /// Common traits and types for ergonomic imports.
 ///
 /// This module provides a convenient way to import frequently used traits
@@ -396,12 +403,9 @@ impl Config {
     let retrievers_dir = &config.retrievers_path;
     std::fs::create_dir_all(retrievers_dir)?;
 
-    // Include default retriever configs as const strings
-    const ARXIV_CONFIG: &str = include_str!("../config/retrievers/arxiv.toml");
-    const DOI_CONFIG: &str = include_str!("../config/retrievers/doi.toml");
-
     std::fs::write(retrievers_dir.join("arxiv.toml"), ARXIV_CONFIG)?;
     std::fs::write(retrievers_dir.join("doi.toml"), DOI_CONFIG)?;
+    std::fs::write(retrievers_dir.join("iacr.toml"), IACR_CONFIG)?;
 
     Ok(config)
   }

@@ -9,8 +9,6 @@ readme.workspace     = true
 repository.workspace = true
 version              = "0.3.0"
 
-build = "../../build.rs"
-
 [[bin]]
 name = "learner"
 path = "src/main.rs"
