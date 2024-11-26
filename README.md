@@ -58,7 +58,7 @@ learner = { version = "*" }  # Uses latest version
 ### CLI Tool
 
 ```bash
-cargo install learnerd
+cargo +nightly install learnerd --features tui
 ```
 
 This installs both the CLI tool and TUI interface, accessible via the `learner` command.
