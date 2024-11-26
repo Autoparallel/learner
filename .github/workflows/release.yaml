@@ -8,6 +8,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   release:
@@ -32,12 +35,23 @@ jobs:
         run: cargo semver-checks check-release --workspace
 
       - name: Update Cargo.lock
-        uses: stefanzweifel/git-auto-commit-action@v5  # Better commit action
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: update Cargo.lock"
           file_pattern: "Cargo.lock"
 
+      # Dry run for PRs
+      - name: Run release-plz (dry run)
+        if: github.event_name == 'pull_request'
+        uses: MarcoIeni/release-plz-action@v0.5.41
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_PLZ_DRY_RUN: true
+
+      # Real release for main
       - name: Run release-plz
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: MarcoIeni/release-plz-action@v0.5.41
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
