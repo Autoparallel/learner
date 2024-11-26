@@ -9,8 +9,8 @@ readme.workspace     = true
 repository.workspace = true
 version              = "0.3.0"
 
-build   = "../../build.rs"
-include = ["../../build.rs", "../../config/retrievers/*.toml"]
+build   = "build.rs"
+include = ["../../config/retrievers/*.toml"]
 
 [[bin]]
 name = "learner"
