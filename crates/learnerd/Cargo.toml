@@ -7,7 +7,9 @@ license.workspace    = true
 name                 = "learnerd"
 readme.workspace     = true
 repository.workspace = true
-version              = "0.2.2"
+version              = "0.3.0"
+
+build = "../../build.rs"
 
 [[bin]]
 name = "learner"
