@@ -35,6 +35,7 @@ tracing-subscriber = { workspace = true }
 # TUI dependencies (optional)
 crossterm = { workspace = true, optional = true }
 ratatui   = { workspace = true, optional = true }
+clap_complete = "4.5.38"
 
 # Non-nix dependencies
 [target.'cfg(not(target_os = "windows"))'.dependencies]
