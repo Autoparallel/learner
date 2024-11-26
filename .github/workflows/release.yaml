@@ -23,12 +23,6 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.head_ref || github.ref_name }}
           
-      - name: Fetch base ref for PR
-        if: github.event_name == 'pull_request'
-        run: |
-          git fetch origin ${{ github.base_ref }}
-          git checkout -b PR_BRANCH
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -41,28 +35,17 @@ jobs:
       - name: Run semver checks
         run: cargo semver-checks check-release --workspace
 
-      # Build to generate files
-      - name: Build
-        run: cargo build
-
-      # Combined commit for both Cargo.lock and generated files
-      - name: Update generated files
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: update Cargo.lock and generated files"
-          file_pattern: |
-            Cargo.lock
-            crates/*/config/**/*
-
-      # Dry run for PRs
+      # Dry run for PRs using release command
       - name: Run release-plz (dry run)
         if: github.event_name == 'pull_request'
         uses: MarcoIeni/release-plz-action@v0.5.41
+        with:
+          command: release  # Specifically use release command
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_PLZ_DRY_RUN: true
+          RELEASE_PLZ_DRY_RUN: "true"
 
-      # Real release for main
+      # Real release for main using both commands
       - name: Run release-plz
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: MarcoIeni/release-plz-action@v0.5.41
