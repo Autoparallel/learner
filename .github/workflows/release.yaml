@@ -35,19 +35,15 @@ jobs:
       - name: Run semver checks
         run: cargo semver-checks check-release --workspace
 
-      # For PRs, run manual release-plz command to properly handle dry-run
-      - name: Run release-plz dry run
+      # Dry run for PRs using release command
+      - name: Run release-plz (dry run)
         if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          release \
-            --dry-run \
-            --git-token ${GITHUB_TOKEN} \
-            --repo-url https://github.com/${GITHUB_REPOSITORY}
+        uses: MarcoIeni/release-plz-action@v0.5.41
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_PLZ_DRY_RUN: "true"
 
-      # Real release for main using action
+      # Real release for main using both commands
       - name: Run release-plz
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: MarcoIeni/release-plz-action@v0.5.41
