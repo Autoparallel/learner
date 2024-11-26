@@ -1,5 +1,5 @@
 [workspace]
-allow_dirty         = false
+allow_dirty         = true
 dependencies_update = false
 semver_check        = true
 
