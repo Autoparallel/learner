@@ -67,6 +67,8 @@ pub async fn init<I: UserInteraction>(interaction: &mut I, init_args: InitArgs) 
     config
   };
 
+  std::fs::write(Config::default_path()?.join("config.toml"), toml::to_string(&config)?)?;
+
   // Create learner with this configuration and with the default retrievers (arXiv, DOI, IACR)
   if default_retrievers {
     interaction
@@ -80,7 +82,7 @@ pub async fn init<I: UserInteraction>(interaction: &mut I, init_args: InitArgs) 
   interaction.reply(ResponseContent::Success(&format!(
     "Created Learner configuration with\nConfig path: {:?}\nDatabase path: {:?}\nDocument storage \
      path: {:?}",
-    Config::default_path(),
+    Config::default_path()?,
     config.database_path,
     config.storage_path,
   )))?;

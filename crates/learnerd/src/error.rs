@@ -69,4 +69,8 @@ pub enum LearnerdError {
   /// Error parsing a datetime format.
   #[error(transparent)]
   ChronoParse(#[from] chrono::format::ParseError),
+
+  /// Error serializing toml
+  #[error(transparent)]
+  Toml(#[from] toml::ser::Error),
 }
