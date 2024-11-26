@@ -101,6 +101,8 @@ static TREE_LEAF: &str = "└";
 
 /// Command line interface configuration and argument parsing
 #[derive(Parser)]
+#[command(name = "learner")]
+#[command(bin_name = "learner")]
 #[command(author, version, about = "Daemon and CLI for the learner paper management system")]
 pub struct CliArgs {
   /// Verbose mode (-v, -vv, -vvv) for different levels of logging detail
