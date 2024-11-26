@@ -41,12 +41,18 @@ jobs:
       - name: Run semver checks
         run: cargo semver-checks check-release --workspace
 
-      - name: Update Cargo.lock
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      # Build to generate files
+      - name: Build
+        run: cargo build
+
+      # Combined commit for both Cargo.lock and generated files
+      - name: Update generated files
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: update Cargo.lock"
-          file_pattern: "Cargo.lock"
+          commit_message: "chore: update Cargo.lock and generated files"
+          file_pattern: |
+            Cargo.lock
+            crates/*/config/**/*
 
       # Dry run for PRs
       - name: Run release-plz (dry run)
@@ -55,7 +61,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_PLZ_DRY_RUN: true
-          RELEASE_PLZ_ARGS: "--allow-dirty"
 
       # Real release for main
       - name: Run release-plz
@@ -64,4 +69,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          RELEASE_PLZ_ARGS: "--allow-dirty"
