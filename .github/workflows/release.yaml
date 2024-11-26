@@ -40,7 +40,7 @@ jobs:
         if: github.event_name == 'pull_request'
         shell: bash
         run: |
-          release-plz release \
+          release \
             --dry-run \
             --git-token ${GITHUB_TOKEN} \
             --repo-url https://github.com/${GITHUB_REPOSITORY}
