@@ -1,34 +1,64 @@
 //! Command line interface and daemon for the learner paper management system.
 //!
-//! This crate provides a CLI tool for managing academic papers using the `learner` library.
-//! It supports operations like:
+//! This crate provides a CLI tool and optional TUI for managing academic papers using the `learner`
+//! library. It supports both command-line operations and a full-featured terminal interface for
+//! paper management.
+//!
+//! # Features
+//! - Interactive terminal UI with vim-style navigation
 //! - Database initialization and management
 //! - Paper addition and retrieval
-//! - Full-text search across papers
-//! - Database maintenance and cleanup
+//! - Full-text search with filtering
+//! - System daemon for background operations
+//! - PDF management and viewing
 //!
-//! # Usage
+//! # Command Line Usage
 //!
 //! ```bash
 //! # Initialize a new database
-//! learnerd init
+//! learner init
 //!
-//! # Add a paper by its identifier
-//! learnerd add 2301.07041
+//! # Add a paper with optional PDF download
+//! learner add 2301.07041 --pdf
+//! learner add "https://arxiv.org/abs/2301.07041"
+//! learner add "10.1145/1327452.1327492"
 //!
-//! # Retrieve a paper
-//! learnerd get arxiv 2301.07041
+//! # Search papers with filters
+//! learner search "quantum" --author "Alice" --before 2023
+//! learner search "neural networks" --detailed
 //!
-//! # Search for papers
-//! learnerd search "neural networks"
+//! # Remove papers (with confirmation)
+//! learner remove "quantum computing" --remove-pdf
+//! learner remove --author "Smith" --before 2020
 //!
-//! # Clean up the database
-//! learnerd clean
+//! # Daemon management
+//! learner daemon start
+//! learner daemon status
 //! ```
 //!
-//! The CLI provides colored output and interactive confirmations for destructive
-//! operations. It also supports various verbosity levels for debugging through
-//! the `-v` flag.
+//! # Terminal UI
+//!
+//! When built with the `tui` feature, running `learner` with no arguments launches
+//! an interactive terminal interface with:
+//!
+//! - Split-pane view of papers and details
+//! - Vim-style navigation (h/j/k/l)
+//! - PDF availability status and opening
+//! - Real-time paper information display
+//!
+//! # Configuration
+//!
+//! The CLI uses platform-specific default paths:
+//! - Database: `~/.local/share/learner/learner.db` (Unix)
+//! - PDFs: `~/Documents/learner/papers` (Unix)
+//!
+//! All paths can be customized during initialization or via command line options.
+//!
+//! The CLI provides:
+//! - Colored output for better readability
+//! - Interactive confirmations for destructive operations
+//! - Detailed logging with `-v`, `-vv`, `-vvv` verbosity levels
+//! - Dry-run options for testing operations
 
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
@@ -37,8 +67,6 @@ use std::{path::PathBuf, str::FromStr};
 use clap::{builder::ArgAction, Parser, Subcommand};
 use console::style;
 use error::LearnerdError;
-#[cfg(not(target_os = "windows"))]
-use learner::error::LearnerError;
 use learner::{database::Database, paper::Paper, prelude::*, Config, Learner};
 use tracing_subscriber::EnvFilter;
 
