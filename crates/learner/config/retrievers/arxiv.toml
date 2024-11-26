@@ -1,0 +1,32 @@
+base_url          = "http://export.arxiv.org"
+endpoint_template = "http://export.arxiv.org/api/query?id_list={identifier}&max_results=1"
+name              = "arxiv"
+pattern           = "(?:^|https?://arxiv\\.org/(?:abs|pdf)/)(\\d{4}\\.\\d{4,5}|[a-zA-Z-]+(?:\\.[A-Z]{2})?/\\d{7})(?:\\.pdf)?$"
+source            = "arxiv"
+
+[response_format]
+strip_namespaces = true
+type             = "xml"
+
+[response_format.field_maps.title]
+path = "feed/entry/title"
+
+[response_format.field_maps.abstract]
+path = "feed/entry/summary"
+
+[response_format.field_maps.authors]
+path = "feed/entry/author/name"
+
+[response_format.field_maps.publication_date]
+path = "feed/entry/published"
+
+[response_format.field_maps.pdf_url]
+path = "feed/entry/id"
+
+[response_format.field_maps.pdf_url.transform]
+pattern     = "/abs/"
+replacement = "/pdf/"
+type        = "Replace"
+
+[headers]
+Accept = "application/xml"
