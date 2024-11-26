@@ -21,6 +21,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}  # Use PR branch or default to ref_name
+          
+      # For PRs, we need to fetch the base branch for comparison
+      - name: Fetch base ref for PR
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git checkout -b PR_BRANCH
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
