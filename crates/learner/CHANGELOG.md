@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4](https://github.com/Autoparallel/learner/compare/learner-v0.8.3...learner-v0.8.4) - 2024-11-26
+
+### Fixed
+- fix build rs
+- build for release ([#109](https://github.com/Autoparallel/learner/pull/109))
+
+### Other
+- reset all this jazz and just put the things in learner
+- try again
+- retry this build
+- use include
+- add build rs
+- update build.rs locations
+- remove unecessary files
+
 ## [0.8.3](https://github.com/Autoparallel/learner/compare/learner-v0.8.2...learner-v0.8.3) - 2024-11-25
 
 ### Added

@@ -12,7 +12,7 @@ repository = "https://github.com/autoparallel/learner"
 
 [workspace.dependencies]
 # local
-learner = { path = "crates/learner", version = "=0.8.3" }
+learner = { path = "crates/learner", version = "=0.8.4" }
 
 # shared dependencies
 chrono = { version = "0.4", features = ["serde"] }
