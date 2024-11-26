@@ -16,6 +16,17 @@
 
 </div>
 
+[Features](#features)
+[Installation](#installation)
+[Usage](#usage)
+[Configuration](#configuration)
+[Roadmap](#roadmap)
+[Contributing](#contributing)
+[Development](#development)
+[License](#license)
+[Acknowledgements](#acknowledgements)
+
+---
 ## Features
 
 - Paper Metadata Management
@@ -40,9 +51,7 @@
 ### Library
 
 ```toml
-[
-dependencies
-]
+[dependencies]
 learner = { version = "*" }  # Uses latest version
 ```
 
@@ -122,11 +131,39 @@ TUI commands:
 :search   # Search papers
 ```
 
-Search within TUI supports all filters:
+(TODO:) Search within TUI supports all filters:
 ```bash
 :search "quantum" --author "Feynman"
 :search "neural" --source arxiv --before 2023
 ```
+
+### System Daemon Management
+
+`learnerd` can run as a background service for paper monitoring and updates.
+Currently, there are no distinct processes it runs but there is a tracking issue: [issue #83](https://github.com/Autoparallel/learner/issues/83).
+
+#### System Service 
+```bash
+# Install and start
+sudo learnerd daemon install
+sudo systemctl enable --now learnerd  # Linux
+sudo launchctl load /Library/LaunchDaemons/learnerd.daemon.plist  # macOS
+
+# Remove
+sudo learnerd daemon uninstall
+```
+
+#### Logs
+- Linux: /var/log/learnerd/
+- macOS: /Library/Logs/learnerd/
+
+Files: `learnerd.log` (main, rotated daily), `stdout.log`, `stderr.log`
+
+#### Troubleshooting
+
+- **Permission Errors:** Check ownership of log directories
+- **Won't Start:** Check system logs and remove stale PID file if present
+- **Installation:** Run commands as root/sudo
 
 ## Configuration
 
@@ -153,9 +190,7 @@ The `learner` system uses a flexible configuration system that allows customizat
 The configuration file (`config.toml`) allows you to customize:
 ```toml
 # Base configuration
-[
-config
-]
+[config]
 database_path = "/custom/path/to/db.sqlite" # Where the datbase itself is stored
 storage_path = "/custom/path/to/papers"     # Where the documents are stored
 retrievers_path = "/custom/path/to/papers"  # Where configuration for retrievers are stored
@@ -212,33 +247,6 @@ Custom sources must provide:
   - XPath-style field selection
   - Namespace handling
   - Multiple value aggregation
-
-### System Daemon Management
-
-`learnerd` can run as a background service for paper monitoring and updates.
-
-#### System Service 
-```bash
-# Install and start
-sudo learnerd daemon install
-sudo systemctl enable --now learnerd  # Linux
-sudo launchctl load /Library/LaunchDaemons/learnerd.daemon.plist  # macOS
-
-# Remove
-sudo learnerd daemon uninstall
-```
-
-#### Logs
-- Linux: /var/log/learnerd/
-- macOS: /Library/Logs/learnerd/
-
-Files: `learnerd.log` (main, rotated daily), `stdout.log`, `stderr.log`
-
-#### Troubleshooting
-
-- **Permission Errors:** Check ownership of log directories
-- **Won't Start:** Check system logs and remove stale PID file if present
-- **Installation:** Run commands as root/sudo
 
 ## Project Structure
 
@@ -319,25 +327,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <div align="center">
 Made for making learning sh*t less annoying.
 </div>
-
-
-# NOTES:
-```
-# General search
-learner search "quantum computing"
-
-# Detailed output
-learner search "quantum" --detailed
-
-# Author search
-learner search "quantum" --author "Feynman"
-
-# Source filter
-learner search "quantum" --source arxiv
-
-# Date filter
-learner search "quantum" --before 2023-01-01
-
-# Scope limitation
-learner search "quantum" --title-only
-```
