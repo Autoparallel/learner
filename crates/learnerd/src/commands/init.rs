@@ -71,8 +71,8 @@ pub async fn init<I: UserInteraction>(interaction: &mut I, init_args: InitArgs) 
   if default_retrievers {
     interaction
       .reply(ResponseContent::Info("Using the default set of retrievers (arXiv and DOI)."))?;
-    const ARXIV_CONFIG: &str = include_str!("../../../learner/config/retrievers/arxiv.toml");
-    const DOI_CONFIG: &str = include_str!("../../../learner/config/retrievers/doi.toml");
+    const ARXIV_CONFIG: &str = include_str!("../../config/retrievers/arxiv.toml");
+    const DOI_CONFIG: &str = include_str!("../../config/retrievers/doi.toml");
 
     std::fs::write(config.retrievers_path.join("arxiv.toml"), ARXIV_CONFIG)?;
     std::fs::write(config.retrievers_path.join("doi.toml"), DOI_CONFIG)?;
