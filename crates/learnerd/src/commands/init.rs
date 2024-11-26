@@ -71,16 +71,17 @@ pub async fn init<I: UserInteraction>(interaction: &mut I, init_args: InitArgs) 
   if default_retrievers {
     interaction
       .reply(ResponseContent::Info("Using the default set of retrievers (arXiv and DOI)."))?;
-
+    std::fs::create_dir_all(Config::default_path()?.join("retrievers"))?;
     std::fs::write(config.retrievers_path.join("arxiv.toml"), learner::ARXIV_CONFIG)?;
     std::fs::write(config.retrievers_path.join("doi.toml"), learner::DOI_CONFIG)?;
     std::fs::write(config.retrievers_path.join("iacr.toml"), learner::IACR_CONFIG)?;
   }
   Learner::builder().with_config(config.clone()).build().await?;
+  std::fs::write(Config::default_path()?.join("config.toml"), toml::to_string(&config)?)?;
   interaction.reply(ResponseContent::Success(&format!(
     "Created Learner configuration with\nConfig path: {:?}\nDatabase path: {:?}\nDocument storage \
      path: {:?}",
-    Config::default_path(),
+    Config::default_path()?,
     config.database_path,
     config.storage_path,
   )))?;

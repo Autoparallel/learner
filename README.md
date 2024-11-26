@@ -90,7 +90,7 @@ async fn main() -> Result> {
 
 ```bash
 # Initialize database
-learner init
+learner init --default-retrievers
 
 # Add papers
 learner add 2301.07041
