@@ -98,6 +98,30 @@ pub struct Retriever {
   configs: HashMap<String, RetrieverConfig>,
 }
 
+impl Retriever {
+  /// Checks whether the retreivers map is empty.
+  ///
+  /// This is useful for handling the case where no retreivers are specified and
+  /// we wish to inform the user.
+  ///
+  /// # Examples
+  ///
+  /// ```no_run
+  /// # use learner::retriever::Retriever;
+  /// # use learner::error::LearnerError;
+  ///
+  /// # fn check_is_empty() -> Result<(), LearnerError> {
+  /// let retriever = Retriever::new();
+  ///
+  /// if retriever.is_empty() {
+  ///   return Err(LearnerError::Config("No retriever configured.".to_string()));
+  /// }
+  /// # Ok(())
+  /// # }
+  /// ```
+  pub fn is_empty(&self) -> bool { self.configs.is_empty() }
+}
+
 /// Configuration for a specific paper source retriever.
 ///
 /// This struct defines how to interact with a particular paper source's API,

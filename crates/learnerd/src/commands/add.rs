@@ -24,6 +24,12 @@ pub struct AddArgs {
 pub async fn add<I: UserInteraction>(interaction: &mut I, add_args: AddArgs) -> Result<Paper> {
   let AddArgs { identifier, pdf, no_pdf } = add_args;
 
+  if interaction.learner().retriever.is_empty() {
+    return Err(LearnerdError::Learner(LearnerError::Config(
+      "No retriever configured.".to_string(),
+    )));
+  }
+
   let (source, sanitized_identifier) =
     interaction.learner().retriever.sanitize_identifier(&identifier)?;
   let papers = Query::by_source(&source, &sanitized_identifier)
