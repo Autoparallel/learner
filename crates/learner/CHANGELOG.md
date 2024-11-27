@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6](https://github.com/Autoparallel/learner/compare/learner-v0.8.5...learner-v0.8.6) - 2024-11-27
+
+### Fixed
+- fix(`learnerd`) improved error for missing retrievers ([#140](https://github.com/Autoparallel/learner/pull/140))
+
 ## [0.8.5](https://github.com/Autoparallel/learner/compare/learner-v0.8.4...learner-v0.8.5) - 2024-11-26
 
 ### Fixed
