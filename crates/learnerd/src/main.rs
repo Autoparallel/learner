@@ -101,6 +101,8 @@ static TREE_LEAF: &str = "└";
 
 /// Command line interface configuration and argument parsing
 #[derive(Parser)]
+#[command(name = "learner")]
+#[command(bin_name = "learner")]
 #[command(author, version, about = "Daemon and CLI for the learner paper management system")]
 pub struct CliArgs {
   /// Verbose mode (-v, -vv, -vvv) for different levels of logging detail
@@ -125,6 +127,10 @@ pub struct CliArgs {
   /// Skip all prompts and accept defaults (mostly for testing)
   #[arg(long, hide = true, global = true)]
   accept_defaults: bool,
+
+  /// Generate shell completions, using doc strings for subcommand hints
+  #[arg(short = 'g', long = "generate", value_enum)]
+  generator: Option<clap_complete::Shell>,
 }
 
 /// The command line interface for using `Learner`
@@ -182,6 +188,12 @@ fn setup_logging(verbosity: u8) {
 #[tokio::main]
 async fn main() -> Result<()> {
   let args = CliArgs::parse();
+
+  let cmd = &mut <CliArgs as clap::CommandFactory>::command();
+  if let Some(generator) = args.generator {
+    clap_complete::generate(generator, cmd, cmd.get_name().to_string(), &mut std::io::stdout());
+    return Ok(());
+  }
 
   // Handle the command, using TUI as default when enabled
   let command = args.command.clone().unwrap_or_else(|| {

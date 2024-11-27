@@ -20,6 +20,7 @@ tui     = ["dep:ratatui", "dep:crossterm"]
 [dependencies]
 chrono             = { workspace = true }
 clap               = { workspace = true }
+clap_complete      = { workspace = true }
 console            = { workspace = true }
 dialoguer          = { workspace = true }
 glob               = { workspace = true }

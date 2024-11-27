@@ -52,6 +52,7 @@ ratatui   = { version = "0.29" }
 
 # learnerd dependencies
 clap               = { version = "4.5", features = ["derive", "std"] }
+clap_complete      = { version = "4.5" }
 console            = { version = "0.15" }
 dialoguer          = { version = "0.11" }
 glob               = { version = "0.3" }

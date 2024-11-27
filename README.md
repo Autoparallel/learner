@@ -41,7 +41,7 @@
 
 - Interactive Interfaces
   - Terminal User Interface (TUI) with vim-style navigation
-  - Command-line interface (CLI) for scripting and automation
+  - Command-line interface (CLI) for scripting and automation with shell CLI completions
   - Search, filter, and preview functionality
   - Document management and viewing
   - Daemon support for background operations
@@ -62,6 +62,15 @@ cargo +nightly install learnerd --features tui
 ```
 
 This installs both the CLI tool and TUI interface, accessible via the `learner` command.
+
+
+To obtain shell completions for `learner`:
+```
+# replace fish with your shell: bash, zsh or whatever
+# then, move completions to somewhere reasonable, and source them from your shell setup config.
+learner -g fish > learner_completions.fish
+source learner_completions.fish
+```
 
 ## Usage
 
