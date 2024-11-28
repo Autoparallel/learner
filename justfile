@@ -145,6 +145,11 @@ clean:
     @just header "Cleaning build artifacts"
     cargo clean
 
+# Install learnerd binary with TUI feature in debug mode
+debug:
+    @just header "Installing learnerd in debug mode"
+    cargo install --path crates/learnerd --features tui --debug
+
 # Show your relevant environment information
 info:
     @just header "Environment Information"

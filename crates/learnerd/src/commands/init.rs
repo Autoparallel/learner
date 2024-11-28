@@ -16,14 +16,14 @@ pub struct InitArgs {
   pub storage_path: Option<PathBuf>,
 
   /// Whether to use the default set of retrievier configurations.
-  /// Defaults to `true`.
-  #[arg(long, action=ArgAction::SetTrue)]
-  pub default_retrievers: bool,
+  /// Defaults to `false`.
+  #[arg(long)]
+  pub no_default_retrievers: bool,
 }
 
 /// Function for the [`Commands::Init`] in the CLI.
 pub async fn init<I: UserInteraction>(interaction: &mut I, init_args: InitArgs) -> Result<()> {
-  let InitArgs { db_path, storage_path, default_retrievers } = init_args;
+  let InitArgs { db_path, storage_path, no_default_retrievers } = init_args;
   // Throughout, assume we are using default config path (`~/.learner`)
 
   // Set database storage location
@@ -68,9 +68,9 @@ pub async fn init<I: UserInteraction>(interaction: &mut I, init_args: InitArgs) 
   };
 
   // Create learner with this configuration and with the default retrievers (arXiv, DOI, IACR)
-  if default_retrievers {
+  if !no_default_retrievers {
     interaction
-      .reply(ResponseContent::Info("Using the default set of retrievers (arXiv and DOI)."))?;
+      .reply(ResponseContent::Info("Using the default set of retrievers (arXiv, DOI, and DOI)."))?;
     std::fs::create_dir_all(Config::default_path()?.join("retrievers"))?;
     std::fs::write(config.retrievers_path.join("arxiv.toml"), learner::ARXIV_CONFIG)?;
     std::fs::write(config.retrievers_path.join("doi.toml"), learner::DOI_CONFIG)?;
