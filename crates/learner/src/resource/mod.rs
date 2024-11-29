@@ -177,7 +177,7 @@ mod tests {
 
   #[test]
   fn test_thesis_from_toml() -> Result<()> {
-    let toml_str = include_str!("../../config/resource/thesis.toml");
+    let toml_str = include_str!("../../config/resources/thesis.toml");
     let config: ResourceConfig = toml::from_str(toml_str)?;
     dbg!(&config);
 
