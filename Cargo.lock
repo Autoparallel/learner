@@ -1192,6 +1192,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "learner-sdk"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "learner",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "learnerd"
 version = "0.3.5"
 dependencies = [
