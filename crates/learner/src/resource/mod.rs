@@ -7,7 +7,7 @@ mod paper;
 pub use paper::*;
 
 pub trait Resource: Serialize + for<'de> Deserialize<'de> {
-  fn resource_type(&self) -> &'static str;
+  fn resource_type(&self) -> String;
 
   fn fields(&self) -> Result<Map<String, Value>> {
     Ok(
@@ -17,6 +17,16 @@ pub trait Resource: Serialize + for<'de> Deserialize<'de> {
         .ok_or_else(|| LearnerError::InvalidResource)?,
     )
   }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceConfig {
+  type_name: String,
+  fields:    Map<String, Value>,
+}
+
+impl Resource for ResourceConfig {
+  fn resource_type(&self) -> String { self.type_name.clone() }
 }
 
 /// Author information for academic papers.

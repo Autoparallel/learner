@@ -190,5 +190,5 @@ impl Paper {
 }
 
 impl Resource for Paper {
-  fn resource_type(&self) -> &'static str { "paper" }
+  fn resource_type(&self) -> String { "paper".to_string() }
 }
