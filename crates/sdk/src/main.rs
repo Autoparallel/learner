@@ -29,12 +29,6 @@ enum Commands {
   },
 }
 
-#[derive(Clone, Debug, ValueEnum)]
-enum ValidationType {
-  Retriever,
-  Resource,
-}
-
 #[tokio::main]
 async fn main() {
   tracing_subscriber::fmt()
