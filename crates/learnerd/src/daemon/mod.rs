@@ -382,7 +382,7 @@ mod tests {
     let daemon_clone = daemon.clone();
     // Start should create directories
     let _handle = std::thread::spawn(move || daemon.start());
-    std::thread::sleep(std::time::Duration::from_secs(5));
+    std::thread::sleep(std::time::Duration::from_secs(1));
 
     assert!(daemon_clone.working_dir.exists(), "Working directory should be created");
     assert!(daemon_clone.log_dir.exists(), "Log directory should be created");

@@ -19,7 +19,7 @@
 //! Creating papers from different sources:
 //!
 //! ```no_run
-//! use learner::{paper::Paper, Learner};
+//! use learner::{resource::Paper, Learner};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let learner = Learner::builder().build().await?;
@@ -63,7 +63,7 @@ use super::*;
 /// Creating and using papers:
 ///
 /// ```no_run
-/// # use learner::{Learner, paper::Paper};
+/// # use learner::{Learner, resource::Paper};
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Create a Learner instance to connect to a database
 /// let mut learner = Learner::builder().build().await?;
@@ -102,33 +102,6 @@ pub struct Paper {
   pub doi:               Option<String>,
 }
 
-/// Author information for academic papers.
-///
-/// Represents a single author of a paper, including their name and optional
-/// institutional details. This struct supports varying levels of author
-/// information availability across different sources.
-///
-/// # Examples
-///
-/// ```
-/// use learner::paper::Author;
-///
-/// let author = Author {
-///   name:        "Alice Researcher".to_string(),
-///   affiliation: Some("Example University".to_string()),
-///   email:       Some("alice@example.edu".to_string()),
-/// };
-/// ```
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Author {
-  /// Author's full name
-  pub name:        String,
-  /// Optional institutional affiliation
-  pub affiliation: Option<String>,
-  /// Optional contact email
-  pub email:       Option<String>,
-}
-
 impl Paper {
   /// Downloads the paper's PDF to the specified directory.
   ///
@@ -153,7 +126,7 @@ impl Paper {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::{Learner, paper::Paper};
+  /// # use learner::{Learner, resource::Paper};
   /// # use std::path::PathBuf;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// let learner = Learner::builder().build().await?;
@@ -200,7 +173,7 @@ impl Paper {
   /// # Examples
   ///
   /// ```no_run
-  /// # use learner::{Learner, paper::Paper};
+  /// # use learner::{Learner, resource::Paper};
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   ///
   /// let learner = Learner::builder().build().await?;
@@ -214,4 +187,8 @@ impl Paper {
     let formatted_title = format::format_title(&self.title, Some(50));
     PathBuf::from(format!("{}.pdf", formatted_title))
   }
+}
+
+impl Resource for Paper {
+  fn resource_type(&self) -> String { "paper".to_string() }
 }

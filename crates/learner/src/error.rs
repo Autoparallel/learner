@@ -10,7 +10,7 @@
 //! # Examples
 //!
 //! ```
-//! use learner::{error::LearnerError, paper::Paper, Learner};
+//! use learner::{error::LearnerError, resource::Paper, Learner};
 //! // or `use learner::prelude::*` to bring in the error type
 //!
 //! # async fn example() -> Result<(), LearnerError> {
@@ -235,4 +235,33 @@ pub enum LearnerError {
   /// ```
   #[error("{0}")]
   Config(String),
+
+  /// Errors when parsing or working with JSON data.
+  ///
+  /// This error variant wraps errors from serde_json, which can occur during:
+  /// - Serialization of Rust types to JSON
+  /// - Deserialization of JSON to Rust types
+  /// - JSON value manipulation and transformation
+  ///
+  /// Common scenarios include:
+  /// - Invalid JSON syntax
+  /// - Type mismatches during deserialization
+  /// - Missing required fields
+  /// - Numeric conversion failures
+  #[error(transparent)]
+  SerdeJson(#[from] serde_json::Error),
+
+  /// Indicates a resource failed to serialize into a valid structure.
+  ///
+  /// This error occurs when attempting to serialize a resource type
+  /// into JSON and the result is not a simple object structure. This
+  /// typically happens when:
+  /// - The resource type contains complex nested structures
+  /// - The resource serializes to a JSON array instead of an object
+  /// - The resource serializes to a primitive value
+  ///
+  /// The error helps ensure that resources maintain a flat, searchable
+  /// structure that can be properly stored and queried in the database.
+  #[error("A resource must serialize into a flat Rust struct or JSON object.")]
+  InvalidResource,
 }

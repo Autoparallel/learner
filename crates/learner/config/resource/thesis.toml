@@ -1,0 +1,11 @@
+type_name = "thesis"
+
+[fields]
+abstract     = { type = "string", required = false }
+author       = { type = "array", items = "string", required = true }
+committee    = { type = "array", items = "string", required = false }
+defense_date = { type = "string", format = "date-time", required = false }
+department   = { type = "string", required = false, default = "Computer Science" }
+keywords     = { type = "array", items = "string", required = false }
+title        = { type = "string", required = true }
+university   = { type = "string", required = true }

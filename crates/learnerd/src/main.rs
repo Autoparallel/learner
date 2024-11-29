@@ -67,7 +67,7 @@ use std::{path::PathBuf, str::FromStr};
 use clap::{builder::ArgAction, Parser, Subcommand};
 use console::style;
 use error::LearnerdError;
-use learner::{database::Database, paper::Paper, prelude::*, Config, Learner};
+use learner::{database::Database, prelude::*, resource::Paper, Config, Learner};
 use tracing_subscriber::EnvFilter;
 
 pub mod commands;
