@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.6](https://github.com/Autoparallel/learner/compare/learnerd-v0.3.5...learnerd-v0.3.6) - 2024-11-29
+
+### Added
+- `Resource` and `ResourceConfig` ([#144](https://github.com/Autoparallel/learner/pull/144))
+
 ## [0.3.5](https://github.com/Autoparallel/learner/compare/learnerd-v0.3.4...learnerd-v0.3.5) - 2024-11-28
 
 ### Fixed
