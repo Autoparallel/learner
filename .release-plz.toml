@@ -10,3 +10,7 @@ publish = true
 [[package]]
 name    = "learnerd"
 publish = true
+
+[[package]]
+name    = "learner-sdk"
+publish = false
