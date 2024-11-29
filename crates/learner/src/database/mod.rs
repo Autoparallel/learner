@@ -57,7 +57,7 @@ use tokio_rusqlite::Connection;
 use super::*;
 
 mod instruction;
-// pub mod models;
+pub mod record;
 #[cfg(test)] mod tests;
 
 pub use self::instruction::{
@@ -133,10 +133,12 @@ impl Database {
     // Initialize schema
     conn
       .call(|conn| {
-        Ok(conn.execute_batch(include_str!(concat!(
-          env!("CARGO_MANIFEST_DIR"),
-          "/migrations/init.sql"
-        )))?)
+        Ok(
+          conn.execute_batch(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/migrations/v1.sql"
+          )))?,
+        )
       })
       .await?;
 

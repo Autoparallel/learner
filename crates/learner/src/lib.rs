@@ -148,6 +148,7 @@
 #![feature(str_from_utf16_endian)]
 
 use std::{
+  collections::BTreeMap,
   fmt::Display,
   path::{Path, PathBuf},
 };
@@ -174,6 +175,7 @@ pub mod resource;
 use crate::{
   database::*,
   error::*,
+  prelude::*,
   resource::{Author, Paper},
   retriever::*,
 };
