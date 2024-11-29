@@ -133,12 +133,10 @@ impl Database {
     // Initialize schema
     conn
       .call(|conn| {
-        Ok(
-          conn.execute_batch(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/migrations/v1.sql"
-          )))?,
-        )
+        Ok(conn.execute_batch(include_str!(concat!(
+          env!("CARGO_MANIFEST_DIR"),
+          "/migrations/init.sql"
+        )))?)
       })
       .await?;
 
