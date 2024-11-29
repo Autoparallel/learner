@@ -235,4 +235,10 @@ pub enum LearnerError {
   /// ```
   #[error("{0}")]
   Config(String),
+
+  #[error(transparent)]
+  SerdeJson(#[from] serde_json::Error),
+
+  #[error("A resource must serialize into a flat Rust struct or JSON object.")]
+  InvalidResource,
 }

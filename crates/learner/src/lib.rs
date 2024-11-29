@@ -155,7 +155,6 @@ use std::{
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
-use paper::{Author, Paper};
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -169,10 +168,15 @@ pub mod retriever;
 pub mod error;
 pub mod format;
 pub mod llm;
-pub mod paper;
 pub mod pdf;
+pub mod resource;
 
-use crate::{database::*, error::*, retriever::*};
+use crate::{
+  database::*,
+  error::*,
+  resource::{Author, Paper},
+  retriever::*,
+};
 
 /// ArXiv default configuration
 pub const ARXIV_CONFIG: &str = include_str!("../config/retrievers/arxiv.toml");

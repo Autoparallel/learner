@@ -7,9 +7,9 @@ use std::{
 use learner::{
   error::LearnerError,
   llm::{LlamaRequest, Model},
-  paper::{Author, Paper},
   pdf::PDFContentBuilder,
   prelude::*,
+  resource::{Author, Paper},
   Config, Learner,
 };
 use tempfile::{tempdir, TempDir};

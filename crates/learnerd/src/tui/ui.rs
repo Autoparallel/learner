@@ -366,7 +366,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   /// - Source information
   /// - Abstract (scrollable)
   /// - PDF status
-  fn draw_paper_details(&mut self, paper: &learner::paper::Paper, area: Rect) {
+  fn draw_paper_details(&mut self, paper: &Paper, area: Rect) {
     let chunks = Layout::default()
       .direction(Direction::Vertical)
       .margin(1)
@@ -407,7 +407,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   /// - A "Title:" label in the defined label style
   /// - The actual title in white
   /// - Word wrapping enabled for long titles
-  fn draw_title(&mut self, paper: &learner::paper::Paper, area: Rect) {
+  fn draw_title(&mut self, paper: &Paper, area: Rect) {
     let title = Paragraph::new(Line::from(vec![
       Span::styled("Title: ", styles::LABEL),
       Span::styled(&paper.title, Style::default().fg(Color::White)),
@@ -422,7 +422,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   /// - An "Authors:" label in the defined label style
   /// - Author names in the normal text style
   /// - Word wrapping for long author lists
-  fn draw_authors(&mut self, paper: &learner::paper::Paper, area: Rect) {
+  fn draw_authors(&mut self, paper: &Paper, area: Rect) {
     let authors = Paragraph::new(Line::from(vec![
       Span::styled("Authors: ", styles::LABEL),
       Span::styled(
@@ -441,7 +441,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   /// - The source type (e.g., "arXiv", "DOI")
   /// - The source-specific identifier in parentheses
   /// - Both source and identifier in light yellow
-  fn draw_source(&mut self, paper: &learner::paper::Paper, area: Rect) {
+  fn draw_source(&mut self, paper: &Paper, area: Rect) {
     let source = Paragraph::new(Line::from(vec![
       Span::styled("Source: ", styles::LABEL),
       Span::styled(paper.source.to_string(), Style::default().fg(Color::LightYellow)),
@@ -469,12 +469,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   /// * `paper` - The paper whose abstract is being displayed
   /// * `header_area` - The area for the "Abstract:" label
   /// * `content_area` - The area for the abstract text
-  fn draw_abstract(
-    &mut self,
-    paper: &learner::paper::Paper,
-    header_area: Rect,
-    content_area: Rect,
-  ) {
+  fn draw_abstract(&mut self, paper: &Paper, header_area: Rect, content_area: Rect) {
     let abstract_header = Paragraph::new(Span::styled("Abstract:", styles::LABEL));
     self.frame.render_widget(abstract_header, header_area);
 
@@ -498,7 +493,7 @@ impl<'a, 'b> UIDrawer<'a, 'b> {
   /// - A cross (✗) in red if the PDF is not downloaded
   /// - The full path where the PDF is/would be stored
   /// - Word wrapping for long paths
-  fn draw_pdf_status(&mut self, paper: &learner::paper::Paper, area: Rect) {
+  fn draw_pdf_status(&mut self, paper: &Paper, area: Rect) {
     let pdf_path = format!(
       "{}/{}.pdf",
       Database::default_storage_path().display(),
