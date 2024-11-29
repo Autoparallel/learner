@@ -1,4 +1,9 @@
-use learner::resource::ResourceConfig;
+use std::fs::read_to_string;
+
+use learner::{
+  resource::ResourceConfig,
+  retriever::{ResponseFormat, RetrieverConfig},
+};
 
 use super::*;
 
@@ -25,62 +30,85 @@ pub fn validate_resource(path: &PathBuf) {
   // Ok(())
 }
 
-pub fn validate_retriever(path: &PathBuf) {
-  let config_str =
-    read_to_string("config/retrievers/arxiv.toml").expect("Failed to read config file");
+pub async fn validate_retriever(path: &PathBuf, input: &Option<String>) {
+  let config_str = match read_to_string(path) {
+    Ok(str) => str,
+    Err(e) => {
+      error!("Failed to read config to string due to: {e:?}");
+      return;
+    },
+  };
 
-  let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
+  let retriever: RetrieverConfig = match toml::from_str(&config_str) {
+    Ok(config) => config,
+    Err(e) => {
+      error!("Failed to parse config to string due to: {e:?}");
+      return;
+    },
+  };
 
-  // Verify basic fields
-  assert_eq!(retriever.name, "arxiv");
-  assert_eq!(retriever.base_url, "http://export.arxiv.org");
-  assert_eq!(retriever.source, "arxiv");
-
-  // Test pattern matching
-  assert!(retriever.pattern.is_match("2301.07041"));
-  assert!(retriever.pattern.is_match("math.AG/0601001"));
-  assert!(retriever.pattern.is_match("https://arxiv.org/abs/2301.07041"));
-  assert!(retriever.pattern.is_match("https://arxiv.org/pdf/2301.07041"));
-  assert!(retriever.pattern.is_match("https://arxiv.org/abs/math.AG/0601001"));
-  assert!(retriever.pattern.is_match("https://arxiv.org/abs/math/0404443"));
-
-  // Test identifier extraction
-  assert_eq!(retriever.extract_identifier("2301.07041").unwrap(), "2301.07041");
-  assert_eq!(
-    retriever.extract_identifier("https://arxiv.org/abs/2301.07041").unwrap(),
-    "2301.07041"
-  );
-  assert_eq!(retriever.extract_identifier("math.AG/0601001").unwrap(), "math.AG/0601001");
-
-  // Verify response format
-
-  if let ResponseFormat::Xml(config) = &retriever.response_format {
-    assert!(config.strip_namespaces);
-
-    // Verify field mappings
-    let field_maps = &config.field_maps;
-    assert!(field_maps.contains_key("title"));
-    assert!(field_maps.contains_key("abstract"));
-    assert!(field_maps.contains_key("authors"));
-    assert!(field_maps.contains_key("publication_date"));
-    assert!(field_maps.contains_key("pdf_url"));
-
-    // Verify PDF transform
-    if let Some(map) = field_maps.get("pdf_url") {
-      match &map.transform {
-        Some(Transform::Replace { pattern, replacement }) => {
-          assert_eq!(pattern, "/abs/");
-          assert_eq!(replacement, "/pdf/");
-        },
-        _ => panic!("Expected Replace transform for pdf_url"),
-      }
-    } else {
-      panic!("Missing pdf_url field map");
-    }
-  } else {
-    panic!("Expected an XML configuration, but did not get one.")
+  match &retriever.response_format {
+    ResponseFormat::Xml(config) => {
+      debug!("Retriever is configured for: XML\n{config:#?}")
+    },
+    ResponseFormat::Json(config) => {
+      debug!("Retriever is configured for: JSON\n{config:#?}")
+    },
   }
 
-  // Verify headers
-  assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
+  if let Some(input) = input {
+    info!("Attempting to match against pattern...");
+    match retriever.extract_identifier(input) {
+      Ok(identifier) => info!("Retriever extracted input into: {identifier}"),
+      Err(e) => {
+        error!("Retriever failed to extract input due to: {e:?}");
+        return;
+      },
+    }
+
+    info!("Attempting to fetch paper using retriever...");
+    let paper = match retriever.retrieve_paper(input).await {
+      Ok(paper) => {
+        info!("Paper retrieved!\n{paper:#?}");
+        paper
+      },
+      Err(e) => {
+        error!("Retriever failed to retriever paper due to: {e:?}");
+        return;
+      },
+    };
+
+    if paper.pdf_url.is_some() {
+      info!("Attempting to download associated pdf");
+      let tempdir = tempfile::tempdir().unwrap();
+      match paper.download_pdf(tempdir.path()).await {
+        Ok(filename) => {
+          let pdf_filepath = tempdir.path().join(filename);
+          if pdf_filepath.exists() {
+            let bytes = std::fs::read(path).unwrap();
+            if bytes.is_empty() {
+              error!("PDF download was empty.");
+            } else {
+              info!("Non-empty PDF downloaded successfully.");
+            }
+          } else {
+            error!("PDF path did not end up getting written.")
+          }
+        },
+        Err(e) => {
+          error!("PDF was unable to be downloaded due to: {e:?}")
+        },
+      }
+    } else {
+      warn!(
+        "PDF URL was not determined. Please check your configuration against the server response."
+      );
+    }
+  } else {
+    warn!(
+      "No input string provided to further debug your `RetrieverConfig`. If you want to test \
+       identifier pattern matching and online fetching, please pass in an input string with an \
+       additional input, e.g., `2301.07041`."
+    );
+  }
 }
