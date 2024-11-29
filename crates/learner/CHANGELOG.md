@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1](https://github.com/Autoparallel/learner/compare/learner-v0.9.0...learner-v0.9.1) - 2024-11-29
+
+### Added
+- *(`sdk`)* initial SDK ([#149](https://github.com/Autoparallel/learner/pull/149))
+
 ## [0.8.6](https://github.com/Autoparallel/learner/compare/learner-v0.8.5...learner-v0.8.6) - 2024-11-27
 
 ### Fixed
