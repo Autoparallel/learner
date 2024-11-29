@@ -65,3 +65,7 @@
 - name: "security 🔒"
   color: "d93f0b"
   description: "Security-related changes or fixes"
+
+- name: "sdk 👷"
+  color: "#fb00ff"
+  description: "Adding to or modifying SDK"

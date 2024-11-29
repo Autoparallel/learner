@@ -150,6 +150,20 @@ debug:
     @just header "Installing learnerd in debug mode"
     cargo install --path crates/learnerd --features tui --debug
 
+# Setup SDK
+setup-sdk:
+    cargo install --path crates/sdk --debug
+
+# Validate a retriever config
+validate-retriever path input="":
+    @just header "Validating retriever config"
+    learner-sdk validate-retriever {{path}} {{input}} 
+
+# Validate a resource config
+validate-resource path:
+    @just header "Validating resource config"
+    learner-sdk validate-resource {{path}}
+
 # Show your relevant environment information
 info:
     @just header "Environment Information"
@@ -212,3 +226,5 @@ _ci-summary-failure:
     @printf "\n{{bold}}CI Summary:{{reset}}\n"
     @printf "{{error}}{{bold}}Some checks failed. See output above for details.{{reset}}\n"
     @exit 1
+
+
