@@ -13,17 +13,16 @@
 //! # Examples
 //!
 //! ```rust,no_run
-//! use learner::resource::{Resource, ResourceConfig, Paper};
+//! use learner::{
+//!   resource::{Paper, Resource, ResourceConfig},
+//!   Learner,
+//! };
 //! use serde_json::json;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Using a built-in resource type
-//! let paper = Paper {
-//!     title: Some("Quantum Computing Advances".to_string()),
-//!     authors: Some(vec![/* ... */]),
-//!     // ... other fields
-//!     # ..Default::default()
-//! };
+//! let learner = Learner::builder().build().await?;
+//! let paper = learner.retriever.get_paper("2301.07041").await?;
 //!
 //! // Access resource fields
 //! let fields = paper.fields()?;
@@ -34,10 +33,7 @@
 //! fields.insert("title".into(), json!("My Thesis"));
 //! fields.insert("university".into(), json!("Tech University"));
 //!
-//! let thesis = ResourceConfig {
-//!     type_name: "thesis".to_string(),
-//!     fields,
-//! };
+//! let thesis = ResourceConfig { type_name: "thesis".to_string(), fields };
 //! # Ok(())
 //! # }
 //! ```
