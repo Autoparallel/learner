@@ -38,7 +38,7 @@
 //! # }
 //! ```
 
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use super::*;
 
@@ -92,8 +92,16 @@ pub trait Resource: Serialize + for<'de> Deserialize<'de> {
   ///
   /// Returns [`LearnerError::InvalidResource`] if the resource cannot be serialized
   /// to a JSON object.
-  fn fields(&self) -> Result<Map<String, Value>> {
-    serde_json::to_value(self)?.as_object().cloned().ok_or_else(|| LearnerError::InvalidResource)
+  fn fields(&self) -> Result<BTreeMap<String, Value>> {
+    let mut output = BTreeMap::new();
+    let map = serde_json::to_value(self)?
+      .as_object()
+      .cloned()
+      .ok_or_else(|| LearnerError::InvalidResource)?;
+    map.into_iter().for_each(|(k, v)| {
+      let _v = output.insert(k, v).unwrap();
+    });
+    Ok(output)
   }
 }
 
@@ -110,10 +118,12 @@ pub trait Resource: Serialize + for<'de> Deserialize<'de> {
 /// # Examples
 ///
 /// ```rust
-/// use learner::resource::ResourceConfig;
-/// use serde_json::{json, Map};
+/// use std::collections::BTreeMap;
 ///
-/// let mut fields = Map::new();
+/// use learner::resource::ResourceConfig;
+/// use serde_json::json;
+///
+/// let mut fields = BTreeMap::new();
 /// fields.insert("title".into(), json!("Understanding Type Systems"));
 /// fields.insert("university".into(), json!("Tech University"));
 ///
@@ -124,13 +134,13 @@ pub struct ResourceConfig {
   /// The type identifier for this resource configuration
   pub type_name: String,
   /// Map of field names to their values
-  pub fields:    Map<String, Value>,
+  pub fields:    BTreeMap<String, Value>,
 }
 
 impl Resource for ResourceConfig {
   fn resource_type(&self) -> String { self.type_name.clone() }
 
-  fn fields(&self) -> Result<Map<String, Value>> { Ok(self.fields.clone()) }
+  fn fields(&self) -> Result<BTreeMap<String, Value>> { Ok(self.fields.clone()) }
 }
 
 #[cfg(test)]
@@ -142,7 +152,7 @@ mod tests {
   #[test]
   fn test_thesis_resource() -> Result<()> {
     // Create a thesis resource
-    let mut fields = Map::new();
+    let mut fields = BTreeMap::new();
     fields.insert("title".into(), json!("Understanding Quantum Computing Effects"));
     fields.insert("author".into(), json!(["Alice Researcher", "Bob Scientist"]));
     fields.insert("university".into(), json!("Tech University"));
