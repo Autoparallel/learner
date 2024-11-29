@@ -215,7 +215,8 @@ pub const IACR_CONFIG: &str = include_str!("../config/retrievers/iacr.toml");
 /// ```
 pub mod prelude {
   pub use crate::{
-    database::DatabaseInstruction, error::LearnerError, retriever::ResponseProcessor,
+    database::DatabaseInstruction, error::LearnerError, resource::Resource,
+    retriever::ResponseProcessor,
   };
 }
 

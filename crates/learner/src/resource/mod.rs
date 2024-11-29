@@ -1,3 +1,47 @@
+//! Resource abstraction and configuration for the learner library.
+//!
+//! This module provides the core abstractions for working with different types of academic
+//! and research resources. It defines:
+//!
+//! - A [`Resource`] trait that all resource types must implement
+//! - A flexible [`ResourceConfig`] for runtime-configured resource types
+//! - Common utility types and functions for resource management
+//!
+//! The design allows for both statically defined resource types (like papers and books)
+//! and dynamically configured resources that can be defined through configuration files.
+//!
+//! # Examples
+//!
+//! ```rust,no_run
+//! use learner::resource::{Resource, ResourceConfig, Paper};
+//! use serde_json::json;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // Using a built-in resource type
+//! let paper = Paper {
+//!     title: Some("Quantum Computing Advances".to_string()),
+//!     authors: Some(vec![/* ... */]),
+//!     // ... other fields
+//!     # ..Default::default()
+//! };
+//!
+//! // Access resource fields
+//! let fields = paper.fields()?;
+//! println!("Paper type: {}", paper.resource_type());
+//!
+//! // Or create a custom resource type at runtime
+//! let mut fields = serde_json::Map::new();
+//! fields.insert("title".into(), json!("My Thesis"));
+//! fields.insert("university".into(), json!("Tech University"));
+//!
+//! let thesis = ResourceConfig {
+//!     type_name: "thesis".to_string(),
+//!     fields,
+//! };
+//! # Ok(())
+//! # }
+//! ```
+
 use serde_json::{Map, Value};
 
 use super::*;
@@ -8,23 +52,83 @@ mod shared;
 pub use paper::*;
 pub use shared::*;
 
+/// Core trait that defines the behavior of a resource in the system.
+///
+/// This trait provides a common interface for all resource types, whether they are
+/// statically defined (like [`Paper`]) or dynamically configured through [`ResourceConfig`].
+/// It requires that implementing types can be serialized and deserialized, which enables
+/// persistent storage and retrieval.
+///
+/// The trait provides two key capabilities:
+/// - Identification of the resource type
+/// - Access to the resource's fields in a uniform way
+///
+/// # Examples
+///
+/// ```rust
+/// # use serde::{Serialize, Deserialize};
+/// # use learner::resource::Resource;
+/// #[derive(Serialize, Deserialize)]
+/// struct Book {
+///   title:  String,
+///   author: String,
+///   isbn:   String,
+/// }
+///
+/// impl Resource for Book {
+///   fn resource_type(&self) -> String { "book".to_string() }
+/// }
+/// ```
 pub trait Resource: Serialize + for<'de> Deserialize<'de> {
+  /// Returns the type identifier for this resource.
+  ///
+  /// This identifier is used to distinguish between different types of resources
+  /// in the system. For example, "paper", "book", or "thesis".
   fn resource_type(&self) -> String;
 
+  /// Returns a map of field names to their values for this resource.
+  ///
+  /// This method provides a uniform way to access a resource's fields regardless
+  /// of the concrete type. The default implementation uses serde to serialize
+  /// the resource to JSON and extract its fields.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`LearnerError::InvalidResource`] if the resource cannot be serialized
+  /// to a JSON object.
   fn fields(&self) -> Result<Map<String, Value>> {
-    Ok(
-      serde_json::to_value(self)?
-        .as_object()
-        .cloned()
-        .ok_or_else(|| LearnerError::InvalidResource)?,
-    )
+    serde_json::to_value(self)?.as_object().cloned().ok_or_else(|| LearnerError::InvalidResource)
   }
 }
 
+/// A dynamically configured resource type.
+///
+/// This struct enables the creation of new resource types at runtime through
+/// configuration files. It provides a flexible way to extend the system without
+/// requiring code changes.
+///
+/// The type consists of:
+/// - A type identifier string
+/// - A map of field names to their values
+///
+/// # Examples
+///
+/// ```rust
+/// use learner::resource::ResourceConfig;
+/// use serde_json::{json, Map};
+///
+/// let mut fields = Map::new();
+/// fields.insert("title".into(), json!("Understanding Type Systems"));
+/// fields.insert("university".into(), json!("Tech University"));
+///
+/// let thesis = ResourceConfig { type_name: "thesis".to_string(), fields };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceConfig {
-  type_name: String,
-  fields:    Map<String, Value>,
+  /// The type identifier for this resource configuration
+  pub type_name: String,
+  /// Map of field names to their values
+  pub fields:    Map<String, Value>,
 }
 
 impl Resource for ResourceConfig {
