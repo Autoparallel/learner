@@ -16,14 +16,15 @@
 
 </div>
 
-[Features](#features)
-[Installation](#installation)
-[Usage](#usage)
-[Configuration](#configuration)
-[Roadmap](#roadmap)
-[Contributing](#contributing)
-[Development](#development)
-[License](#license)
+[Features](#features) | 
+[Installation](#installation) | 
+[Usage](#usage) | 
+[Configuration](#configuration) | 
+[Roadmap](#roadmap) | 
+[Contributing](#contributing) | 
+[Development](#development) | 
+[SDK](#sdk) | 
+[License](#license) | 
 [Acknowledgements](#acknowledgements)
 
 ---
@@ -319,6 +320,19 @@ just build-all  # build all targets
 
 > [!TIP]
 > Running `just setup` and `just ci` locally is a quick way to get up to speed and see that the repo is working on your system!
+
+## SDK
+This repository now supplies a very basic SDK for validating a `Retriever` and a `Resource` TOML configurations. 
+To work with this SDK, use:
+```
+# Setup
+just setup-sdk
+
+# Validations
+just validate-retriever <PATH> <OPTIONAL_INPUT> # optionally supply url/identifer
+just validate-resource <PATH>
+```
+
 
 ## License
 
