@@ -331,6 +331,10 @@ just setup-sdk
 # Validations
 just validate-retriever <PATH> <OPTIONAL_INPUT> # optionally supply url/identifer
 just validate-resource <PATH>
+
+# Examples
+just validate-retriever crates/learner/config/retrievers/arxiv.toml 2301.07041
+just validate-resource crates/learner/config/resources/thesis.toml
 ```
 
 
