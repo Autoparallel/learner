@@ -13,6 +13,8 @@
 //! # Examples
 //!
 //! ```rust,no_run
+//! use std::collections::BTreeMap;
+//!
 //! use learner::{
 //!   resource::{Paper, Resource, ResourceConfig},
 //!   Learner,
@@ -29,7 +31,7 @@
 //! println!("Paper type: {}", paper.resource_type());
 //!
 //! // Or create a custom resource type at runtime
-//! let mut fields = serde_json::Map::new();
+//! let mut fields = BTreeMap::new();
 //! fields.insert("title".into(), json!("My Thesis"));
 //! fields.insert("university".into(), json!("Tech University"));
 //!
