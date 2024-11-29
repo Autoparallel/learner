@@ -159,6 +159,11 @@ validate-retriever path input="":
     @just header "Validating retriever config"
     learner-sdk validate-retriever {{path}} {{input}} 
 
+# Validate a resource config
+validate-resource path:
+    @just header "Validating resource config"
+    learner-sdk validate-resource {{path}}
+
 # Show your relevant environment information
 info:
     @just header "Environment Information"

@@ -3,6 +3,7 @@ mod validate;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
+use learner::prelude::*;
 use tracing::{debug, error, info, warn};
 
 #[derive(Parser)]

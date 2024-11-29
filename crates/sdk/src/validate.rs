@@ -8,26 +8,26 @@ use learner::{
 use super::*;
 
 pub fn validate_resource(path: &PathBuf) {
-  todo!()
+  let config_str = match read_to_string(path) {
+    Ok(str) => str,
+    Err(e) => {
+      error!("Failed to read config to string due to: {e:?}");
+      return;
+    },
+  };
+
+  let resource: ResourceConfig = match toml::from_str(&config_str) {
+    Ok(config) => config,
+    Err(e) => {
+      error!("Failed to parse config to string due to: {e:?}");
+      return;
+    },
+  };
+
+  info!("Resource type: {}", resource.type_name);
+
   // Check all required fields are present
-  // for field in &self.type_config.required_fields {
-  //   if !self.values.contains_key(field) {
-  //     return Err(LearnerError::InvalidResource(format!("Missing required field: {}", field)));
-  //   }
-  // }
-
-  // // Validate all present fields match their declared types
-  // for (field, value) in &self.values {
-  //   if let Some(field_type) = self.type_config.field_types.get(field) {
-  //     if !self.type_config.validate_value_type(value, field_type) {
-  //       return Err(LearnerError::InvalidResource(format!("Field {} has invalid type", field)));
-  //     }
-  //   } else {
-  //     return Err(LearnerError::InvalidResource(format!("Unknown field: {}", field)));
-  //   }
-  // }
-
-  // Ok(())
+  debug!("All config fields are:\n{:#?}", resource.fields());
 }
 
 pub async fn validate_retriever(path: &PathBuf, input: &Option<String>) {
