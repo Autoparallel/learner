@@ -37,8 +37,8 @@
 //! ```no_run
 //! use learner::{
 //!   database::{Add, OrderField, Query},
-//!   paper::Paper,
 //!   prelude::*,
+//!   resource::Paper,
 //!   Learner,
 //! };
 //!
@@ -199,8 +199,8 @@ pub const IACR_CONFIG: &str = include_str!("../config/retrievers/iacr.toml");
 /// ```no_run
 /// use learner::{
 ///   database::{Add, Database},
-///   paper::Paper,
 ///   prelude::*,
+///   resource::Paper,
 ///   Learner,
 /// };
 ///

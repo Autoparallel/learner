@@ -10,7 +10,7 @@
 //! # Examples
 //!
 //! ```
-//! use learner::{error::LearnerError, paper::Paper, Learner};
+//! use learner::{error::LearnerError, resource::Paper, Learner};
 //! // or `use learner::prelude::*` to bring in the error type
 //!
 //! # async fn example() -> Result<(), LearnerError> {

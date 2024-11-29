@@ -277,7 +277,7 @@ pub enum Transform {
 /// # Examples
 ///
 /// ```no_run
-/// # use learner::{retriever::ResponseProcessor, paper::Paper};
+/// # use learner::{retriever::ResponseProcessor, resource::Paper};
 /// # use learner::error::LearnerError;
 /// struct CustomProcessor;
 ///

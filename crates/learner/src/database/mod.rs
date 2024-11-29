@@ -30,8 +30,8 @@
 //! ```no_run
 //! use learner::{
 //!   database::{Add, Database, Query},
-//!   paper::Paper,
 //!   prelude::*,
+//!   resource::Paper,
 //!   Learner,
 //! };
 //!

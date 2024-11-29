@@ -26,8 +26,8 @@
 //! ```no_run
 //! use learner::{
 //!   database::{Add, Database, Query, Remove},
-//!   paper::Paper,
 //!   prelude::*,
+//!   resource::Paper,
 //!   Learner,
 //! };
 //!

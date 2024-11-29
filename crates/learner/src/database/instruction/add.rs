@@ -98,7 +98,7 @@ impl<'a> Add<'a> {
   ///
   /// ```no_run
   /// # use learner::database::Add;
-  /// # use learner::paper::Paper;
+  /// # use learner::resource::Paper;
   /// # use learner::Learner;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// # let learner = Learner::builder().build().await?;
@@ -125,7 +125,7 @@ impl<'a> Add<'a> {
   ///
   /// ```no_run
   /// # use learner::database::Add;
-  /// # use learner::paper::Paper;
+  /// # use learner::resource::Paper;
   /// # use learner::Learner;
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// # let learner = Learner::builder().build().await?;

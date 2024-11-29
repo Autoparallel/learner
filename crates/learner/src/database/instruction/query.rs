@@ -165,7 +165,7 @@ impl<'a> Query<'a> {
   ///
   /// ```no_run
   /// # use learner::database::Query;
-  /// # use learner::{Learner, paper::Paper};
+  /// # use learner::{Learner, resource::Paper};
   /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
   /// let learner = Learner::builder().build().await?;
   /// let paper = learner.retriever.get_paper("2301.07041").await?;
