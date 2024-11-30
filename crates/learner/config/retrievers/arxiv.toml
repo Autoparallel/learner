@@ -2,6 +2,7 @@ base_url          = "http://export.arxiv.org"
 endpoint_template = "http://export.arxiv.org/api/query?id_list={identifier}&max_results=1"
 name              = "arxiv"
 pattern           = "(?:^|https?://arxiv\\.org/(?:abs|pdf)/)(\\d{4}\\.\\d{4,5}|[a-zA-Z-]+(?:\\.[A-Z]{2})?/\\d{7})(?:\\.pdf)?$"
+resource_type     = "paper"
 source            = "arxiv"
 
 [response_format]

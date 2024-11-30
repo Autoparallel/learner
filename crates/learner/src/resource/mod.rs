@@ -50,6 +50,15 @@ mod shared;
 pub use paper::*;
 pub use shared::*;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceType {
+  Paper,
+  Book,
+  // We can add more built-in types as needed
+  Custom(PathBuf), // For user-defined resource types via config
+}
+
 /// Core trait that defines the behavior of a resource in the system.
 ///
 /// This trait provides a common interface for all resource types, whether they are

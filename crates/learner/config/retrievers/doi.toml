@@ -2,6 +2,7 @@ base_url          = "https://api.crossref.org/works"
 endpoint_template = "https://api.crossref.org/works/{identifier}"
 name              = "doi"
 pattern           = "(?:^|https?://doi\\.org/)(10\\.\\d{4,9}/[-._;()/:\\w]+)$"
+resource_type     = "paper"
 source            = "doi"
 
 [response_format]

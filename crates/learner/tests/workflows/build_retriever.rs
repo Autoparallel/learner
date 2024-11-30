@@ -1,6 +1,8 @@
 use std::fs::read_to_string;
 
-use learner::retriever::{ResponseFormat, RetrieverConfig, Transform};
+use learner::retriever::{ResponseFormat, Transform};
+
+use super::*;
 
 #[test]
 fn test_arxiv_config_deserialization() {
