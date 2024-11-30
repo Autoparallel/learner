@@ -333,8 +333,8 @@ just validate-retriever <PATH> <OPTIONAL_INPUT> # optionally supply url/identife
 just validate-resource <PATH>
 
 # Examples
-just validate-retriever config/retrievers/arxiv.toml 2301.07041
-just validate-resource config/resources/thesis.toml
+just validate-retriever crates/learner/config/retrievers/arxiv.toml 2301.07041
+just validate-resource crates/learner/config/resources/thesis.toml
 ```
 
 

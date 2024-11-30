@@ -168,6 +168,7 @@ pub mod database;
 pub mod retriever;
 
 pub mod configuration;
+pub mod environment;
 pub mod error;
 pub mod format;
 pub mod llm;

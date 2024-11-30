@@ -1,3 +1,5 @@
+use environment::Environment;
+
 use super::*;
 
 /// Configuration for a specific paper source retriever.
@@ -167,14 +169,36 @@ where D: serde::Deserializer<'de> {
   #[serde(untagged)]
   enum ResourceConfigRef {
     Inline(ResourceConfig),
-    Path(PathBuf),
+    Path(String),
   }
 
   let config_ref = ResourceConfigRef::deserialize(deserializer)?;
   match config_ref {
     ResourceConfigRef::Inline(config) => Ok(config),
-    ResourceConfigRef::Path(path) => {
-      let content = std::fs::read_to_string(&path).map_err(serde::de::Error::custom)?;
+    ResourceConfigRef::Path(resource_name) => {
+      // Add .toml extension if not present
+      let resource_file = if !resource_name.ends_with(".toml") {
+        format!("{}.toml", resource_name)
+      } else {
+        resource_name
+      };
+
+      // First try using Environment to resolve path
+      let env_path = Environment::resolve_resource_path(&resource_file);
+      if env_path.exists() {
+        let content = std::fs::read_to_string(&env_path).map_err(serde::de::Error::custom)?;
+        return toml::from_str(&content).map_err(serde::de::Error::custom);
+      }
+
+      // Fallback for tests
+      let fallback_path = PathBuf::from("config/resources").join(&resource_file);
+      let content = std::fs::read_to_string(&fallback_path).map_err(|_| {
+        serde::de::Error::custom(format!(
+          "Resource not found at either {} or {}",
+          env_path.display(),
+          fallback_path.display()
+        ))
+      })?;
       toml::from_str(&content).map_err(serde::de::Error::custom)
     },
   }

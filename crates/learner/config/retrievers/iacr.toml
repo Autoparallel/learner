@@ -2,7 +2,7 @@ base_url          = "https://eprint.iacr.org"
 endpoint_template = "https://eprint.iacr.org/oai?verb=GetRecord&identifier=oai:eprint.iacr.org:{identifier}&metadataPrefix=oai_dc"
 name              = "iacr"
 pattern           = "(?:^|https?://eprint\\.iacr\\.org/)(\\d{4}/\\d+)(?:\\.pdf)?$"
-resource          = "config/resources/paper.toml"
+resource          = "paper"
 source            = "iacr"
 
 [response_format]

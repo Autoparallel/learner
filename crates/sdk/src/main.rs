@@ -3,7 +3,7 @@ mod validate;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use learner::prelude::*;
+use learner::{environment::Environment, prelude::*};
 use tracing::{debug, error, info, warn};
 
 #[derive(Parser)]
@@ -41,6 +41,23 @@ async fn main() {
     .init();
 
   let cli = LearnerSdk::parse();
+
+  // Get the path from the command
+  let path = match &cli.command {
+    Commands::ValidateRetriever { path, .. } | Commands::ValidateResource { path } => path,
+  };
+
+  // // Set up environment from the config directory in the path
+  // if let Some(config_dir) = path.parent().and_then(|p| p.parent()) {
+  //   debug!("Setting config directory to: {}", config_dir.display());
+  //   if let Err(e) = Environment::set_global(config_dir.to_path_buf()) {
+  //     error!("Failed to set global environment: {}", e);
+  //     return;
+  //   }
+  // } else {
+  //   error!("Could not determine config directory from path: {}", path.display());
+  //   return;
+  // }
 
   match &cli.command {
     Commands::ValidateRetriever { path, input } => {
