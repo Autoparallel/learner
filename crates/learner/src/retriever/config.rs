@@ -76,6 +76,30 @@ impl RetrieverConfig {
       .ok_or(LearnerError::InvalidIdentifier)
   }
 
+  /// Retrieves a paper using this configuration.
+  ///
+  /// This method:
+  /// 1. Extracts the canonical identifier
+  /// 2. Constructs the API URL
+  /// 3. Makes the HTTP request
+  /// 4. Processes the response
+  ///
+  /// # Arguments
+  ///
+  /// * `input` - Paper identifier or URL
+  ///
+  /// # Returns
+  ///
+  /// Returns a Result containing either:
+  /// - The retrieved Paper object
+  /// - A LearnerError if any step fails
+  ///
+  /// # Errors
+  ///
+  /// This method will return an error if:
+  /// - The identifier cannot be extracted
+  /// - The HTTP request fails
+  /// - The response cannot be parsed
   pub async fn retrieve_paper(&self, input: &str) -> Result<Paper> {
     let identifier = self.extract_identifier(input)?;
     let url = self.endpoint_template.replace("{identifier}", identifier);
