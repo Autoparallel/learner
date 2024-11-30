@@ -8,3 +8,6 @@
 *.log
 *.out
 *.synctex.gz
+
+# SDK stuff
+config/*

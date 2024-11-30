@@ -153,6 +153,7 @@ debug:
 # Setup SDK
 setup-sdk:
     cargo install --path crates/sdk --debug
+    cp -r crates/learner/config .
 
 # Validate a retriever config
 validate-retriever path input="":

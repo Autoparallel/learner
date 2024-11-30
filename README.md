@@ -326,15 +326,15 @@ This repository now supplies a very basic SDK for validating a `Retriever` and a
 To work with this SDK, use:
 ```
 # Setup
-just setup-sdk
+just setup-sdk # sets up a `config/` dir at repo root with defaults
 
 # Validations
 just validate-retriever <PATH> <OPTIONAL_INPUT> # optionally supply url/identifer
 just validate-resource <PATH>
 
 # Examples
-just validate-retriever crates/learner/config/retrievers/arxiv.toml 2301.07041
-just validate-resource crates/learner/config/resources/thesis.toml
+just validate-retriever config/retrievers/arxiv.toml 2301.07041
+just validate-resource config/resources/thesis.toml
 ```
 
 
