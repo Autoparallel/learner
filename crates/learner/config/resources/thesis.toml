@@ -1,11 +1,73 @@
 type_name = "thesis"
 
-[fields]
-abstract     = { type = "string", required = false }
-author       = { type = "array", items = "string", required = true }
-committee    = { type = "array", items = "string", required = false }
-defense_date = { type = "string", format = "date-time", required = false }
-department   = { type = "string", required = false, default = "Computer Science" }
-keywords     = { type = "array", items = "string", required = false }
-title        = { type = "string", required = true }
-university   = { type = "string", required = true }
+description = "A master's thesis or doctoral dissertation"
+
+[[fields]]
+description = "The full title of the thesis"
+field_type  = "string"
+name        = "title"
+required    = true
+validation  = { min_length = 1, max_length = 500 }
+
+[[fields]]
+description = "The thesis author"
+field_type  = "string"
+name        = "author"
+required    = true
+
+[[fields]]
+description = "Thesis abstract or summary"
+field_type  = "string"
+name        = "abstract"
+required    = false
+
+[[fields]]
+description = "The degree type (e.g., PhD, MSc)"
+field_type  = "string"
+name        = "degree"
+required    = true
+validation  = { enum_values = ["PhD", "DPhil", "MSc", "MA", "MPhil", "MEng"] }
+
+[[fields]]
+description = "The degree-granting institution"
+field_type  = "string"
+name        = "institution"
+required    = true
+
+[[fields]]
+description = "The academic department"
+field_type  = "string"
+name        = "department"
+required    = false
+
+[[fields]]
+description = "When the degree was awarded"
+field_type  = "datetime"
+name        = "completion_date"
+required    = true
+
+[[fields]]
+description = "Thesis advisors or supervisors"
+field_type  = "array"
+name        = "advisors"
+required    = true
+validation  = { min_items = 1 }
+
+[[fields]]
+description = "Committee members beyond advisors"
+field_type  = "array"
+name        = "committee"
+required    = false
+
+[[fields]]
+description = "Keywords or subject areas"
+field_type  = "array"
+name        = "keywords"
+required    = false
+
+[[fields]]
+description = "Digital Object Identifier if available"
+field_type  = "string"
+name        = "doi"
+required    = false
+validation  = { pattern = "^10\\.\\d{4,9}/[-._;()/:a-zA-Z0-9]+$" }

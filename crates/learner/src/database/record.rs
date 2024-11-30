@@ -1,9 +1,11 @@
+use resource::ResourceConfig;
+
 use super::*;
 
 /// A complete view of a resource with all associated data
 #[derive(Debug)]
-pub struct ResourceRecord<R: Resource> {
-  pub resource:  R,
+pub struct ResourceRecord {
+  pub resource:  ResourceConfig,
   pub state:     ResourceState,
   pub tags:      Vec<String>,
   pub storage:   Option<StorageData>,

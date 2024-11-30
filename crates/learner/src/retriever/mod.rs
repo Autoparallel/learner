@@ -67,7 +67,6 @@
 use std::collections::HashMap;
 
 use super::*;
-use crate::resource::ResourceType;
 
 mod config;
 mod response;

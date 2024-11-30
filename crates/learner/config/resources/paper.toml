@@ -1,0 +1,73 @@
+type_name = "paper"
+
+description = "A scholarly paper or article published in an academic context"
+
+[[fields]]
+description = "The full title of the paper"
+field_type  = "string"
+name        = "title"
+required    = true
+validation  = { min_length = 1, max_length = 500 }
+
+[[fields]]
+description = "The paper's authors with their affiliations"
+field_type  = "array"
+name        = "authors"
+required    = true
+validation  = { min_items = 1 }
+
+[[fields]]
+description = "The paper's abstract or summary"
+field_type  = "string"
+name        = "abstract"
+required    = false
+
+[[fields]]
+description = "When the paper was published or last updated"
+field_type  = "datetime"
+name        = "publication_date"
+required    = false
+
+[[fields]]
+description = "Digital Object Identifier"
+field_type  = "string"
+name        = "doi"
+required    = false
+validation  = { pattern = "^10\\.\\d{4,9}/[-._;()/:a-zA-Z0-9]+$" }
+
+[[fields]]
+description = "Keywords or subject areas"
+field_type  = "array"
+name        = "keywords"
+required    = false
+
+[[fields]]
+description = "Journal where the paper was published"
+field_type  = "string"
+name        = "journal"
+required    = false
+
+[[fields]]
+description = "Journal volume number"
+field_type  = "string"
+name        = "volume"
+required    = false
+
+[[fields]]
+description = "Journal issue number"
+field_type  = "string"
+name        = "issue"
+required    = false
+
+[[fields]]
+description = "Page range in the journal"
+field_type  = "string"
+name        = "pages"
+required    = false
+
+[[fields]]
+default     = true
+description = "Whether the paper underwent peer review"
+field_type  = "boolean"
+name        = "peer_reviewed"
+required    = false

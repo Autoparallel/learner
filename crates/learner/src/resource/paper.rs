@@ -188,7 +188,3 @@ impl Paper {
     PathBuf::from(format!("{}.pdf", formatted_title))
   }
 }
-
-impl Resource for Paper {
-  fn resource_type(&self) -> String { "paper".to_string() }
-}

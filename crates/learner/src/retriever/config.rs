@@ -1,3 +1,4 @@
+use resource::ResourceConfig;
 use response::ResponseFormat;
 
 use super::*;
@@ -33,7 +34,7 @@ pub struct RetrieverConfig {
   /// Name of this retriever configuration
   pub name:              String,
   /// The type of resource this retriever should yield
-  pub resource_type:     ResourceType,
+  pub resource:          ResourceConfig,
   /// Base URL for API requests
   pub base_url:          String,
   /// Regex pattern for matching and extracting paper identifiers
@@ -101,5 +102,35 @@ impl RetrieverConfig {
     paper.source = self.source.clone();
     paper.source_identifier = identifier.to_string();
     Ok(paper)
+  }
+
+  pub async fn retrieve_resource(&self, input: &str) -> Result<ResourceConfig> {
+    let identifier = self.extract_identifier(input)?;
+
+    // Send request and get response
+    let url = self.endpoint_template.replace("{identifier}", identifier);
+    debug!("Fetching from {} via: {}", self.name, url);
+
+    let client = reqwest::Client::new();
+    let mut request = client.get(&url);
+
+    // Add any configured headers
+    for (key, value) in &self.headers {
+      request = request.header(key, value);
+    }
+
+    let response = request.send().await?;
+    let data = response.bytes().await?;
+    trace!("{} response: {}", self.name, String::from_utf8_lossy(&data));
+
+    // Process the response into a generic Value first
+    let response_processor = match &self.response_format {
+      ResponseFormat::Xml(config) => config as &dyn ResponseProcessor,
+      ResponseFormat::Json(config) => config as &dyn ResponseProcessor,
+    };
+
+    todo!();
+
+    // Ok(resource)
   }
 }
