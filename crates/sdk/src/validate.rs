@@ -32,7 +32,7 @@ pub fn validate_resource(path: &PathBuf) {
     },
   };
 
-  info!("Found resource type: {}", resource.type_name);
+  info!("Found resource type: {}", resource.name);
   if let Some(desc) = &resource.description {
     info!("Description: {}", desc);
   }

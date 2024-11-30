@@ -28,6 +28,7 @@ pub async fn create_test_learner() -> (Learner, TempDir, TempDir, TempDir) {
   let config = Config::default()
     .with_database_path(&database_dir.path().join("learner.db"))
     .with_retrievers_path(Path::new("config/retrievers/"))
+    .with_resources_path(Path::new("config/resources/"))
     .with_storage_path(storage_dir.path());
   let learner =
     Learner::builder().with_path(config_dir.path()).with_config(config).build().await.unwrap();

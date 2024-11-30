@@ -1,4 +1,4 @@
-type_name = "book"
+name = "book"
 
 description = "A published book, including textbooks, monographs, and edited volumes"
 

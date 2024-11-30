@@ -1,4 +1,4 @@
-type_name = "paper"
+name = "paper"
 
 description = "A scholarly paper or article published in an academic context"
 

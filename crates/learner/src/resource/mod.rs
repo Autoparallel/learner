@@ -9,16 +9,37 @@ pub use paper::*;
 pub use shared::*;
 use toml::Value;
 
+#[derive(Debug, Clone, Default)]
+pub struct Resources {
+  resource_configs: BTreeMap<String, ResourceConfig>,
+}
+
+impl Resources {
+  pub fn new() -> Self { Self::default() }
+}
+
+impl Configurable for Resources {
+  type Config = ResourceConfig;
+
+  fn insert(&mut self, config_name: String, config: Self::Config) {
+    self.resource_configs.insert(config_name, config);
+  }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceConfig {
   /// The type identifier for this resource
-  pub type_name:   String,
+  pub name:        String,
   /// Optional description of this resource type
   #[serde(default)]
   pub description: Option<String>,
   /// Field definitions with optional metadata
   #[serde(default)]
   pub fields:      Vec<FieldDefinition>,
+}
+
+impl Identifiable for ResourceConfig {
+  fn name(&self) -> String { self.name.clone() }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

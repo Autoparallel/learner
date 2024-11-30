@@ -4,10 +4,12 @@ use learner::retriever::{ResponseFormat, Transform};
 
 use super::*;
 
-#[test]
-fn test_arxiv_config_deserialization() {
+#[tokio::test]
+async fn test_arxiv_config_deserialization() {
   let config_str =
     read_to_string("config/retrievers/arxiv.toml").expect("Failed to read config file");
+
+  // let (learner, _config_dir, _database_dir, _storage_dir) = create_test_learner().await;
 
   let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
 

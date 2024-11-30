@@ -101,6 +101,14 @@ pub struct Retriever {
   configs: HashMap<String, RetrieverConfig>,
 }
 
+impl Configurable for Retriever {
+  type Config = RetrieverConfig;
+
+  fn insert(&mut self, config_name: String, config: Self::Config) {
+    self.configs.insert(config_name, config);
+  }
+}
+
 impl Retriever {
   /// Checks whether the retreivers map is empty.
   ///
@@ -136,129 +144,6 @@ impl Retriever {
   /// let retriever = Retriever::new();
   /// ```
   pub fn new() -> Self { Self::default() }
-
-  /// Adds a retriever configuration to this instance.
-  ///
-  /// This method configures support for a new paper source using the provided
-  /// configuration. Multiple configurations can be added to support different sources.
-  ///
-  /// # Arguments
-  ///
-  /// * `config` - Configuration for the paper source
-  ///
-  /// # Examples
-  ///
-  /// ```no_run
-  /// # use learner::retriever::{Retriever, RetrieverConfig};
-  /// # fn example(config: RetrieverConfig) {
-  /// let retriever = Retriever::new().with_config(config);
-  /// # }
-  /// ```
-  pub fn with_config(mut self, config: RetrieverConfig) {
-    self.configs.insert(config.name.clone(), config);
-  }
-
-  /// Adds a retriever configuration from a TOML string.
-  ///
-  /// Parses the provided TOML string into a RetrieverConfig and adds it
-  /// to this instance.
-  ///
-  /// # Arguments
-  ///
-  /// * `toml_str` - TOML configuration string
-  ///
-  /// # Returns
-  ///
-  /// Returns a Result containing either:
-  /// - The updated Retriever instance
-  /// - A LearnerError if parsing fails
-  ///
-  /// # Examples
-  ///
-  /// ```no_run
-  /// # use learner::retriever::Retriever;
-  /// let toml = r#"
-  ///     name = "arxiv"
-  ///     base_url = "http://export.arxiv.org/api/query"
-  ///     pattern = "^\\d{4}\\.\\d{4,5}$"
-  ///     source = "arxiv"
-  ///     endpoint_template = "http://export.arxiv.org/api/query?id_list={identifier}"
-  /// "#;
-  ///
-  /// let retriever = Retriever::new().with_config_str(toml)?;
-  /// # Ok::<(), Box<dyn std::error::Error>>(())
-  /// ```
-  pub fn with_config_str(mut self, toml_str: &str) -> Result<Self> {
-    let config: RetrieverConfig = toml::from_str(toml_str)?;
-    self.configs.insert(config.name.clone(), config);
-    Ok(self)
-  }
-
-  /// Adds a retriever configuration from a TOML file.
-  ///
-  /// # Arguments
-  ///
-  /// * `path` - Path to TOML configuration file
-  ///
-  /// # Returns
-  ///
-  /// Returns a Result containing either:
-  /// - The updated Retriever instance
-  /// - A LearnerError if reading or parsing fails
-  ///
-  /// # Examples
-  ///
-  /// ```no_run
-  /// # use learner::retriever::Retriever;
-  /// let retriever = Retriever::new().with_config_file("config/arxiv.toml")?;
-  /// # Ok::<(), Box<dyn std::error::Error>>(())
-  /// ```
-  pub fn with_config_file(self, path: impl AsRef<Path>) -> Result<Self> {
-    let content = std::fs::read_to_string(path)?;
-    self.with_config_str(&content)
-  }
-
-  /// Adds multiple configurations from a directory of TOML files.
-  ///
-  /// This method loads all .toml files from the specified directory and
-  /// adds them as configurations.
-  ///
-  /// # Arguments
-  ///
-  /// * `dir` - Path to directory containing TOML configuration files
-  ///
-  /// # Returns
-  ///
-  /// Returns a Result containing either:
-  /// - The updated Retriever instance
-  /// - A LearnerError if directory access or parsing fails
-  ///
-  /// # Examples
-  ///
-  /// ```no_run
-  /// # use learner::retriever::Retriever;
-  /// let retriever = Retriever::new().with_config_dir("config/")?;
-  /// # Ok::<(), Box<dyn std::error::Error>>(())
-  /// ```
-  pub fn with_config_dir(self, dir: impl AsRef<Path>) -> Result<Self> {
-    let dir = dir.as_ref();
-    if !dir.is_dir() {
-      return Err(LearnerError::Path(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        "Config directory not found",
-      )));
-    }
-
-    let mut retriever = self;
-    for entry in std::fs::read_dir(dir)? {
-      let entry = entry?;
-      let path = entry.path();
-      if path.extension().is_some_and(|ext| ext == "toml") {
-        retriever = retriever.with_config_file(path)?;
-      }
-    }
-    Ok(retriever)
-  }
 
   /// Attempts to retrieve a paper using any matching configuration.
   ///

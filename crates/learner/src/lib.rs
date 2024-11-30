@@ -158,6 +158,7 @@ use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::Url;
+use resource::{ResourceConfig, Resources};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, trace, warn};
 #[cfg(test)]
@@ -166,6 +167,7 @@ use {tempfile::tempdir, tracing_test::traced_test};
 pub mod database;
 pub mod retriever;
 
+pub mod configuration;
 pub mod error;
 pub mod format;
 pub mod llm;
@@ -186,6 +188,13 @@ pub const ARXIV_CONFIG: &str = include_str!("../config/retrievers/arxiv.toml");
 pub const DOI_CONFIG: &str = include_str!("../config/retrievers/doi.toml");
 /// IACR default configuration
 pub const IACR_CONFIG: &str = include_str!("../config/retrievers/iacr.toml");
+
+/// Paper default configuration
+pub const PAPER_CONFIG: &str = include_str!("../config/resources/paper.toml");
+/// Book default configuration
+pub const BOOK_CONFIG: &str = include_str!("../config/resources/book.toml");
+/// Thesis default configuration
+pub const THESIS_CONFIG: &str = include_str!("../config/resources/thesis.toml");
 
 /// Common traits and types for ergonomic imports.
 ///
@@ -217,7 +226,10 @@ pub const IACR_CONFIG: &str = include_str!("../config/retrievers/iacr.toml");
 /// ```
 pub mod prelude {
   pub use crate::{
-    database::DatabaseInstruction, error::LearnerError, retriever::ResponseProcessor,
+    configuration::{Configurable, Identifiable},
+    database::DatabaseInstruction,
+    error::LearnerError,
+    retriever::ResponseProcessor,
   };
 }
 
@@ -253,6 +265,10 @@ pub struct Config {
   /// The path to load retriever configs from.
   #[serde(default = "Config::default_retrievers_path")]
   pub retrievers_path: PathBuf,
+
+  /// The path to load retriever configs from.
+  #[serde(default = "Config::default_resources_path")]
+  pub resources_path: PathBuf,
 }
 
 // TODO: We should really let the database storage path be set prior to opening. We need a slightly
@@ -284,6 +300,8 @@ pub struct Learner {
   pub database:  Database,
   /// Paper retrieval system
   pub retriever: Retriever,
+  /// Resources to use
+  pub resources: Resources,
 }
 
 /// Builder for creating configured Learner instances.
@@ -339,6 +357,14 @@ impl Config {
   /// config_dir is determined by [`default_path()`](Config::default_path).
   pub fn default_retrievers_path() -> PathBuf {
     Self::default_path().unwrap_or_else(|_| PathBuf::from(".")).join("retrievers")
+  }
+
+  /// Returns the default path for resource configuration files.
+  ///
+  /// The path is constructed as `{config_dir}/retrievers` where
+  /// config_dir is determined by [`default_path()`](Config::default_path).
+  pub fn default_resources_path() -> PathBuf {
+    Self::default_path().unwrap_or_else(|_| PathBuf::from(".")).join("resources")
   }
 
   /// Loads existing configuration or creates new with defaults.
@@ -405,6 +431,14 @@ impl Config {
     let config = Self::default();
     config.save()?;
 
+    // Write example resource configs
+    let resources_dir = &config.resources_path;
+    std::fs::create_dir_all(resources_dir)?;
+
+    std::fs::write(resources_dir.join("paper.toml"), PAPER_CONFIG)?;
+    std::fs::write(resources_dir.join("book.toml"), BOOK_CONFIG)?;
+    std::fs::write(resources_dir.join("thesis.toml"), THESIS_CONFIG)?;
+
     // Write example retriever configs
     let retrievers_dir = &config.retrievers_path;
     std::fs::create_dir_all(retrievers_dir)?;
@@ -444,6 +478,16 @@ impl Config {
     self
   }
 
+  /// Sets the path for retriever configuration files.
+  ///
+  /// # Arguments
+  ///
+  /// * `retrievers_path` - Directory where retriever TOML configs are stored
+  pub fn with_resources_path(mut self, resources_path: &Path) -> Self {
+    self.resources_path = resources_path.to_path_buf();
+    self
+  }
+
   /// Sets the path for paper document storage.
   ///
   /// # Arguments
@@ -461,6 +505,7 @@ impl Default for Config {
       database_path:   Database::default_path(),
       storage_path:    Database::default_storage_path(),
       retrievers_path: Self::default_retrievers_path(),
+      resources_path:  Self::default_resources_path(),
     }
   }
 }
@@ -537,6 +582,7 @@ impl LearnerBuilder {
     };
 
     // Ensure paths exist
+    std::fs::create_dir_all(&config.resources_path)?;
     std::fs::create_dir_all(&config.retrievers_path)?;
     if let Some(parent) = config.database_path.parent() {
       std::fs::create_dir_all(parent)?;
@@ -547,8 +593,9 @@ impl LearnerBuilder {
     database.set_storage_path(&config.storage_path).await?;
 
     let retriever = Retriever::new().with_config_dir(&config.retrievers_path)?;
+    let resources = Resources::new().with_config_dir(&config.resources_path)?;
 
-    Ok(Learner { config, database, retriever })
+    Ok(Learner { config, database, retriever, resources })
   }
 }
 
@@ -713,11 +760,13 @@ mod tests {
     let storage_dir = tempdir().unwrap();
     let config = Config::default()
       .with_database_path(&database_dir.path().join("learner.db"))
+      .with_resources_path(&config_dir.path().join("config/resources/"))
       .with_retrievers_path(&config_dir.path().join("config/retrievers/"))
       .with_storage_path(storage_dir.path());
     let learner =
       Learner::builder().with_path(config_dir.path()).with_config(config).build().await.unwrap();
 
+    assert_eq!(learner.config.resources_path, config_dir.path().join("config/resources/"));
     assert_eq!(learner.config.retrievers_path, config_dir.path().join("config/retrievers/"));
     assert_eq!(learner.config.database_path, database_dir.path().join("learner.db"));
     assert_eq!(learner.database.get_storage_path().await.unwrap(), storage_dir.path());

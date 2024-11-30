@@ -1,4 +1,4 @@
-type_name = "thesis"
+name = "thesis"
 
 description = "A master's thesis or doctoral dissertation"
 

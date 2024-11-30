@@ -1,6 +1,3 @@
-use resource::ResourceConfig;
-use response::ResponseFormat;
-
 use super::*;
 
 /// Configuration for a specific paper source retriever.
@@ -50,6 +47,10 @@ pub struct RetrieverConfig {
   /// Optional HTTP headers for API requests
   #[serde(default)]
   pub headers:           HashMap<String, String>,
+}
+
+impl Identifiable for RetrieverConfig {
+  fn name(&self) -> String { self.name.clone() }
 }
 
 impl RetrieverConfig {
