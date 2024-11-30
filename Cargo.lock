@@ -1197,6 +1197,8 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "learner",
+ "regex",
+ "reqwest",
  "tempfile",
  "tokio",
  "toml",
