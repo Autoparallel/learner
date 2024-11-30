@@ -34,6 +34,7 @@ pub struct RetrieverConfig {
   /// Name of this retriever configuration
   pub name:              String,
   /// The type of resource this retriever should yield
+  #[serde(deserialize_with = "load_resource_config")]
   pub resource:          ResourceConfig,
   /// Base URL for API requests
   pub base_url:          String,
@@ -132,5 +133,24 @@ impl RetrieverConfig {
     todo!();
 
     // Ok(resource)
+  }
+}
+
+fn load_resource_config<'de, D>(deserializer: D) -> std::result::Result<ResourceConfig, D::Error>
+where D: serde::Deserializer<'de> {
+  #[derive(Deserialize)]
+  #[serde(untagged)]
+  enum ResourceConfigRef {
+    Inline(ResourceConfig),
+    Path(PathBuf),
+  }
+
+  let config_ref = ResourceConfigRef::deserialize(deserializer)?;
+  match config_ref {
+    ResourceConfigRef::Inline(config) => Ok(config),
+    ResourceConfigRef::Path(path) => {
+      let content = std::fs::read_to_string(&path).map_err(serde::de::Error::custom)?;
+      toml::from_str(&content).map_err(serde::de::Error::custom)
+    },
   }
 }
