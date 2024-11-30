@@ -1,3 +1,5 @@
+use std::ops::{Index, IndexMut};
+
 use super::*;
 
 pub trait Identifiable {
@@ -6,13 +8,13 @@ pub trait Identifiable {
 
 pub trait Configurable: Sized {
   type Config: Identifiable + for<'de> Deserialize<'de>;
-  fn insert(&mut self, config_name: String, config: Self::Config);
+  fn as_map(&mut self) -> &mut BTreeMap<String, Self::Config>;
 
-  fn with_config(mut self, config: Self::Config) { self.insert(config.name(), config); }
+  fn with_config(mut self, config: Self::Config) { self.as_map().insert(config.name(), config); }
 
   fn with_config_str(mut self, toml_str: &str) -> Result<Self> {
     let config: Self::Config = toml::from_str(toml_str)?;
-    self.insert(config.name(), config);
+    self.as_map().insert(config.name(), config);
     Ok(self)
   }
 
@@ -23,7 +25,6 @@ pub trait Configurable: Sized {
 
   fn with_config_dir(self, dir: impl AsRef<Path>) -> Result<Self> {
     let dir = dir.as_ref();
-    dbg!(&dir);
     if !dir.is_dir() {
       return Err(LearnerError::Path(std::io::Error::new(
         std::io::ErrorKind::NotFound,

@@ -299,7 +299,7 @@ pub struct Learner {
   /// Database connection and operations
   pub database:  Database,
   /// Paper retrieval system
-  pub retriever: Retriever,
+  pub retriever: Retrievers,
   /// Resources to use
   pub resources: Resources,
 }
@@ -592,7 +592,7 @@ impl LearnerBuilder {
     let database = Database::open(&config.database_path).await?;
     database.set_storage_path(&config.storage_path).await?;
 
-    let retriever = Retriever::new().with_config_dir(&config.retrievers_path)?;
+    let retriever = Retrievers::new().with_config_dir(&config.retrievers_path)?;
     let resources = Resources::new().with_config_dir(&config.resources_path)?;
 
     Ok(Learner { config, database, retriever, resources })

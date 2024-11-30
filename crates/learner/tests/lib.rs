@@ -20,7 +20,6 @@ mod workflows;
 
 pub type TestResult<T> = Result<T, Box<dyn Error>>;
 
-// #[tokio::test]
 pub async fn create_test_learner() -> (Learner, TempDir, TempDir, TempDir) {
   let config_dir = tempdir().unwrap();
   let database_dir = tempdir().unwrap();

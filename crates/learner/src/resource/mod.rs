@@ -11,7 +11,7 @@ use toml::Value;
 
 #[derive(Debug, Clone, Default)]
 pub struct Resources {
-  resource_configs: BTreeMap<String, ResourceConfig>,
+  configs: BTreeMap<String, ResourceConfig>,
 }
 
 impl Resources {
@@ -21,9 +21,7 @@ impl Resources {
 impl Configurable for Resources {
   type Config = ResourceConfig;
 
-  fn insert(&mut self, config_name: String, config: Self::Config) {
-    self.resource_configs.insert(config_name, config);
-  }
+  fn as_map(&mut self) -> &mut BTreeMap<String, Self::Config> { &mut self.configs }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -283,15 +281,14 @@ pub fn toml_to_chrono_datetime(dt: toml::value::Datetime) -> DateTime<Utc> {
 
 #[cfg(test)]
 mod tests {
-  use chrono::{TimeZone, Utc};
+  use chrono::TimeZone;
 
   use super::*;
 
   #[test]
-  fn test_paper_configuration() -> Result<()> {
-    // Load the paper configuration
+  fn validate_paper_configuration() {
     let config = include_str!("../../config/resources/paper.toml");
-    let config: ResourceConfig = toml::from_str(config)?;
+    let config: ResourceConfig = toml::from_str(config).unwrap();
 
     let date = chrono_to_toml_datetime(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
@@ -310,21 +307,19 @@ mod tests {
     ]);
 
     // Validate the paper
-    assert!(config.validate(&paper_values)?);
+    assert!(config.validate(&paper_values).unwrap());
 
     // Test required field validation
     let invalid_paper = toml::value::Table::from_iter([
       ("authors".into(), toml::Value::Array(vec![])), // Missing title
     ]);
     assert!(config.validate(&invalid_paper).is_err());
-
-    Ok(())
   }
 
   #[test]
-  fn test_book_configuration() -> Result<()> {
+  fn validate_book_configuration() {
     let config = include_str!("../../config/resources/book.toml");
-    let config: ResourceConfig = toml::from_str(config)?;
+    let config: ResourceConfig = toml::from_str(config).unwrap();
 
     let date = chrono_to_toml_datetime(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
@@ -342,14 +337,13 @@ mod tests {
       ("publication_date".into(), toml::Value::Datetime(date)),
     ]);
 
-    assert!(config.validate(&book_values)?);
-    Ok(())
+    assert!(config.validate(&book_values).unwrap());
   }
 
   #[test]
-  fn test_thesis_configuration() -> Result<()> {
+  fn validate_thesis_configuration() {
     let config = include_str!("../../config/resources/thesis.toml");
-    let config: ResourceConfig = toml::from_str(config)?;
+    let config: ResourceConfig = toml::from_str(config).unwrap();
 
     let date = chrono_to_toml_datetime(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
@@ -365,13 +359,11 @@ mod tests {
       ),
     ]);
 
-    assert!(config.validate(&thesis_values)?);
+    assert!(config.validate(&thesis_values).unwrap());
 
     // Test degree enum validation
     let mut invalid_thesis = thesis_values.clone();
     invalid_thesis.insert("degree".into(), toml::Value::String("InvalidDegree".into()));
     assert!(config.validate(&invalid_thesis).is_err());
-
-    Ok(())
   }
 }
