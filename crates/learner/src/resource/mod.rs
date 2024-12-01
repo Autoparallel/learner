@@ -9,6 +9,13 @@ pub use paper::*;
 pub use shared::*;
 use toml::Value;
 
+// TODO (autoparallel): We almost need something like `Resource` to be given by these
+// `ResourceConfig`s. Or, even renaming these like `ResourceTemplates` or something so a `Resource`
+// has to fit into the `ResourceTemplate` (now that I type this out, `ResourceConfig` is still a
+// reasonable name). But when we want to retrieve a resource, we need to actually get back a
+// resource. Perhaps its just:
+pub type Resource = BTreeMap<String, Value>;
+
 #[derive(Debug, Clone, Default)]
 pub struct Resources {
   configs: BTreeMap<String, ResourceConfig>,

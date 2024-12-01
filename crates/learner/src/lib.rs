@@ -153,7 +153,7 @@ use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::Url;
-use resource::{ResourceConfig, Resources};
+use resource::{Resource, ResourceConfig, Resources};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, trace, warn};
 #[cfg(test)]
@@ -292,13 +292,13 @@ pub struct Config {
 #[derive(Debug, Clone)]
 pub struct Learner {
   /// Active configuration
-  pub config:    Config,
+  pub config:     Config,
   /// Database connection and operations
-  pub database:  Database,
+  pub database:   Database,
   /// Paper retrieval system
-  pub retriever: Retrievers,
+  pub retrievers: Retrievers,
   /// Resources to use
-  pub resources: Resources,
+  pub resources:  Resources,
 }
 
 /// Builder for creating configured Learner instances.
@@ -591,7 +591,7 @@ impl LearnerBuilder {
     let retriever = Retrievers::new().with_config_dir(&config.retrievers_path)?;
     let resources = Resources::new().with_config_dir(&config.resources_path)?;
 
-    Ok(Learner { config, database, retriever, resources })
+    Ok(Learner { config, database, retrievers: retriever, resources })
   }
 }
 
@@ -743,6 +743,32 @@ impl Learner {
   /// # }
   /// ```
   pub async fn init() -> Result<Self> { Self::with_config(Config::init()?).await }
+
+  pub async fn retreive(&mut self, input: &str) -> Result<Resource> {
+    let mut matches = Vec::new();
+
+    // Find all configs that match the input
+    for (name, config) in self.retrievers.as_map().iter() {
+      if config.pattern.is_match(input) {
+        matches.push((name, config));
+      }
+    }
+
+    match matches.len() {
+      0 => Err(LearnerError::InvalidIdentifier),
+      1 => {
+        let resource_config = self.resources.as_map().get(matches[0].0);
+        if let Some(resource_config) = resource_config {
+          Ok(matches[0].1.retrieve_resource(input, resource_config).await?)
+        } else {
+          todo!("Error because that resource wasn't available.")
+        }
+      },
+      _ => Err(LearnerError::AmbiguousIdentifier(
+        matches.into_iter().map(|(n, c)| n.to_string()).collect(),
+      )),
+    }
+  }
 }
 
 #[cfg(test)]

@@ -8,7 +8,7 @@ use super::*;
 async fn test_download_then_send_pdf() -> Result<(), Box<dyn Error>> {
   // Download a PDF
   let (mut learner, _cfg_dir, _db_dir, _strg_dir) = create_test_learner().await;
-  let paper = learner.retriever.get_paper("https://eprint.iacr.org/2016/260").await?;
+  let paper = learner.retrievers.get_paper("https://eprint.iacr.org/2016/260").await?;
   // let paper = Paper::new("https://eprint.iacr.org/2016/260").await.unwrap();
 
   // paper.download_pdf(dir.path()).await.unwrap();

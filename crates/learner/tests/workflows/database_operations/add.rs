@@ -79,7 +79,7 @@ mod document_operations {
   #[tokio::test]
   async fn test_add_complete_paper() -> TestResult<()> {
     let (mut learner, _cfg_dir, _db_dir, _strg_dir) = create_test_learner().await;
-    let paper = learner.retriever.get_paper("https://arxiv.org/abs/2301.07041").await?;
+    let paper = learner.retrievers.get_paper("https://arxiv.org/abs/2301.07041").await?;
 
     let papers = Add::complete(&paper).execute(&mut learner.database).await?;
     assert_eq!(papers.len(), 1);
@@ -102,7 +102,7 @@ mod document_operations {
   #[tokio::test]
   async fn test_add_paper_then_document() -> TestResult<()> {
     let (mut learner, _cfg_dir, _db_dir, _strg_dir) = create_test_learner().await;
-    let paper = learner.retriever.get_paper("https://arxiv.org/abs/2301.07041").await?;
+    let paper = learner.retrievers.get_paper("https://arxiv.org/abs/2301.07041").await?;
 
     // First add paper only
     Add::paper(&paper).execute(&mut learner.database).await?;
@@ -127,7 +127,7 @@ mod document_operations {
   #[tokio::test]
   async fn test_chain_document_addition() -> TestResult<()> {
     let (mut learner, _cfg_dir, _db_dir, _strg_dir) = create_test_learner().await;
-    let paper = learner.retriever.get_paper("https://arxiv.org/abs/2301.07041").await?;
+    let paper = learner.retrievers.get_paper("https://arxiv.org/abs/2301.07041").await?;
 
     let papers = Add::paper(&paper).with_document().execute(&mut learner.database).await?;
     assert_eq!(papers.len(), 1);
@@ -146,8 +146,8 @@ mod document_operations {
     let (mut learner, _cfg_dir, _db_dir, _strg_dir) = create_test_learner().await;
 
     // Add multiple papers without documents
-    let paper1 = learner.retriever.get_paper("https://arxiv.org/abs/2301.07041").await?;
-    let paper2 = learner.retriever.get_paper("https://eprint.iacr.org/2016/260").await?;
+    let paper1 = learner.retrievers.get_paper("https://arxiv.org/abs/2301.07041").await?;
+    let paper2 = learner.retrievers.get_paper("https://eprint.iacr.org/2016/260").await?;
     Add::paper(&paper1).execute(&mut learner.database).await?;
     Add::paper(&paper2).execute(&mut learner.database).await?;
 

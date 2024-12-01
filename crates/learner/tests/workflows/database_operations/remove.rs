@@ -60,7 +60,7 @@ mod basic_operations {
   async fn test_remove_complete_paper() -> TestResult<()> {
     let (mut learner, _cfg_dir, _db_dir, _strg_dir) = create_test_learner().await;
 
-    let paper = learner.retriever.get_paper("https://arxiv.org/abs/2301.07041").await?;
+    let paper = learner.retrievers.get_paper("https://arxiv.org/abs/2301.07041").await?;
     // Add paper with document
     Add::complete(&paper).execute(&mut learner.database).await?;
 
@@ -145,7 +145,7 @@ mod dry_run {
   async fn test_dry_run_with_complete_paper() -> TestResult<()> {
     let (mut learner, _cfg_dir, _db_dir, _strg_dir) = create_test_learner().await;
 
-    let paper = learner.retriever.get_paper("https://arxiv.org/abs/2301.07041").await?;
+    let paper = learner.retrievers.get_paper("https://arxiv.org/abs/2301.07041").await?;
     Add::complete(&paper).execute(&mut learner.database).await?;
 
     let would_remove = Remove::by_source(&paper.source, &paper.source_identifier)
@@ -358,7 +358,7 @@ mod recovery {
     let (mut learner, _cfg_dir, _db_dir, _strg_dir) = create_test_learner().await;
 
     // Add paper without document
-    let paper = learner.retriever.get_paper("https://arxiv.org/abs/2301.07041").await?;
+    let paper = learner.retrievers.get_paper("https://arxiv.org/abs/2301.07041").await?;
     Add::paper(&paper).execute(&mut learner.database).await?;
 
     // Remove it

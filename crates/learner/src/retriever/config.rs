@@ -1,3 +1,5 @@
+use resource::Resource;
+
 use super::*;
 
 /// Configuration for a specific paper source retriever.
@@ -130,8 +132,14 @@ impl RetrieverConfig {
     Ok(paper)
   }
 
+  // TODO: perhaps this just isn't even implemented here and is instead implemented on `Learner`.
+  // Could consider an `api.rs` module to extend more learner functionality there.
   #[allow(missing_docs)]
-  pub async fn retrieve_resource(&self, input: &str) -> Result<ResourceConfig> {
+  pub async fn retrieve_resource(
+    &self,
+    input: &str,
+    resource_config: &ResourceConfig,
+  ) -> Result<Resource> {
     let identifier = self.extract_identifier(input)?;
 
     // Send request and get response
