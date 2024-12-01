@@ -1,32 +1,9 @@
-//! JSON response parser implementation.
-//!
-//! This module handles parsing of JSON API responses into resources using
-//! configurable field mappings. It supports path-based field extraction
-//! with optional transformations.
-//!
-//! # Example Configuration
-//!
-//! ```toml
-//! [response_format]
-//! type = "json"
-//!
-//! [response_format.field_maps]
-//! title = { path = "message/title/0" }
-//! summary = { path = "message/abstract" }
-//! created_at = { path = "message/published/date-time" }
-//! contributors = { path = "message/contributors" }
-//! ```
-
 use resource::{chrono_to_toml_datetime, FieldDefinition, TypeDefinition};
 use serde_json;
 use toml::{self, Value as TomlValue};
 
 use super::*;
 
-/// Configuration for processing JSON API responses.
-///
-/// Provides field mapping rules to extract resource fields from JSON responses
-/// using path-based access patterns.
 #[derive(Debug, Clone, Deserialize)]
 pub struct JsonConfig {
   pub field_maps: HashMap<String, FieldMap>,
@@ -39,12 +16,14 @@ impl ResponseProcessor for JsonConfig {
     let json: serde_json::Value = serde_json::from_slice(data)
       .map_err(|e| LearnerError::ApiError(format!("Failed to parse JSON: {}", e)))?;
 
+    dbg!(&self);
     trace!("Processing JSON response: {}", serde_json::to_string_pretty(&json).unwrap());
 
     let mut resource = BTreeMap::new();
 
     // Process each field according to resource configuration
     for field_def in &resource_config.fields {
+      dbg!(&field_def);
       if let Some(field_map) = self.field_maps.get(&field_def.name) {
         // Extract raw value if present, now passing the full field definition
         if let Some(value) = self.extract_value(&json, field_map, field_def)? {
@@ -89,7 +68,7 @@ impl JsonConfig {
               self.json_to_toml_value(item, &def.field_type, def.type_definition.as_ref())
             } else {
               // For simple arrays without type definitions, do basic conversion
-              Ok(self.convert_simple_value(item))
+              Ok(convert_simple_value(item))
             }
           })
           .filter_map(|r| r.transpose())
@@ -107,7 +86,7 @@ impl JsonConfig {
           if let Some(fields) = &type_def.fields {
             for field_def in fields {
               if let Some(field_map) = self.field_maps.get(&field_def.name) {
-                if let Some(field_value) = self.get_path_value(value, &field_map.path) {
+                if let Some(field_value) = get_path_value(value, &field_map.path) {
                   if let Some(converted) = self.json_to_toml_value(
                     field_value,
                     &field_def.field_type,
@@ -125,7 +104,7 @@ impl JsonConfig {
             .as_object()
             .ok_or_else(|| LearnerError::ApiError("Expected object value".into()))?;
           for (key, val) in obj {
-            if let Some(converted) = self.convert_simple_value(val) {
+            if let Some(converted) = convert_simple_value(val) {
               map.insert(key.clone(), converted);
             }
           }
@@ -135,70 +114,11 @@ impl JsonConfig {
       },
 
       // Handle primitive types
-      "string" | "datetime" | "boolean" => self.convert_primitive_value(value, field_type),
+      "string" | "datetime" | "boolean" => convert_primitive_value(value, field_type),
 
       // Handle unsupported types
       unsupported =>
         Err(LearnerError::ApiError(format!("Unsupported field type: {}", unsupported))),
-    }
-  }
-
-  /// Converts a primitive JSON value to a TOML value
-  fn convert_primitive_value(
-    &self,
-    value: &serde_json::Value,
-    field_type: &str,
-  ) -> Result<Option<TomlValue>> {
-    match field_type {
-      "string" => value
-        .as_str()
-        .map(|s| TomlValue::String(s.to_string()))
-        .ok_or_else(|| LearnerError::ApiError("Expected string value".into()))
-        .map(Some),
-
-      "datetime" => value
-        .as_str()
-        .ok_or_else(|| LearnerError::ApiError("Expected string for datetime".into()))
-        .and_then(|s| {
-          DateTime::parse_from_rfc3339(s)
-            .map_err(|e| LearnerError::ApiError(format!("Invalid datetime: {}", e)))
-        })
-        .map(|dt| Some(TomlValue::Datetime(chrono_to_toml_datetime(dt.with_timezone(&Utc))))),
-
-      "boolean" => value
-        .as_bool()
-        .map(TomlValue::Boolean)
-        .ok_or_else(|| LearnerError::ApiError("Expected boolean value".into()))
-        .map(Some),
-
-      _ => Ok(self.convert_simple_value(value)),
-    }
-  }
-
-  /// Basic conversion for simple JSON values
-  fn convert_simple_value(&self, value: &serde_json::Value) -> Option<TomlValue> {
-    match value {
-      serde_json::Value::String(s) => Some(TomlValue::String(s.clone())),
-      serde_json::Value::Number(n) =>
-        if n.is_i64() {
-          n.as_i64().map(TomlValue::Integer)
-        } else {
-          n.as_f64().map(TomlValue::Float)
-        },
-      serde_json::Value::Bool(b) => Some(TomlValue::Boolean(*b)),
-      serde_json::Value::Array(arr) => {
-        let values: Vec<_> =
-          arr.iter().filter_map(|item| self.convert_simple_value(item)).collect();
-        Some(TomlValue::Array(values))
-      },
-      serde_json::Value::Object(obj) => {
-        let map = obj
-          .iter()
-          .filter_map(|(k, v)| self.convert_simple_value(v).map(|val| (k.clone(), val)))
-          .collect();
-        Some(TomlValue::Table(map))
-      },
-      serde_json::Value::Null => None,
     }
   }
 
@@ -209,15 +129,10 @@ impl JsonConfig {
     field_map: &FieldMap,
     field_def: &FieldDefinition,
   ) -> Result<Option<TomlValue>> {
-    if let Some(value) = self.get_path_value(json, &field_map.path) {
+    if let Some(value) = get_path_value(json, &field_map.path) {
       // Apply transformations if configured
       let transformed_value = if let Some(transform) = &field_map.transform {
-        if let Some(str_val) = value.as_str() {
-          let transformed = apply_transform(str_val, transform)?;
-          serde_json::Value::String(transformed)
-        } else {
-          value.clone()
-        }
+        serde_json::from_str(&apply_transform(&serde_json::to_string(&value)?, transform)?)?
       } else {
         value.clone()
       };
@@ -232,21 +147,76 @@ impl JsonConfig {
       Ok(None)
     }
   }
+}
 
-  // get_path_value remains the same as it's already working well
-  fn get_path_value<'a>(
-    &self,
-    json: &'a serde_json::Value,
-    path: &str,
-  ) -> Option<&'a serde_json::Value> {
-    let mut current = json;
-    for part in path.split('/') {
-      current = if let Ok(index) = part.parse::<usize>() {
-        current.as_array()?.get(index)?
+/// Converts a primitive JSON value to a TOML value
+fn convert_primitive_value(
+  value: &serde_json::Value,
+  field_type: &str,
+) -> Result<Option<TomlValue>> {
+  match field_type {
+    "string" => value
+      .as_str()
+      .map(|s| TomlValue::String(s.to_string()))
+      .ok_or_else(|| LearnerError::ApiError("Expected string value".into()))
+      .map(Some),
+
+    "datetime" => value
+      .as_str()
+      .ok_or_else(|| LearnerError::ApiError("Expected string for datetime".into()))
+      .and_then(|s| {
+        DateTime::parse_from_rfc3339(s)
+          .map_err(|e| LearnerError::ApiError(format!("Invalid datetime: {}", e)))
+      })
+      .map(|dt| Some(TomlValue::Datetime(chrono_to_toml_datetime(dt.with_timezone(&Utc))))),
+
+    "boolean" => value
+      .as_bool()
+      .map(TomlValue::Boolean)
+      .ok_or_else(|| LearnerError::ApiError("Expected boolean value".into()))
+      .map(Some),
+
+    _ => Ok(convert_simple_value(value)),
+  }
+}
+
+pub fn get_path_value<'a>(
+  json: &'a serde_json::Value,
+  path: &str,
+) -> Option<&'a serde_json::Value> {
+  let mut current = json;
+  for part in path.split('/') {
+    current = if let Ok(index) = part.parse::<usize>() {
+      current.as_array()?.get(index)?
+    } else {
+      current.get(part)?
+    };
+  }
+  Some(current)
+}
+
+/// Basic conversion for simple JSON values
+fn convert_simple_value(value: &serde_json::Value) -> Option<TomlValue> {
+  match value {
+    serde_json::Value::String(s) => Some(TomlValue::String(s.clone())),
+    serde_json::Value::Number(n) =>
+      if n.is_i64() {
+        n.as_i64().map(TomlValue::Integer)
       } else {
-        current.get(part)?
-      };
-    }
-    Some(current)
+        n.as_f64().map(TomlValue::Float)
+      },
+    serde_json::Value::Bool(b) => Some(TomlValue::Boolean(*b)),
+    serde_json::Value::Array(arr) => {
+      let values: Vec<_> = arr.iter().filter_map(|item| convert_simple_value(item)).collect();
+      Some(TomlValue::Array(values))
+    },
+    serde_json::Value::Object(obj) => {
+      let map = obj
+        .iter()
+        .filter_map(|(k, v)| convert_simple_value(v).map(|val| (k.clone(), val)))
+        .collect();
+      Some(TomlValue::Table(map))
+    },
+    serde_json::Value::Null => None,
   }
 }

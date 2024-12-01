@@ -21,6 +21,9 @@ type        = "Replace"
 
 [response_format.field_maps.authors]
 path = "message/author"
+[response_format.field_maps.authors.transform]
+fields = ["given", "family"]
+type   = "CombineFields"
 
 [response_format.field_maps.publication_date]
 path = "message/created/date-time"

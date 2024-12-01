@@ -151,7 +151,6 @@ impl ResourceConfig {
 
           // Pattern matching via regex
           if let Some(pattern) = &rules.pattern {
-            dbg!(&pattern);
             let re = Regex::new(pattern)
               .map_err(|_| LearnerError::InvalidResource("Invalid regex pattern".into()))?;
             if !re.is_match(v) {

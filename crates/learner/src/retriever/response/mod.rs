@@ -100,6 +100,10 @@ pub enum Transform {
     /// Optional suffix to append to the URL (e.g., ".pdf")
     suffix: Option<String>,
   },
+  // New transform for combining fields
+  CombineFields {
+    fields: Vec<String>,
+  },
 }
 
 /// Trait for processing API responses into Paper objects.

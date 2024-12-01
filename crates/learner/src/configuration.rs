@@ -1,5 +1,3 @@
-use std::ops::{Index, IndexMut};
-
 use super::*;
 
 pub trait Identifiable {
