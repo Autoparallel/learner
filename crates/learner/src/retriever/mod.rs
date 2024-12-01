@@ -327,7 +327,7 @@ fn apply_transform(value: &str, transform: &Transform) -> Result<String> {
         .map(|dt| dt.format(to_format).to_string()),
     Transform::Url { base, suffix } =>
       Ok(format!("{}{}", base.replace("{value}", value), suffix.as_deref().unwrap_or(""))),
-    Transform::CombineFields { fields } => {
+    Transform::CombineFields { fields, inner_paths } => {
       let json: serde_json::Value = serde_json::from_str(value)
         .map_err(|e| LearnerError::ApiError(format!("Failed to parse JSON: {}", e)))?;
 
@@ -338,24 +338,43 @@ fn apply_transform(value: &str, transform: &Transform) -> Result<String> {
           .iter()
           .filter_map(|obj| {
             let mut map = serde_json::Map::new();
+            dbg!(&obj);
+
+            // Handle the name fields combination
             let parts: Vec<_> =
               fields.iter().filter_map(|field| obj.get(field)).filter_map(|v| v.as_str()).collect();
+
             if !parts.is_empty() {
               map.insert("name".to_string(), serde_json::Value::String(parts.join(" ")));
+
+              // Handle any additional inner paths
+              if let Some(paths) = inner_paths {
+                dbg!(paths);
+                for path in paths {
+                  if let Some(inner_val) = get_path_value(obj, &path.path) {
+                    dbg!(inner_val);
+                    if let Some(str_val) = inner_val.as_str() {
+                      // Use the last component of the path as the field name
+                      let field_name = path.new_key_name.clone();
+                      map.insert(
+                        field_name.to_string(),
+                        serde_json::Value::String(str_val.to_string()),
+                      );
+                    }
+                  }
+                }
+              }
+
               Some(map)
             } else {
               None
             }
           })
           .collect();
+
         serde_json::Value::Array(combined.into_iter().map(serde_json::Value::Object).collect())
-      } else if let Some(obj) = json.as_object() {
-        // Handle single object
-        let parts: Vec<_> =
-          fields.iter().filter_map(|field| obj.get(field)).filter_map(|v| v.as_str()).collect();
-        serde_json::Value::String(parts.join(" "))
       } else {
-        return Err(LearnerError::ApiError("Expected object or array for CombineFields".into()));
+        return Err(LearnerError::ApiError("Expected array for CombineFields".into()));
       };
 
       serde_json::to_string(&result)

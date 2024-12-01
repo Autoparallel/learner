@@ -102,8 +102,15 @@ pub enum Transform {
   },
   // New transform for combining fields
   CombineFields {
-    fields: Vec<String>,
+    fields:      Vec<String>,            // Fields to combine for name
+    inner_paths: Option<Vec<InnerPath>>, // Additional paths to collect
   },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct InnerPath {
+  pub new_key_name: String,
+  pub path:         String,
 }
 
 /// Trait for processing API responses into Paper objects.

@@ -22,8 +22,9 @@ type        = "Replace"
 [response_format.field_maps.authors]
 path = "message/author"
 [response_format.field_maps.authors.transform]
-fields = ["given", "family"]
-type   = "CombineFields"
+fields      = ["given", "family"]
+inner_paths = [{ new_key_name = "affiliation", path = "affiliation/0/name" }]
+type        = "CombineFields"
 
 [response_format.field_maps.publication_date]
 path = "message/created/date-time"
