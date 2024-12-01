@@ -4,6 +4,7 @@ use learner::resource::ResourceConfig;
 
 use super::*;
 
+#[traced_test]
 #[tokio::test]
 async fn test_arxiv_retriever_integration() -> TestResult<()> {
   let ret_config_str = fs::read_to_string("config/retrievers/arxiv.toml").expect(
@@ -27,6 +28,7 @@ async fn test_arxiv_retriever_integration() -> TestResult<()> {
     paper.get("title").unwrap().as_str().unwrap(),
     "Verifiable Fully Homomorphic Encryption"
   );
+  todo!("This needs cleaned up.");
   // assert!(!paper.title.is_empty());
   // assert!(!paper.authors.is_empty());
   // assert!(!paper.abstract_text.is_empty());
@@ -59,22 +61,35 @@ async fn test_arxiv_pdf_from_paper() -> TestResult<()> {
   // Ok(())
 }
 
+#[traced_test]
 #[tokio::test]
-async fn test_iacr_retriever_integration() {
-  let config_str =
-    fs::read_to_string("config/retrievers/iacr.toml").expect("Failed to read config file");
+async fn test_iacr_retriever_integration() -> TestResult<()> {
+  let ret_config_str = fs::read_to_string("config/retrievers/iacr.toml").expect(
+    "Failed to read config
+    file",
+  );
+  let res_config_str = fs::read_to_string("config/resources/paper.toml").expect(
+    "Failed to read config
+    file",
+  );
 
-  let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
+  let retriever: RetrieverConfig = toml::from_str(&ret_config_str).expect("Failed to parse config");
+  let resource: ResourceConfig = toml::from_str(&res_config_str).expect("Failed to parse config");
 
   // // Test with a real IACR paper
-  // let paper = retriever.retrieve_paper("2016/260").await.unwrap();
+  let paper = retriever.retrieve_resource("2016/260", resource).await.unwrap();
 
+  dbg!(&paper);
+
+  todo!("This likely needs cleaned up");
   // assert!(!paper.title.is_empty());
   // assert!(!paper.authors.is_empty());
   // assert!(!paper.abstract_text.is_empty());
   // assert!(paper.pdf_url.is_some());
   // assert_eq!(paper.source, "iacr");
   // assert_eq!(paper.source_identifier, "2016/260");
+
+  Ok(())
 }
 
 #[traced_test]

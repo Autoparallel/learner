@@ -65,6 +65,8 @@ impl ResponseProcessor for XmlConfig {
       String::from_utf8_lossy(data).to_string()
     };
 
+    trace!("Processing XML response: {:#?}", &xml);
+
     // Extract raw XML content into path -> string mapping
     let content = self.extract_content(&xml)?;
     let mut resource = BTreeMap::new();
