@@ -16,14 +16,12 @@ impl ResponseProcessor for JsonConfig {
     let json: serde_json::Value = serde_json::from_slice(data)
       .map_err(|e| LearnerError::ApiError(format!("Failed to parse JSON: {}", e)))?;
 
-    dbg!(&self);
     trace!("Processing JSON response: {}", serde_json::to_string_pretty(&json).unwrap());
 
     let mut resource = BTreeMap::new();
 
     // Process each field according to resource configuration
     for field_def in &resource_config.fields {
-      dbg!(&field_def);
       if let Some(field_map) = self.field_maps.get(&field_def.name) {
         // Extract raw value if present, now passing the full field definition
         if let Some(value) = self.extract_value(&json, field_map, field_def)? {
