@@ -1,5 +1,3 @@
-use environment::Environment;
-
 use super::*;
 
 /// Configuration for a specific paper source retriever.
@@ -32,9 +30,9 @@ use super::*;
 pub struct RetrieverConfig {
   /// Name of this retriever configuration
   pub name:              String,
+  // TODO (autoparallel): Ultimately this will have to peer into the `Resources` to be useful
   /// The type of resource this retriever should yield
-  #[serde(deserialize_with = "load_resource_config")]
-  pub resource:          ResourceConfig,
+  pub resource:          String,
   /// Base URL for API requests
   pub base_url:          String,
   /// Regex pattern for matching and extracting paper identifiers
@@ -132,6 +130,7 @@ impl RetrieverConfig {
     Ok(paper)
   }
 
+  #[allow(missing_docs)]
   pub async fn retrieve_resource(&self, input: &str) -> Result<ResourceConfig> {
     let identifier = self.extract_identifier(input)?;
 
@@ -152,56 +151,11 @@ impl RetrieverConfig {
     trace!("{} response: {}", self.name, String::from_utf8_lossy(&data));
 
     // Process the response into a generic Value first
-    let response_processor = match &self.response_format {
+    let _response_processor = match &self.response_format {
       ResponseFormat::Xml(config) => config as &dyn ResponseProcessor,
       ResponseFormat::Json(config) => config as &dyn ResponseProcessor,
     };
 
     todo!();
-
-    // Ok(resource)
-  }
-}
-
-fn load_resource_config<'de, D>(deserializer: D) -> std::result::Result<ResourceConfig, D::Error>
-where D: serde::Deserializer<'de> {
-  #[derive(Deserialize)]
-  #[serde(untagged)]
-  enum ResourceConfigRef {
-    Inline(ResourceConfig),
-    Path(String),
-  }
-
-  let config_ref = ResourceConfigRef::deserialize(deserializer)?;
-  match config_ref {
-    ResourceConfigRef::Inline(config) => Ok(config),
-    ResourceConfigRef::Path(resource_name) => {
-      // Try loading from the global environment path
-      let env_path = Environment::resolve_resource_path(&resource_name);
-
-      if env_path.exists() {
-        let content = std::fs::read_to_string(&env_path).map_err(serde::de::Error::custom)?;
-        return toml::from_str(&content).map_err(serde::de::Error::custom);
-      }
-
-      // If global path doesn't exist, try the local fallback
-      // This is mainly useful for development and testing
-      let fallback_path =
-        PathBuf::from("config/resources").join(if resource_name.ends_with(".toml") {
-          resource_name.to_string()
-        } else {
-          format!("{}.toml", resource_name)
-        });
-
-      let content = std::fs::read_to_string(&fallback_path).map_err(|_| {
-        serde::de::Error::custom(format!(
-          "Resource not found at either {} or {}",
-          env_path.display(),
-          fallback_path.display()
-        ))
-      })?;
-
-      toml::from_str(&content).map_err(serde::de::Error::custom)
-    },
   }
 }

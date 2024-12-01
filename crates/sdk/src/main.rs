@@ -3,8 +3,7 @@ mod validate;
 use std::path::{Path, PathBuf};
 
 use clap::{ArgAction, Parser, Subcommand};
-use learner::{environment::Environment, prelude::*};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -120,14 +119,6 @@ async fn main() {
   // Initialize the environment
   info!("{}", message);
   debug!("Using config directory: {}", config_dir.display());
-
-  if let Err(e) =
-    Environment::builder().config_dir(&config_dir).build().and_then(Environment::set_global)
-  {
-    error!("Failed to initialize environment: {}", e);
-    error!("This might indicate a problem with the config directory structure");
-    return;
-  }
 
   // Proceed with validation based on command
   match &cli.command {

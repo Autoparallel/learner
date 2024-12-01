@@ -1,6 +1,6 @@
 use std::fs::read_to_string;
 
-use console::{style, Term}; // For better formatted output
+use console::style;
 use learner::{
   resource::ResourceConfig,
   retriever::{ResponseFormat, RetrieverConfig},
@@ -265,7 +265,7 @@ pub async fn validate_retriever(path: &PathBuf, input: &Option<String>) {
             );
 
             // PDF download test
-            if let Some(url) = &paper.pdf_url {
+            if paper.pdf_url.is_some() {
               println!("\nTesting PDF download capability...");
               let tempdir = tempfile::tempdir().unwrap();
               match paper.download_pdf(tempdir.path()).await {

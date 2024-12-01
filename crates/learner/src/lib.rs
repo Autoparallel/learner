@@ -85,11 +85,6 @@
 //!   - Document storage management
 //!   - Command pattern operations
 //!
-//! - [`clients`]: API clients for paper sources
-//!   - Source-specific implementations
-//!   - Response parsing and validation
-//!   - Error handling and retry logic
-//!
 //! - [`retriever`]: Configurable paper retrieval system
 //!   - Automatic source detection
 //!   - XML and JSON response handling
@@ -168,7 +163,7 @@ pub mod database;
 pub mod retriever;
 
 pub mod configuration;
-pub mod environment;
+
 pub mod error;
 pub mod format;
 pub mod llm;
@@ -575,7 +570,7 @@ impl LearnerBuilder {
   pub async fn build(self) -> Result<Learner> {
     let config = if let Some(config) = self.config {
       config
-    } else if let Some(path) = self.config_path {
+    } else if let Some(path) = &self.config_path {
       let config_file = path.join("config.toml");
       let content = std::fs::read_to_string(config_file)?;
       toml::from_str(&content).map_err(|e| LearnerError::Config(e.to_string()))?
@@ -593,7 +588,6 @@ impl LearnerBuilder {
 
     let database = Database::open(&config.database_path).await?;
     database.set_storage_path(&config.storage_path).await?;
-
     let retriever = Retrievers::new().with_config_dir(&config.retrievers_path)?;
     let resources = Resources::new().with_config_dir(&config.resources_path)?;
 
@@ -755,6 +749,7 @@ impl Learner {
 mod tests {
   use super::*;
 
+  #[traced_test]
   #[tokio::test]
   async fn test_learner_creation() {
     let config_dir = tempdir().unwrap();
@@ -765,6 +760,7 @@ mod tests {
       .with_resources_path(&config_dir.path().join("config/resources/"))
       .with_retrievers_path(&config_dir.path().join("config/retrievers/"))
       .with_storage_path(storage_dir.path());
+
     let learner =
       Learner::builder().with_path(config_dir.path()).with_config(config).build().await.unwrap();
 
