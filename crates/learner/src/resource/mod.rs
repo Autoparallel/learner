@@ -65,6 +65,16 @@ pub struct FieldDefinition {
   /// Optional validation rules
   #[serde(default)]
   pub validation:  Option<ValidationRules>,
+
+  pub type_definition: Option<TypeDefinition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeDefinition {
+  // For array types, defines the structure of elements
+  pub element_type: Option<Box<FieldDefinition>>,
+  // For table types, defines the fields
+  pub fields:       Option<Vec<FieldDefinition>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

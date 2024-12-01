@@ -17,7 +17,7 @@
 //! contributors = { path = "message/contributors" }
 //! ```
 
-use resource::chrono_to_toml_datetime;
+use resource::{chrono_to_toml_datetime, FieldDefinition, TypeDefinition};
 use serde_json;
 use toml::{self, Value as TomlValue};
 
@@ -46,8 +46,8 @@ impl ResponseProcessor for JsonConfig {
     // Process each field according to resource configuration
     for field_def in &resource_config.fields {
       if let Some(field_map) = self.field_maps.get(&field_def.name) {
-        // Extract raw value if present
-        if let Some(value) = self.extract_value(&json, field_map, &field_def.field_type)? {
+        // Extract raw value if present, now passing the full field definition
+        if let Some(value) = self.extract_value(&json, field_map, field_def)? {
           resource.insert(field_def.name.clone(), value);
         } else if field_def.required {
           return Err(LearnerError::ApiError(format!(
@@ -65,27 +65,119 @@ impl ResponseProcessor for JsonConfig {
 }
 
 impl JsonConfig {
-  /// Recursively converts a JSON value into a TOML value
-  fn json_to_toml_value(&self, value: &serde_json::Value) -> Option<TomlValue> {
-    match value {
-      // For JSON objects, recursively convert all their fields
-      serde_json::Value::Object(obj) => {
+  /// Converts a JSON value into a TOML value, respecting type definitions
+  fn json_to_toml_value(
+    &self,
+    value: &serde_json::Value,
+    field_type: &str,
+    type_definition: Option<&TypeDefinition>,
+  ) -> Result<Option<TomlValue>> {
+    match field_type {
+      // Handle array types with potential element type definitions
+      "array" => {
+        let array =
+          value.as_array().ok_or_else(|| LearnerError::ApiError("Expected array value".into()))?;
+
+        // Get element type definition if available
+        let element_def = type_definition.and_then(|def| def.element_type.as_ref());
+
+        // Convert each array element according to its type definition
+        let values: Result<Vec<_>> = array
+          .iter()
+          .map(|item| {
+            if let Some(def) = element_def {
+              self.json_to_toml_value(item, &def.field_type, def.type_definition.as_ref())
+            } else {
+              // For simple arrays without type definitions, do basic conversion
+              Ok(self.convert_simple_value(item))
+            }
+          })
+          .filter_map(|r| r.transpose())
+          .collect();
+
+        Ok(Some(TomlValue::Array(values?)))
+      },
+
+      // Handle table types with field definitions
+      "table" => {
         let mut map = toml::map::Map::new();
-        for (key, val) in obj {
-          if let Some(converted) = self.json_to_toml_value(val) {
-            map.insert(key.clone(), converted);
+
+        // If we have field definitions, follow them for the table structure
+        if let Some(type_def) = type_definition {
+          if let Some(fields) = &type_def.fields {
+            for field_def in fields {
+              if let Some(field_map) = self.field_maps.get(&field_def.name) {
+                if let Some(field_value) = self.get_path_value(value, &field_map.path) {
+                  if let Some(converted) = self.json_to_toml_value(
+                    field_value,
+                    &field_def.field_type,
+                    field_def.type_definition.as_ref(),
+                  )? {
+                    map.insert(field_def.name.clone(), converted);
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          // For tables without type definitions, convert all fields
+          let obj = value
+            .as_object()
+            .ok_or_else(|| LearnerError::ApiError("Expected object value".into()))?;
+          for (key, val) in obj {
+            if let Some(converted) = self.convert_simple_value(val) {
+              map.insert(key.clone(), converted);
+            }
           }
         }
-        Some(TomlValue::Table(map))
+
+        Ok(Some(TomlValue::Table(map)))
       },
 
-      // For arrays, recursively convert all elements
-      serde_json::Value::Array(arr) => {
-        let values: Vec<_> = arr.iter().filter_map(|item| self.json_to_toml_value(item)).collect();
-        Some(TomlValue::Array(values))
-      },
+      // Handle primitive types
+      "string" | "datetime" | "boolean" => self.convert_primitive_value(value, field_type),
 
-      // Direct conversions for primitive types
+      // Handle unsupported types
+      unsupported =>
+        Err(LearnerError::ApiError(format!("Unsupported field type: {}", unsupported))),
+    }
+  }
+
+  /// Converts a primitive JSON value to a TOML value
+  fn convert_primitive_value(
+    &self,
+    value: &serde_json::Value,
+    field_type: &str,
+  ) -> Result<Option<TomlValue>> {
+    match field_type {
+      "string" => value
+        .as_str()
+        .map(|s| TomlValue::String(s.to_string()))
+        .ok_or_else(|| LearnerError::ApiError("Expected string value".into()))
+        .map(Some),
+
+      "datetime" => value
+        .as_str()
+        .ok_or_else(|| LearnerError::ApiError("Expected string for datetime".into()))
+        .and_then(|s| {
+          DateTime::parse_from_rfc3339(s)
+            .map_err(|e| LearnerError::ApiError(format!("Invalid datetime: {}", e)))
+        })
+        .map(|dt| Some(TomlValue::Datetime(chrono_to_toml_datetime(dt.with_timezone(&Utc))))),
+
+      "boolean" => value
+        .as_bool()
+        .map(TomlValue::Boolean)
+        .ok_or_else(|| LearnerError::ApiError("Expected boolean value".into()))
+        .map(Some),
+
+      _ => Ok(self.convert_simple_value(value)),
+    }
+  }
+
+  /// Basic conversion for simple JSON values
+  fn convert_simple_value(&self, value: &serde_json::Value) -> Option<TomlValue> {
+    match value {
       serde_json::Value::String(s) => Some(TomlValue::String(s.clone())),
       serde_json::Value::Number(n) =>
         if n.is_i64() {
@@ -94,20 +186,31 @@ impl JsonConfig {
           n.as_f64().map(TomlValue::Float)
         },
       serde_json::Value::Bool(b) => Some(TomlValue::Boolean(*b)),
+      serde_json::Value::Array(arr) => {
+        let values: Vec<_> =
+          arr.iter().filter_map(|item| self.convert_simple_value(item)).collect();
+        Some(TomlValue::Array(values))
+      },
+      serde_json::Value::Object(obj) => {
+        let map = obj
+          .iter()
+          .filter_map(|(k, v)| self.convert_simple_value(v).map(|val| (k.clone(), val)))
+          .collect();
+        Some(TomlValue::Table(map))
+      },
       serde_json::Value::Null => None,
     }
   }
 
-  /// Extracts and converts a value from the JSON response according to the field type
+  /// Updates extract_value to use the full field definition
   fn extract_value(
     &self,
     json: &serde_json::Value,
     field_map: &FieldMap,
-    field_type: &str,
+    field_def: &FieldDefinition,
   ) -> Result<Option<TomlValue>> {
-    // Get the value at the specified path
     if let Some(value) = self.get_path_value(json, &field_map.path) {
-      // Apply any transformations if it's a string
+      // Apply transformations if configured
       let transformed_value = if let Some(transform) = &field_map.transform {
         if let Some(str_val) = value.as_str() {
           let transformed = apply_transform(str_val, transform)?;
@@ -119,44 +222,18 @@ impl JsonConfig {
         value.clone()
       };
 
-      // Convert the value based on the expected field type
-      match field_type {
-        "string" => transformed_value
-          .as_str()
-          .map(|s| TomlValue::String(s.to_string()))
-          .ok_or_else(|| {
-            LearnerError::ApiError(format!("Expected string value for field type 'string'"))
-          })
-          .map(Some),
-        "datetime" => transformed_value
-          .as_str()
-          .ok_or_else(|| LearnerError::ApiError("Expected string for datetime".into()))
-          .and_then(|s| {
-            DateTime::parse_from_rfc3339(s)
-              .map_err(|e| LearnerError::ApiError(format!("Invalid datetime format: {}", e)))
-          })
-          .map(|dt| Some(TomlValue::Datetime(chrono_to_toml_datetime(dt.with_timezone(&Utc))))),
-        "array" => Ok(self.json_to_toml_value(&transformed_value)),
-        "table" => Ok(self.json_to_toml_value(&transformed_value)),
-        unsupported =>
-          Err(LearnerError::ApiError(format!("Unsupported field type: {}", unsupported))),
-      }
+      // Convert using type definition
+      self.json_to_toml_value(
+        &transformed_value,
+        &field_def.field_type,
+        field_def.type_definition.as_ref(),
+      )
     } else {
       Ok(None)
     }
   }
 
-  /// Gets a string value from JSON using a path
-  fn get_by_path(&self, json: &serde_json::Value, path: &str) -> Option<String> {
-    self.get_path_value(json, path).and_then(|value| match value {
-      serde_json::Value::String(s) => Some(s.clone()),
-      serde_json::Value::Number(n) => Some(n.to_string()),
-      serde_json::Value::Array(arr) if !arr.is_empty() => arr[0].as_str().map(String::from),
-      _ => value.as_str().map(String::from),
-    })
-  }
-
-  /// Navigates JSON structure using a path
+  // get_path_value remains the same as it's already working well
   fn get_path_value<'a>(
     &self,
     json: &'a serde_json::Value,

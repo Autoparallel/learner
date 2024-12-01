@@ -1,7 +1,8 @@
-name = "paper"
-
+# Core resource definition
 description = "A scholarly paper or article published in an academic context"
+name        = "paper"
 
+# Title field - simple string type
 [[fields]]
 description = "The full title of the paper"
 field_type  = "string"
@@ -9,6 +10,7 @@ name        = "title"
 required    = true
 validation  = { min_length = 1, max_length = 500 }
 
+# Authors field - array of complex author objects
 [[fields]]
 description = "The paper's authors with their affiliations"
 field_type  = "array"
@@ -16,18 +18,30 @@ name        = "authors"
 required    = true
 validation  = { min_items = 1 }
 
+[fields.type_definition.element_type]
+field_type = "table"
+fields = [
+    { name = "name", field_type = "string", description = "Author's full name", required = true },
+    { name = "affiliation", field_type = "string", description = "Author's institutional affiliation", required = false },
+    { name = "email", field_type = "string", description = "Author's contact email", required = false },
+]
+name = "author"
+
+# Abstract field - simple string
 [[fields]]
 description = "The paper's abstract or summary"
 field_type  = "string"
 name        = "abstract"
 required    = false
 
+# Publication date - datetime type
 [[fields]]
 description = "When the paper was published or last updated"
 field_type  = "datetime"
 name        = "publication_date"
 required    = false
 
+# DOI field - string with pattern validation
 [[fields]]
 description = "Digital Object Identifier"
 field_type  = "string"
@@ -35,12 +49,20 @@ name        = "doi"
 required    = false
 validation  = { pattern = "^10\\.\\d{4,9}/[-._;()/:a-zA-Z0-9]+$" }
 
+# Keywords field - array of strings
 [[fields]]
 description = "Keywords or subject areas"
 field_type  = "array"
 name        = "keywords"
 required    = false
 
+[fields.type_definition.element_type]
+description = "A single keyword or subject area"
+field_type  = "string"
+name        = "keyword"                          # Add this!
+required    = false
+
+# Publication details - all simple strings
 [[fields]]
 description = "Journal where the paper was published"
 field_type  = "string"
@@ -65,6 +87,7 @@ field_type  = "string"
 name        = "pages"
 required    = false
 
+# Peer review flag - boolean with default
 [[fields]]
 default     = true
 description = "Whether the paper underwent peer review"
