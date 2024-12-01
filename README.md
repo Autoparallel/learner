@@ -321,21 +321,87 @@ just build-all  # build all targets
 > [!TIP]
 > Running `just setup` and `just ci` locally is a quick way to get up to speed and see that the repo is working on your system!
 
-## SDK
-This repository now supplies a very basic SDK for validating a `Retriever` and a `Resource` TOML configurations. 
-To work with this SDK, use:
+## Learner SDK
+
+The Learner SDK provides command-line tools for validating and testing your resource and retriever configurations.
+
+### Installation
+
+```bash
+# From the repository root
+just setup-sdk
 ```
-# Setup
-just setup-sdk # sets up a `config/` dir at repo root with defaults
 
-# Validations
-just validate-retriever <PATH> <OPTIONAL_INPUT> # optionally supply url/identifer
-just validate-resource <PATH>
+### Validating Resource Configurations
 
-# Examples
-just validate-retriever crates/learner/config/retrievers/arxiv.toml 2301.07041
+Resource configurations define the structure and validation rules for different types of academic materials (papers, books, theses, etc.).
+
+```bash
+# View usage information
+just help-resource
+
+# Validate example configurations
+just validate-resource crates/learner/config/resources/paper.toml
+just validate-resource crates/learner/config/resources/book.toml
 just validate-resource crates/learner/config/resources/thesis.toml
 ```
+
+The validator will check:
+- TOML syntax and structure
+- Field type correctness
+- Default value compatibility
+- Validation rule syntax (regex patterns, etc.)
+- Required field presence
+
+### Validating Retriever Configurations
+
+Retriever configurations define how to fetch papers from different sources (arXiv, DOI, IACR, etc.).
+
+```bash
+# View usage information
+just help-retriever
+
+# Validate configuration syntax only
+just validate-retriever crates/learner/config/retrievers/arxiv.toml
+
+# Validate and test live retrieval
+just validate-retriever crates/learner/config/retrievers/arxiv.toml "2301.07041"
+just validate-retriever crates/learner/config/retrievers/doi.toml "10.1145/1327452.1327492"
+just validate-retriever crates/learner/config/retrievers/iacr.toml "2023/123"
+```
+
+The validator will check:
+- TOML syntax and structure
+- URL validity
+- Response format configuration
+- Field mappings
+- Pattern matching
+- Live paper retrieval (when identifier provided)
+- PDF download capability
+
+### Running All Examples
+
+To run all example validations (useful for testing your setup or in CI):
+
+```bash
+just validate-examples
+```
+
+This will validate all provided example configurations and test live retrieval for each supported source.
+
+## Creating Your Own Configurations
+
+Use the example configurations in `crates/learner/config/` as templates:
+
+- Resources
+  - `resources/paper.toml` - Academic papers
+  - `resources/book.toml` - Books and monographs
+  - `resources/thesis.toml` - Theses and dissertations
+
+- Retrievers
+  - `retrievers/arxiv.toml` - arXiv papers
+  - `retrievers/doi.toml` - DOI-based papers
+  - `retrievers/iacr.toml` - IACR papers
 
 
 ## License
