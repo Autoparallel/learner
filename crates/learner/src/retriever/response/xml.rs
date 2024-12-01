@@ -19,6 +19,8 @@
 //! ```
 
 use quick_xml::{events::Event, Reader};
+use resource::chrono_to_toml_datetime;
+use toml::Value;
 
 use super::*;
 
@@ -49,107 +51,77 @@ pub struct XmlConfig {
   pub field_maps:       HashMap<String, FieldMap>,
 }
 
-#[async_trait]
 impl ResponseProcessor for XmlConfig {
-  /// Processes an XML API response into a Paper object.
-  ///
-  /// Extracts paper metadata from the XML response using configured field mappings.
-  /// Handles namespace stripping if enabled and validates required fields.
-  ///
-  /// # Arguments
-  ///
-  /// * `data` - Raw XML response bytes
-  ///
-  /// # Returns
-  ///
-  /// Returns a Result containing either:
-  /// - A populated Paper object
-  /// - A LearnerError if parsing fails or required fields are missing
-  ///
-  /// # Errors
-  ///
-  /// This method will return an error if:
-  /// - XML parsing fails
-  /// - Required fields are missing
-  /// - Field values are invalid or cannot be transformed
-  async fn process_response(&self, data: &[u8]) -> Result<Paper> {
+  fn process_response(
+    &self,
+    data: &[u8],
+    // retriever_config: &RetrieverConfig,
+    resource_config: &ResourceConfig,
+  ) -> Result<Resource> {
+    // Handle namespace stripping
     let xml = if self.strip_namespaces {
       strip_xml_namespaces(&String::from_utf8_lossy(data))
     } else {
       String::from_utf8_lossy(data).to_string()
     };
 
+    // Extract raw XML content into path -> string mapping
     let content = self.extract_content(&xml)?;
+    let mut resource = BTreeMap::new();
 
-    // Helper function to extract and transform field
-    let get_field = |name: &str| -> Result<String> {
-      let map = self
-        .field_maps
-        .get(name)
-        .ok_or_else(|| LearnerError::ApiError(format!("Missing field mapping for {}", name)))?;
+    // Process each field according to the resource configuration
+    for field_def in &resource_config.fields {
+      // Look up the field mapping from retriever config
+      if let Some(field_map) = self.field_maps.get(&field_def.name) {
+        // Try to get the raw value using configured path
+        if let Some(raw_value) = content.get(&field_map.path) {
+          // Apply any configured transformations
+          let transformed_value = if let Some(transform) = &field_map.transform {
+            apply_transform(raw_value, transform)?
+          } else {
+            raw_value.clone()
+          };
 
-      let value = content
-        .get(&map.path)
-        .ok_or_else(|| LearnerError::ApiError(format!("No content found for {}", name)))?;
-
-      if let Some(transform) = &map.transform {
-        apply_transform(value, transform)
-      } else {
-        Ok(value.clone())
-      }
-    };
-
-    let title = get_field("title")?;
-    let abstract_text = get_field("abstract")?;
-    let publication_date = chrono::DateTime::parse_from_rfc3339(&get_field("publication_date")?)
-      .map(|dt| dt.with_timezone(&Utc))
-      .map_err(|e| LearnerError::ApiError(format!("Invalid date format: {}", e)))?;
-
-    // Extract authors
-    let authors = if let Some(map) = self.field_maps.get("authors") {
-      let names: Vec<Author> = content
-        .get(&map.path)
-        .map(|s| {
-          s.split(';')
-            .map(|name| Author {
-              name:        name.trim().to_string(),
-              affiliation: None,
-              email:       None,
-            })
-            .collect()
-        })
-        .unwrap_or_default();
-      if names.is_empty() {
-        return Err(LearnerError::ApiError("No authors found".to_string()));
-      }
-      names
-    } else {
-      return Err(LearnerError::ApiError("Missing authors mapping".to_string()));
-    };
-
-    // Optional fields
-    let pdf_url = self.field_maps.get("pdf_url").and_then(|map| {
-      content.get(&map.path).map(|url| {
-        if let Some(transform) = &map.transform {
-          apply_transform(url, transform).ok().unwrap_or_else(|| url.clone())
-        } else {
-          url.clone()
+          // Convert string to appropriate TOML type based on field definition
+          let value = match field_def.field_type.as_str() {
+            "string" => Value::String(transformed_value),
+            "datetime" => {
+              let dt = DateTime::parse_from_rfc3339(&transformed_value).map_err(|e| {
+                LearnerError::ApiError(format!(
+                  "Invalid date format for field '{}': {}",
+                  field_def.name, e
+                ))
+              })?;
+              Value::Datetime(chrono_to_toml_datetime(dt.with_timezone(&Utc)))
+            },
+            "array" => {
+              // For arrays, split on semicolon and create string array
+              let values =
+                transformed_value.split(';').map(|s| Value::String(s.trim().to_string())).collect();
+              Value::Array(values)
+            },
+            // Add other type conversions as needed
+            unsupported =>
+              return Err(LearnerError::ApiError(format!(
+                "Unsupported field type '{}' for field '{}'",
+                unsupported, field_def.name
+              ))),
+          };
+          resource.insert(field_def.name.clone(), value);
+        } else if field_def.required {
+          // Field was required but not found in response
+          return Err(LearnerError::ApiError(format!(
+            "Required field '{}' not found in response",
+            field_def.name
+          )));
+        } else if let Some(default) = &field_def.default {
+          // Use default value if available
+          resource.insert(field_def.name.clone(), default.clone());
         }
-      })
-    });
+      }
+    }
 
-    let doi = self.field_maps.get("doi").and_then(|map| content.get(&map.path)).map(String::from);
-
-    Ok(Paper {
-      title,
-      authors,
-      abstract_text,
-      publication_date,
-      source: String::new(),
-      source_identifier: String::new(),
-      pdf_url,
-      doi,
-    })
+    Ok(resource)
   }
 }
 

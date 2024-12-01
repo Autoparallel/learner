@@ -124,7 +124,7 @@ pub enum Transform {
 ///   }
 /// }
 /// ```
-#[async_trait]
+// #[async_trait]
 pub trait ResponseProcessor: Send + Sync {
   /// Process raw response data into a Paper object.
   ///
@@ -137,5 +137,10 @@ pub trait ResponseProcessor: Send + Sync {
   /// Returns a Result containing either:
   /// - A fully populated Paper object
   /// - A LearnerError if parsing fails
-  async fn process_response(&self, data: &[u8]) -> Result<Paper>;
+  fn process_response(
+    &self,
+    data: &[u8],
+    // retriever_config: RetrieverConfig,
+    resource_config: &ResourceConfig,
+  ) -> Result<Resource>;
 }

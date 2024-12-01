@@ -1,4 +1,5 @@
 use resource::Resource;
+use toml::Value;
 
 use super::*;
 
@@ -79,66 +80,13 @@ impl RetrieverConfig {
       .ok_or(LearnerError::InvalidIdentifier)
   }
 
-  /// Retrieves a paper using this configuration.
-  ///
-  /// This method:
-  /// 1. Extracts the canonical identifier
-  /// 2. Constructs the API URL
-  /// 3. Makes the HTTP request
-  /// 4. Processes the response
-  ///
-  /// # Arguments
-  ///
-  /// * `input` - Paper identifier or URL
-  ///
-  /// # Returns
-  ///
-  /// Returns a Result containing either:
-  /// - The retrieved Paper object
-  /// - A LearnerError if any step fails
-  ///
-  /// # Errors
-  ///
-  /// This method will return an error if:
-  /// - The identifier cannot be extracted
-  /// - The HTTP request fails
-  /// - The response cannot be parsed
-  pub async fn retrieve_paper(&self, input: &str) -> Result<Paper> {
-    let identifier = self.extract_identifier(input)?;
-    let url = self.endpoint_template.replace("{identifier}", identifier);
-
-    debug!("Fetching from {} via: {}", self.name, url);
-
-    let client = reqwest::Client::new();
-    let mut request = client.get(&url);
-
-    // Add any configured headers
-    for (key, value) in &self.headers {
-      request = request.header(key, value);
-    }
-
-    let response = request.send().await?;
-    let data = response.bytes().await?;
-
-    trace!("{} response: {}", self.name, String::from_utf8_lossy(&data));
-
-    let response_processor = match &self.response_format {
-      ResponseFormat::Xml(config) => config as &dyn ResponseProcessor,
-      ResponseFormat::Json(config) => config as &dyn ResponseProcessor,
-    };
-    let mut paper = response_processor.process_response(&data).await?;
-    paper.source = self.source.clone();
-    paper.source_identifier = identifier.to_string();
-    Ok(paper)
-  }
-
   // TODO: perhaps this just isn't even implemented here and is instead implemented on `Learner`.
   // Could consider an `api.rs` module to extend more learner functionality there.
   #[allow(missing_docs)]
   pub async fn retrieve_resource(
     &self,
     input: &str,
-    resource_config: &ResourceConfig,
+    resource_config: ResourceConfig,
   ) -> Result<Resource> {
     let identifier = self.extract_identifier(input)?;
 
@@ -158,12 +106,22 @@ impl RetrieverConfig {
     let data = response.bytes().await?;
     trace!("{} response: {}", self.name, String::from_utf8_lossy(&data));
 
-    // Process the response into a generic Value first
-    let _response_processor = match &self.response_format {
+    // Process the response using configured processor
+    let processor = match &self.response_format {
       ResponseFormat::Xml(config) => config as &dyn ResponseProcessor,
       ResponseFormat::Json(config) => config as &dyn ResponseProcessor,
     };
 
-    todo!();
+    // Process response and get resource
+    let mut resource = processor.process_response(&data, &resource_config)?;
+
+    // Add source metadata
+    resource.insert("source".into(), Value::String(self.source.clone()));
+    resource.insert("source_identifier".into(), Value::String(identifier.to_string()));
+
+    // Validate full resource against config
+    resource_config.validate(&resource)?;
+
+    Ok(resource)
   }
 }

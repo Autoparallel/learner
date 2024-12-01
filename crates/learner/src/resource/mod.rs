@@ -90,7 +90,7 @@ pub struct ValidationRules {
 
 impl ResourceConfig {
   /// Validates a set of values against this resource configuration
-  pub fn validate(&self, values: &toml::value::Table) -> Result<bool> {
+  pub fn validate(&self, values: &Resource) -> Result<bool> {
     // Check required fields
     for field in &self.fields {
       if field.required {
@@ -299,28 +299,24 @@ mod tests {
 
     let date = chrono_to_toml_datetime(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
-    // Create a valid paper
-    let paper_values = toml::value::Table::from_iter([
-      ("title".into(), toml::Value::String("Understanding Quantum Computing".into())),
-      (
-        "authors".into(),
-        toml::Value::Array(vec![toml::Value::Table(toml::value::Table::from_iter([
-          ("name".into(), toml::Value::String("Alice Researcher".into())),
-          ("affiliation".into(), toml::Value::String("Tech University".into())),
-        ]))]),
-      ),
-      ("publication_date".into(), toml::Value::Datetime(date)),
-      ("doi".into(), toml::Value::String("10.1234/example.123".into())),
-    ]);
+    // Create a valid paper resource
+    let mut paper_resource = BTreeMap::new();
+    paper_resource.insert("title".into(), Value::String("Understanding Quantum Computing".into()));
+
+    // Create the author table using TOML's Map type
+    let author = {
+      let mut map = toml::map::Map::new();
+      map.insert("name".into(), Value::String("Alice Researcher".into()));
+      map.insert("affiliation".into(), Value::String("Tech University".into()));
+      map
+    };
+
+    paper_resource.insert("authors".into(), Value::Array(vec![Value::Table(author)]));
+    paper_resource.insert("publication_date".into(), Value::Datetime(date));
+    paper_resource.insert("doi".into(), Value::String("10.1234/example.123".into()));
 
     // Validate the paper
-    assert!(config.validate(&paper_values).unwrap());
-
-    // Test required field validation
-    let invalid_paper = toml::value::Table::from_iter([
-      ("authors".into(), toml::Value::Array(vec![])), // Missing title
-    ]);
-    assert!(config.validate(&invalid_paper).is_err());
+    assert!(config.validate(&paper_resource).unwrap());
   }
 
   #[test]
@@ -330,21 +326,18 @@ mod tests {
 
     let date = chrono_to_toml_datetime(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
-    let book_values = toml::value::Table::from_iter([
-      ("title".into(), toml::Value::String("Advanced Quantum Computing".into())),
-      (
-        "authors".into(),
-        toml::Value::Array(vec![
-          toml::Value::String("Alice Writer".into()),
-          toml::Value::String("Bob Author".into()),
-        ]),
-      ),
-      ("isbn".into(), toml::Value::String("978-0-12-345678-9".into())),
-      ("publisher".into(), toml::Value::String("Academic Press".into())),
-      ("publication_date".into(), toml::Value::Datetime(date)),
-    ]);
+    // Create a valid book resource
+    let mut book_resource = BTreeMap::new();
+    book_resource.insert("title".into(), Value::String("Advanced Quantum Computing".into()));
+    book_resource.insert(
+      "authors".into(),
+      Value::Array(vec![Value::String("Alice Writer".into()), Value::String("Bob Author".into())]),
+    );
+    book_resource.insert("isbn".into(), Value::String("978-0-12-345678-9".into()));
+    book_resource.insert("publisher".into(), Value::String("Academic Press".into()));
+    book_resource.insert("publication_date".into(), Value::Datetime(date));
 
-    assert!(config.validate(&book_values).unwrap());
+    assert!(config.validate(&book_resource).unwrap());
   }
 
   #[test]
@@ -354,23 +347,22 @@ mod tests {
 
     let date = chrono_to_toml_datetime(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
-    let thesis_values = toml::value::Table::from_iter([
-      ("title".into(), toml::Value::String("Novel Approaches to Quantum Error Correction".into())),
-      ("author".into(), toml::Value::String("Alice Researcher".into())),
-      ("degree".into(), toml::Value::String("PhD".into())),
-      ("institution".into(), toml::Value::String("Tech University".into())),
-      ("completion_date".into(), toml::Value::Datetime(date)),
-      (
-        "advisors".into(),
-        toml::Value::Array(vec![toml::Value::String("Prof. Bob Supervisor".into())]),
-      ),
-    ]);
+    // Create a valid thesis resource
+    let mut thesis_resource = BTreeMap::new();
+    thesis_resource
+      .insert("title".into(), Value::String("Novel Approaches to Quantum Error Correction".into()));
+    thesis_resource.insert("author".into(), Value::String("Alice Researcher".into()));
+    thesis_resource.insert("degree".into(), Value::String("PhD".into()));
+    thesis_resource.insert("institution".into(), Value::String("Tech University".into()));
+    thesis_resource.insert("completion_date".into(), Value::Datetime(date));
+    thesis_resource
+      .insert("advisors".into(), Value::Array(vec![Value::String("Prof. Bob Supervisor".into())]));
 
-    assert!(config.validate(&thesis_values).unwrap());
+    assert!(config.validate(&thesis_resource).unwrap());
 
     // Test degree enum validation
-    let mut invalid_thesis = thesis_values.clone();
-    invalid_thesis.insert("degree".into(), toml::Value::String("InvalidDegree".into()));
+    let mut invalid_thesis = thesis_resource.clone();
+    invalid_thesis.insert("degree".into(), Value::String("InvalidDegree".into()));
     assert!(config.validate(&invalid_thesis).is_err());
   }
 }

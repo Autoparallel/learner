@@ -754,20 +754,21 @@ impl Learner {
       }
     }
 
-    match matches.len() {
-      0 => Err(LearnerError::InvalidIdentifier),
-      1 => {
-        let resource_config = self.resources.as_map().get(matches[0].0);
-        if let Some(resource_config) = resource_config {
-          Ok(matches[0].1.retrieve_resource(input, resource_config).await?)
-        } else {
-          todo!("Error because that resource wasn't available.")
-        }
-      },
-      _ => Err(LearnerError::AmbiguousIdentifier(
-        matches.into_iter().map(|(n, c)| n.to_string()).collect(),
-      )),
-    }
+    todo!("Finish this")
+    // match matches.len() {
+    //   0 => Err(LearnerError::InvalidIdentifier),
+    //   1 => {
+    //     let resource_config = self.resources.as_map().get(matches[0].0);
+    //     if let Some(resource_config) = resource_config {
+    //       Ok(matches[0].1.retrieve_resource(input, resource_config).await?)
+    //     } else {
+    //       todo!("Error because that resource wasn't available.")
+    //     }
+    //   },
+    //   _ => Err(LearnerError::AmbiguousIdentifier(
+    //     matches.into_iter().map(|(n, c)| n.to_string()).collect(),
+    //   )),
+    // }
   }
 }
 

@@ -9,7 +9,7 @@ source            = "doi"
 type = "json"
 
 [response_format.field_maps.title]
-path = "message/title"
+path = "message/title/0"
 
 [response_format.field_maps.abstract]
 path = "message/abstract"

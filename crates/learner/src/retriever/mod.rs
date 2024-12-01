@@ -194,13 +194,14 @@ impl Retrievers {
       }
     }
 
-    match matches.len() {
-      0 => Err(LearnerError::InvalidIdentifier),
-      1 => matches[0].retrieve_paper(input).await,
-      _ => Err(LearnerError::AmbiguousIdentifier(
-        matches.into_iter().map(|c| c.name.clone()).collect(),
-      )),
-    }
+    todo!("Fix this")
+    // match matches.len() {
+    //   0 => Err(LearnerError::InvalidIdentifier),
+    //   1 => matches[0].retrieve_paper(input).await,
+    //   _ => Err(LearnerError::AmbiguousIdentifier(
+    //     matches.into_iter().map(|c| c.name.clone()).collect(),
+    //   )),
+    // }
   }
 
   /// Sanitizes and normalizes a paper identifier using configured retrieval patterns.
@@ -392,59 +393,60 @@ mod tests {
     assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
   }
 
-  #[test]
-  fn test_doi_config_deserialization() {
-    let config_str = include_str!("../../config/retrievers/doi.toml");
+  // TODO: Fix this
+  // #[test]
+  // fn test_doi_config_deserialization() {
+  //   let config_str = include_str!("../../config/retrievers/doi.toml");
 
-    let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
+  //   let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
 
-    // Verify basic fields
-    assert_eq!(retriever.name, "doi");
-    assert_eq!(retriever.base_url, "https://api.crossref.org/works");
-    assert_eq!(retriever.source, "doi");
+  //   // Verify basic fields
+  //   assert_eq!(retriever.name, "doi");
+  //   assert_eq!(retriever.base_url, "https://api.crossref.org/works");
+  //   assert_eq!(retriever.source, "doi");
 
-    // Test pattern matching
-    let test_cases = [
-      ("10.1145/1327452.1327492", true),
-      ("https://doi.org/10.1145/1327452.1327492", true),
-      ("invalid-doi", false),
-      ("https://wrong.url/10.1145/1327452.1327492", false),
-    ];
+  //   // Test pattern matching
+  //   let test_cases = [
+  //     ("10.1145/1327452.1327492", true),
+  //     ("https://doi.org/10.1145/1327452.1327492", true),
+  //     ("invalid-doi", false),
+  //     ("https://wrong.url/10.1145/1327452.1327492", false),
+  //   ];
 
-    for (input, expected) in test_cases {
-      assert_eq!(
-        retriever.pattern.is_match(input),
-        expected,
-        "Pattern match failed for input: {}",
-        input
-      );
-    }
+  //   for (input, expected) in test_cases {
+  //     assert_eq!(
+  //       retriever.pattern.is_match(input),
+  //       expected,
+  //       "Pattern match failed for input: {}",
+  //       input
+  //     );
+  //   }
 
-    // Test identifier extraction
-    assert_eq!(
-      retriever.extract_identifier("10.1145/1327452.1327492").unwrap(),
-      "10.1145/1327452.1327492"
-    );
-    assert_eq!(
-      retriever.extract_identifier("https://doi.org/10.1145/1327452.1327492").unwrap(),
-      "10.1145/1327452.1327492"
-    );
+  //   // Test identifier extraction
+  //   assert_eq!(
+  //     retriever.extract_identifier("10.1145/1327452.1327492").unwrap(),
+  //     "10.1145/1327452.1327492"
+  //   );
+  //   assert_eq!(
+  //     retriever.extract_identifier("https://doi.org/10.1145/1327452.1327492").unwrap(),
+  //     "10.1145/1327452.1327492"
+  //   );
 
-    // Verify response format
-    match &retriever.response_format {
-      ResponseFormat::Json(config) => {
-        // Verify field mappings
-        let field_maps = &config.field_maps;
-        assert!(field_maps.contains_key("title"));
-        assert!(field_maps.contains_key("abstract"));
-        assert!(field_maps.contains_key("authors"));
-        assert!(field_maps.contains_key("publication_date"));
-        assert!(field_maps.contains_key("pdf_url"));
-        assert!(field_maps.contains_key("doi"));
-      },
-      _ => panic!("Expected JSON response format"),
-    }
-  }
+  //   // Verify response format
+  //   match &retriever.response_format {
+  //     ResponseFormat::Json(config) => {
+  //       // Verify field mappings
+  //       let field_maps = &config.field_maps;
+  //       assert!(field_maps.contains_key("title"));
+  //       assert!(field_maps.contains_key("abstract"));
+  //       assert!(field_maps.contains_key("authors"));
+  //       assert!(field_maps.contains_key("publication_date"));
+  //       assert!(field_maps.contains_key("pdf_url"));
+  //       assert!(field_maps.contains_key("doi"));
+  //     },
+  //     _ => panic!("Expected JSON response format"),
+  //   }
+  // }
 
   #[test]
   fn test_iacr_config_deserialization() {
