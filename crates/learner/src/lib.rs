@@ -155,6 +155,7 @@ use regex::Regex;
 use reqwest::Url;
 use resource::{Resource, ResourceConfig, Resources};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tracing::{debug, trace, warn};
 #[cfg(test)]
 use {tempfile::tempdir, tracing_test::traced_test};

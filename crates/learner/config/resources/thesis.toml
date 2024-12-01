@@ -42,9 +42,10 @@ required    = false
 
 [[fields]]
 description = "When the degree was awarded"
-field_type  = "datetime"
+field_type  = "string"
 name        = "completion_date"
 required    = true
+validation  = { datetime = true }
 
 [[fields]]
 description = "Thesis advisors or supervisors"

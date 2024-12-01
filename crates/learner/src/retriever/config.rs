@@ -1,5 +1,4 @@
 use resource::Resource;
-use toml::Value;
 
 use super::*;
 
@@ -49,7 +48,7 @@ pub struct RetrieverConfig {
   pub response_format:   ResponseFormat,
   /// Optional HTTP headers for API requests
   #[serde(default)]
-  pub headers:           HashMap<String, String>,
+  pub headers:           BTreeMap<String, String>,
 }
 
 impl Identifiable for RetrieverConfig {

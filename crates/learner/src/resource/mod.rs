@@ -6,14 +6,10 @@ mod paper;
 mod shared;
 
 pub use paper::*;
+use serde_json::Value;
 pub use shared::*;
-use toml::Value;
 
-// TODO (autoparallel): We almost need something like `Resource` to be given by these
-// `ResourceConfig`s. Or, even renaming these like `ResourceTemplates` or something so a `Resource`
-// has to fit into the `ResourceTemplate` (now that I type this out, `ResourceConfig` is still a
-// reasonable name). But when we want to retrieve a resource, we need to actually get back a
-// resource. Perhaps its just:
+// Type alias for clarity and consistency
 pub type Resource = BTreeMap<String, Value>;
 
 #[derive(Debug, Clone, Default)]
@@ -51,7 +47,7 @@ impl Identifiable for ResourceConfig {
 pub struct FieldDefinition {
   /// Name of the field
   pub name:        String,
-  /// Type of the field (should be a TOML Value)
+  /// Type of the field (should be a JSON Value type)
   pub field_type:  String,
   /// Whether this field must be present
   #[serde(default)]
@@ -77,7 +73,7 @@ pub struct TypeDefinition {
   pub fields:       Option<Vec<FieldDefinition>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ValidationRules {
   // String validations
   pub pattern:    Option<String>, // Regex pattern to match
@@ -96,6 +92,7 @@ pub struct ValidationRules {
 
   // General validations
   pub enum_values: Option<Vec<String>>, // List of allowed values
+  pub datetime:    Option<bool>,        // Validates RFC3339 format
 }
 
 impl ResourceConfig {
@@ -103,13 +100,11 @@ impl ResourceConfig {
   pub fn validate(&self, values: &Resource) -> Result<bool> {
     // Check required fields
     for field in &self.fields {
-      if field.required {
-        if !values.contains_key(&field.name) {
-          return Err(LearnerError::InvalidResource(format!(
-            "Missing required field: {}",
-            field.name
-          )));
-        }
+      if field.required && !values.contains_key(&field.name) {
+        return Err(LearnerError::InvalidResource(format!(
+          "Missing required field: {}",
+          field.name
+        )));
       }
     }
 
@@ -125,11 +120,10 @@ impl ResourceConfig {
   }
 
   /// Validates a single field value against its definition
-  fn validate_field(&self, field: &FieldDefinition, value: &toml::Value) -> Result<()> {
-    // First validate that the provided value matches the declared type
+  fn validate_field(&self, field: &FieldDefinition, value: &Value) -> Result<()> {
     match (field.field_type.as_str(), value) {
       // String validation - handles both basic type checking and string-specific rules
-      ("string", toml::Value::String(v)) => {
+      ("string", Value::String(v)) => {
         if let Some(rules) = &field.validation {
           // Length constraints
           if let Some(min_length) = rules.min_length {
@@ -161,6 +155,16 @@ impl ResourceConfig {
             }
           }
 
+          // Datetime validation if specified
+          if rules.datetime == Some(true) {
+            if DateTime::parse_from_rfc3339(v).is_err() {
+              return Err(LearnerError::InvalidResource(format!(
+                "Field '{}' must be a valid RFC3339 datetime",
+                field.name
+              )));
+            }
+          }
+
           // Enumerated values check
           if let Some(allowed) = &rules.enum_values {
             if !allowed.contains(v) {
@@ -174,23 +178,18 @@ impl ResourceConfig {
         Ok(())
       },
 
-      // Numeric validations - handle both integer and float values
-      ("integer", toml::Value::Integer(v)) => {
+      // Numeric validations - handle both number types
+      ("number", Value::Number(n)) => {
         if let Some(rules) = &field.validation {
-          validate_numeric(field, *v as f64, rules)?;
-        }
-        Ok(())
-      },
-
-      ("float", toml::Value::Float(v)) => {
-        if let Some(rules) = &field.validation {
-          validate_numeric(field, *v, rules)?;
+          if let Some(num) = n.as_f64() {
+            validate_numeric(field, num, rules)?;
+          }
         }
         Ok(())
       },
 
       // Array validation - handles array-specific rules
-      ("array", toml::Value::Array(v)) => {
+      ("array", Value::Array(v)) => {
         if let Some(rules) = &field.validation {
           if let Some(min_items) = rules.min_items {
             if v.len() < min_items {
@@ -213,7 +212,7 @@ impl ResourceConfig {
           if rules.unique_items == Some(true) {
             let mut seen = HashSet::new();
             for item in v {
-              let item_str = toml::to_string(item).map_err(|_| {
+              let item_str = serde_json::to_string(item).map_err(|_| {
                 LearnerError::InvalidResource("Failed to serialize array item".into())
               })?;
               if !seen.insert(item_str) {
@@ -229,9 +228,9 @@ impl ResourceConfig {
       },
 
       // Simple type validations - just ensure type matches
-      ("boolean", toml::Value::Boolean(_)) => Ok(()),
-      ("datetime", toml::Value::Datetime(_)) => Ok(()),
-      ("table", toml::Value::Table(_)) => Ok(()),
+      ("boolean", Value::Bool(_)) => Ok(()),
+      ("object", Value::Object(_)) => Ok(()),
+      ("null", Value::Null) => Ok(()),
 
       // Type mismatch - provide a clear error message
       _ => Err(LearnerError::InvalidResource(format!(
@@ -239,13 +238,12 @@ impl ResourceConfig {
         field.name,
         field.field_type,
         match value {
-          toml::Value::String(_) => "string",
-          toml::Value::Integer(_) => "integer",
-          toml::Value::Float(_) => "float",
-          toml::Value::Boolean(_) => "boolean",
-          toml::Value::Datetime(_) => "datetime",
-          toml::Value::Array(_) => "array",
-          toml::Value::Table(_) => "table",
+          Value::String(_) => "string",
+          Value::Number(_) => "number",
+          Value::Bool(_) => "boolean",
+          Value::Array(_) => "array",
+          Value::Object(_) => "object",
+          Value::Null => "null",
         }
       ))),
     }
@@ -283,21 +281,20 @@ fn validate_numeric(field: &FieldDefinition, value: f64, rules: &ValidationRules
 
   Ok(())
 }
-// Convert from chrono DateTime to TOML Datetime
-pub fn chrono_to_toml_datetime(dt: DateTime<Utc>) -> toml::value::Datetime {
-  // TOML datetime is stored as seconds since Unix epoch
-  toml::value::Datetime::from_str(&dt.to_rfc3339()).unwrap()
-}
 
-// Convert from TOML Datetime to chrono DateTime
-pub fn toml_to_chrono_datetime(dt: toml::value::Datetime) -> DateTime<Utc> {
-  // Create DateTime from Unix timestamp
-  DateTime::parse_from_rfc3339(&dt.to_string()).unwrap().to_utc()
-}
+/// Convert DateTime to RFC3339 string for JSON storage
+pub fn datetime_to_json(dt: DateTime<Utc>) -> String { dt.to_rfc3339() }
 
+/// Parse RFC3339 string from JSON into DateTime
+pub fn datetime_from_json(s: &str) -> Result<DateTime<Utc>> {
+  DateTime::parse_from_rfc3339(s)
+    .map(|dt| dt.with_timezone(&Utc))
+    .map_err(|e| LearnerError::InvalidResource(format!("Invalid datetime format: {}", e)))
+}
 #[cfg(test)]
 mod tests {
   use chrono::TimeZone;
+  use serde_json::json;
 
   use super::*;
 
@@ -306,26 +303,30 @@ mod tests {
     let config = include_str!("../../config/resources/paper.toml");
     let config: ResourceConfig = toml::from_str(config).unwrap();
 
-    let date = chrono_to_toml_datetime(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
+    let date = datetime_to_json(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
     // Create a valid paper resource
-    let mut paper_resource = BTreeMap::new();
-    paper_resource.insert("title".into(), Value::String("Understanding Quantum Computing".into()));
-
-    // Create the author table using TOML's Map type
-    let author = {
-      let mut map = toml::map::Map::new();
-      map.insert("name".into(), Value::String("Alice Researcher".into()));
-      map.insert("affiliation".into(), Value::String("Tech University".into()));
-      map
-    };
-
-    paper_resource.insert("authors".into(), Value::Array(vec![Value::Table(author)]));
-    paper_resource.insert("publication_date".into(), Value::Datetime(date));
-    paper_resource.insert("doi".into(), Value::String("10.1234/example.123".into()));
+    let paper_resource = BTreeMap::from([
+      ("title".into(), json!("Understanding Quantum Computing")),
+      (
+        "authors".into(),
+        json!([{
+            "name": "Alice Researcher",
+            "affiliation": "Tech University"
+        }]),
+      ),
+      ("publication_date".into(), json!(date)),
+      ("doi".into(), json!("10.1234/example.123")),
+    ]);
 
     // Validate the paper
     assert!(config.validate(&paper_resource).unwrap());
+
+    // Test required field validation
+    let invalid_paper = BTreeMap::from([
+      ("authors".into(), json!([])), // Missing title
+    ]);
+    assert!(config.validate(&invalid_paper).is_err());
   }
 
   #[test]
@@ -333,18 +334,15 @@ mod tests {
     let config = include_str!("../../config/resources/book.toml");
     let config: ResourceConfig = toml::from_str(config).unwrap();
 
-    let date = chrono_to_toml_datetime(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
+    let date = datetime_to_json(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
-    // Create a valid book resource
-    let mut book_resource = BTreeMap::new();
-    book_resource.insert("title".into(), Value::String("Advanced Quantum Computing".into()));
-    book_resource.insert(
-      "authors".into(),
-      Value::Array(vec![Value::String("Alice Writer".into()), Value::String("Bob Author".into())]),
-    );
-    book_resource.insert("isbn".into(), Value::String("978-0-12-345678-9".into()));
-    book_resource.insert("publisher".into(), Value::String("Academic Press".into()));
-    book_resource.insert("publication_date".into(), Value::Datetime(date));
+    let book_resource = BTreeMap::from([
+      ("title".into(), json!("Advanced Quantum Computing")),
+      ("authors".into(), json!(["Alice Writer", "Bob Author"])),
+      ("isbn".into(), json!("978-0-12-345678-9")),
+      ("publisher".into(), json!("Academic Press")),
+      ("publication_date".into(), json!(date)),
+    ]);
 
     assert!(config.validate(&book_resource).unwrap());
   }
@@ -354,24 +352,47 @@ mod tests {
     let config = include_str!("../../config/resources/thesis.toml");
     let config: ResourceConfig = toml::from_str(config).unwrap();
 
-    let date = chrono_to_toml_datetime(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
+    let date = datetime_to_json(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
-    // Create a valid thesis resource
-    let mut thesis_resource = BTreeMap::new();
-    thesis_resource
-      .insert("title".into(), Value::String("Novel Approaches to Quantum Error Correction".into()));
-    thesis_resource.insert("author".into(), Value::String("Alice Researcher".into()));
-    thesis_resource.insert("degree".into(), Value::String("PhD".into()));
-    thesis_resource.insert("institution".into(), Value::String("Tech University".into()));
-    thesis_resource.insert("completion_date".into(), Value::Datetime(date));
-    thesis_resource
-      .insert("advisors".into(), Value::Array(vec![Value::String("Prof. Bob Supervisor".into())]));
+    let thesis_resource = BTreeMap::from([
+      ("title".into(), json!("Novel Approaches to Quantum Error Correction")),
+      ("author".into(), json!("Alice Researcher")),
+      ("degree".into(), json!("PhD")),
+      ("institution".into(), json!("Tech University")),
+      ("completion_date".into(), json!(date)),
+      ("advisors".into(), json!(["Prof. Bob Supervisor"])),
+    ]);
 
     assert!(config.validate(&thesis_resource).unwrap());
 
     // Test degree enum validation
     let mut invalid_thesis = thesis_resource.clone();
-    invalid_thesis.insert("degree".into(), Value::String("InvalidDegree".into()));
+    invalid_thesis.insert("degree".into(), json!("InvalidDegree"));
     assert!(config.validate(&invalid_thesis).is_err());
+  }
+
+  #[test]
+  fn test_datetime_validation() {
+    let mut config = ResourceConfig {
+      name:        "test".into(),
+      description: None,
+      fields:      vec![FieldDefinition {
+        name:            "timestamp".into(),
+        field_type:      "string".into(),
+        required:        true,
+        description:     None,
+        default:         None,
+        validation:      Some(ValidationRules { datetime: Some(true), ..Default::default() }),
+        type_definition: None,
+      }],
+    };
+
+    let valid_resource = BTreeMap::from([("timestamp".into(), json!("2024-01-01T00:00:00Z"))]);
+    assert!(config.validate(&valid_resource).unwrap());
+
+    let invalid_resource = BTreeMap::from([
+      ("timestamp".into(), json!("2024-01-01")), // Not RFC3339
+    ]);
+    assert!(config.validate(&invalid_resource).is_err());
   }
 }

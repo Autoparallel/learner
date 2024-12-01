@@ -37,9 +37,10 @@ required    = false
 # Publication date - datetime type
 [[fields]]
 description = "When the paper was published or last updated"
-field_type  = "datetime"
+field_type  = "string"
 name        = "publication_date"
 required    = false
+validation  = { datetime = true }
 
 # DOI field - string with pattern validation
 [[fields]]

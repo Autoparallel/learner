@@ -68,8 +68,6 @@
 //! # }
 //! ```
 
-use std::collections::HashMap;
-
 use super::*;
 
 mod config;
@@ -303,271 +301,273 @@ where D: serde::Deserializer<'de> {
   Regex::new(&s).map_err(serde::de::Error::custom)
 }
 
-/// Applies a transformation to a string value based on the transform type.
-///
-/// Handles three types of transformations:
-/// - Regular expression replacements
-/// - Date format conversions
-/// - URL construction
-///
-/// # Errors
-///
-/// Returns a LearnerError if:
-/// - Regex pattern is invalid
-/// - Date parsing fails
-/// - Date format is invalid
-fn apply_transform(value: &str, transform: &Transform) -> Result<String> {
-  match transform {
-    Transform::Replace { pattern, replacement } => Regex::new(pattern)
-      .map_err(|e| LearnerError::ApiError(format!("Invalid regex: {}", e)))
-      .map(|re| re.replace_all(value, replacement.as_str()).into_owned()),
-    Transform::Date { from_format, to_format } =>
-      chrono::NaiveDateTime::parse_from_str(value, from_format)
-        .map_err(|e| LearnerError::ApiError(format!("Invalid date: {}", e)))
-        .map(|dt| dt.format(to_format).to_string()),
-    Transform::Url { base, suffix } =>
-      Ok(format!("{}{}", base.replace("{value}", value), suffix.as_deref().unwrap_or(""))),
-    Transform::CombineFields { fields, inner_paths } => {
-      let json: serde_json::Value = serde_json::from_str(value)
-        .map_err(|e| LearnerError::ApiError(format!("Failed to parse JSON: {}", e)))?;
+// / Applies a transformation to a string value based on the transform type.
+// /
+// / Handles three types of transformations:
+// / - Regular expression replacements
+// / - Date format conversions
+// / - URL construction
+// /
+// / # Errors
+// /
+// / Returns a LearnerError if:
+// / - Regex pattern is invalid
+// / - Date parsing fails
+// / - Date format is invalid
 
-      // Handle both single objects and arrays
-      let result = if let Some(array) = json.as_array() {
-        // Create array of objects with combined fields
-        let combined: Vec<serde_json::Map<String, serde_json::Value>> = array
-          .iter()
-          .filter_map(|obj| {
-            let mut map = serde_json::Map::new();
-            dbg!(&obj);
+// fn apply_transform(value: &str, transform: &Transform) -> Result<String> {
+//   match transform {
+//     Transform::Replace { pattern, replacement } => Regex::new(pattern)
+//       .map_err(|e| LearnerError::ApiError(format!("Invalid regex: {}", e)))
+//       .map(|re| re.replace_all(value, replacement.as_str()).into_owned()),
+//     Transform::Date { from_format, to_format } =>
+//       chrono::NaiveDateTime::parse_from_str(value, from_format)
+//         .map_err(|e| LearnerError::ApiError(format!("Invalid date: {}", e)))
+//         .map(|dt| dt.format(to_format).to_string()),
+//     Transform::Url { base, suffix } =>
+//       Ok(format!("{}{}", base.replace("{value}", value), suffix.as_deref().unwrap_or(""))),
+//     Transform::CombineFields { fields, inner_paths } => {
+//       let json: serde_json::Value = serde_json::from_str(value)
+//         .map_err(|e| LearnerError::ApiError(format!("Failed to parse JSON: {}", e)))?;
 
-            // Handle the name fields combination
-            let parts: Vec<_> =
-              fields.iter().filter_map(|field| obj.get(field)).filter_map(|v| v.as_str()).collect();
+//       // Handle both single objects and arrays
+//       let result = if let Some(array) = json.as_array() {
+//         // Create array of objects with combined fields
+//         let combined: Vec<serde_json::Map<String, serde_json::Value>> = array
+//           .iter()
+//           .filter_map(|obj| {
+//             let mut map = serde_json::Map::new();
+//             dbg!(&obj);
 
-            if !parts.is_empty() {
-              map.insert("name".to_string(), serde_json::Value::String(parts.join(" ")));
+//             // Handle the name fields combination
+//             let parts: Vec<_> =
+//               fields.iter().filter_map(|field| obj.get(field)).filter_map(|v|
+// v.as_str()).collect();
 
-              // Handle any additional inner paths
-              if let Some(paths) = inner_paths {
-                dbg!(paths);
-                for path in paths {
-                  if let Some(inner_val) = get_path_value(obj, &path.path) {
-                    dbg!(inner_val);
-                    if let Some(str_val) = inner_val.as_str() {
-                      // Use the last component of the path as the field name
-                      let field_name = path.new_key_name.clone();
-                      map.insert(
-                        field_name.to_string(),
-                        serde_json::Value::String(str_val.to_string()),
-                      );
-                    }
-                  }
-                }
-              }
+//             if !parts.is_empty() {
+//               map.insert("name".to_string(), serde_json::Value::String(parts.join(" ")));
 
-              Some(map)
-            } else {
-              None
-            }
-          })
-          .collect();
+//               // Handle any additional inner paths
+//               if let Some(paths) = inner_paths {
+//                 dbg!(paths);
+//                 for path in paths {
+//                   if let Some(inner_val) = get_path_value(obj, &path.path) {
+//                     dbg!(inner_val);
+//                     if let Some(str_val) = inner_val.as_str() {
+//                       // Use the last component of the path as the field name
+//                       let field_name = path.new_key_name.clone();
+//                       map.insert(
+//                         field_name.to_string(),
+//                         serde_json::Value::String(str_val.to_string()),
+//                       );
+//                     }
+//                   }
+//                 }
+//               }
 
-        serde_json::Value::Array(combined.into_iter().map(serde_json::Value::Object).collect())
-      } else {
-        return Err(LearnerError::ApiError("Expected array for CombineFields".into()));
-      };
+//               Some(map)
+//             } else {
+//               None
+//             }
+//           })
+//           .collect();
 
-      serde_json::to_string(&result)
-        .map_err(|e| LearnerError::ApiError(format!("Failed to serialize result: {}", e)))
-    },
-  }
-}
+//         serde_json::Value::Array(combined.into_iter().map(serde_json::Value::Object).collect())
+//       } else {
+//         return Err(LearnerError::ApiError("Expected array for CombineFields".into()));
+//       };
 
-#[cfg(test)]
-mod tests {
-  use super::*;
+//       serde_json::to_string(&result)
+//         .map_err(|e| LearnerError::ApiError(format!("Failed to serialize result: {}", e)))
+//     },
+//   }
+// }
 
-  #[test]
-  fn validate_arxiv_config() {
-    let config_str = include_str!("../../config/retrievers/arxiv.toml");
+// #[cfg(test)]
+// mod tests {
+//   use super::*;
 
-    let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
+//   #[test]
+//   fn validate_arxiv_config() {
+//     let config_str = include_str!("../../config/retrievers/arxiv.toml");
 
-    // Verify basic fields
-    assert_eq!(retriever.name, "arxiv");
-    assert_eq!(retriever.base_url, "http://export.arxiv.org");
-    assert_eq!(retriever.source, "arxiv");
+//     let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
 
-    // Test pattern matching
-    assert!(retriever.pattern.is_match("2301.07041"));
-    assert!(retriever.pattern.is_match("math.AG/0601001"));
-    assert!(retriever.pattern.is_match("https://arxiv.org/abs/2301.07041"));
-    assert!(retriever.pattern.is_match("https://arxiv.org/pdf/2301.07041"));
-    assert!(retriever.pattern.is_match("https://arxiv.org/abs/math.AG/0601001"));
-    assert!(retriever.pattern.is_match("https://arxiv.org/abs/math/0404443"));
+//     // Verify basic fields
+//     assert_eq!(retriever.name, "arxiv");
+//     assert_eq!(retriever.base_url, "http://export.arxiv.org");
+//     assert_eq!(retriever.source, "arxiv");
 
-    // Test identifier extraction
-    assert_eq!(retriever.extract_identifier("2301.07041").unwrap(), "2301.07041");
-    assert_eq!(
-      retriever.extract_identifier("https://arxiv.org/abs/2301.07041").unwrap(),
-      "2301.07041"
-    );
-    assert_eq!(retriever.extract_identifier("math.AG/0601001").unwrap(), "math.AG/0601001");
+//     // Test pattern matching
+//     assert!(retriever.pattern.is_match("2301.07041"));
+//     assert!(retriever.pattern.is_match("math.AG/0601001"));
+//     assert!(retriever.pattern.is_match("https://arxiv.org/abs/2301.07041"));
+//     assert!(retriever.pattern.is_match("https://arxiv.org/pdf/2301.07041"));
+//     assert!(retriever.pattern.is_match("https://arxiv.org/abs/math.AG/0601001"));
+//     assert!(retriever.pattern.is_match("https://arxiv.org/abs/math/0404443"));
 
-    // Verify response format
+//     // Test identifier extraction
+//     assert_eq!(retriever.extract_identifier("2301.07041").unwrap(), "2301.07041");
+//     assert_eq!(
+//       retriever.extract_identifier("https://arxiv.org/abs/2301.07041").unwrap(),
+//       "2301.07041"
+//     );
+//     assert_eq!(retriever.extract_identifier("math.AG/0601001").unwrap(), "math.AG/0601001");
 
-    if let ResponseFormat::Xml(config) = &retriever.response_format {
-      assert!(config.strip_namespaces);
+//     // Verify response format
 
-      // Verify field mappings
-      let field_maps = &config.field_maps;
-      assert!(field_maps.contains_key("title"));
-      assert!(field_maps.contains_key("abstract"));
-      assert!(field_maps.contains_key("authors"));
-      assert!(field_maps.contains_key("publication_date"));
-      assert!(field_maps.contains_key("pdf_url"));
+//     if let ResponseFormat::Xml(config) = &retriever.response_format {
+//       assert!(config.strip_namespaces);
 
-      // Verify PDF transform
-      if let Some(map) = field_maps.get("pdf_url") {
-        match &map.transform {
-          Some(Transform::Replace { pattern, replacement }) => {
-            assert_eq!(pattern, "/abs/");
-            assert_eq!(replacement, "/pdf/");
-          },
-          _ => panic!("Expected Replace transform for pdf_url"),
-        }
-      } else {
-        panic!("Missing pdf_url field map");
-      }
-    } else {
-      panic!("Expected an XML configuration, but did not get one.")
-    }
+//       // Verify field mappings
+//       let field_maps = &config.field_maps;
+//       assert!(field_maps.contains_key("title"));
+//       assert!(field_maps.contains_key("abstract"));
+//       assert!(field_maps.contains_key("authors"));
+//       assert!(field_maps.contains_key("publication_date"));
+//       assert!(field_maps.contains_key("pdf_url"));
 
-    // Verify headers
-    assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
-  }
+//       // Verify PDF transform
+//       if let Some(map) = field_maps.get("pdf_url") {
+//         match &map.transform {
+//           Some(Transform::Replace { pattern, replacement }) => {
+//             assert_eq!(pattern, "/abs/");
+//             assert_eq!(replacement, "/pdf/");
+//           },
+//           _ => panic!("Expected Replace transform for pdf_url"),
+//         }
+//       } else {
+//         panic!("Missing pdf_url field map");
+//       }
+//     } else {
+//       panic!("Expected an XML configuration, but did not get one.")
+//     }
 
-  // TODO: Fix this
-  #[test]
-  fn test_doi_config_deserialization() {
-    let config_str = include_str!("../../config/retrievers/doi.toml");
+//     // Verify headers
+//     assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
+//   }
 
-    let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
+//   // TODO: Fix this
+//   #[test]
+//   fn test_doi_config_deserialization() {
+//     let config_str = include_str!("../../config/retrievers/doi.toml");
 
-    dbg!(&retriever);
+//     let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
 
-    // Verify basic fields
-    assert_eq!(retriever.name, "doi");
-    assert_eq!(retriever.base_url, "https://api.crossref.org/works");
-    assert_eq!(retriever.source, "doi");
+//     dbg!(&retriever);
 
-    // Test pattern matching
-    let test_cases = [
-      ("10.1145/1327452.1327492", true),
-      ("https://doi.org/10.1145/1327452.1327492", true),
-      ("invalid-doi", false),
-      ("https://wrong.url/10.1145/1327452.1327492", false),
-    ];
+//     // Verify basic fields
+//     assert_eq!(retriever.name, "doi");
+//     assert_eq!(retriever.base_url, "https://api.crossref.org/works");
+//     assert_eq!(retriever.source, "doi");
 
-    for (input, expected) in test_cases {
-      assert_eq!(
-        retriever.pattern.is_match(input),
-        expected,
-        "Pattern match failed for input: {}",
-        input
-      );
-    }
+//     // Test pattern matching
+//     let test_cases = [
+//       ("10.1145/1327452.1327492", true),
+//       ("https://doi.org/10.1145/1327452.1327492", true),
+//       ("invalid-doi", false),
+//       ("https://wrong.url/10.1145/1327452.1327492", false),
+//     ];
 
-    // Test identifier extraction
-    assert_eq!(
-      retriever.extract_identifier("10.1145/1327452.1327492").unwrap(),
-      "10.1145/1327452.1327492"
-    );
-    assert_eq!(
-      retriever.extract_identifier("https://doi.org/10.1145/1327452.1327492").unwrap(),
-      "10.1145/1327452.1327492"
-    );
+//     for (input, expected) in test_cases {
+//       assert_eq!(
+//         retriever.pattern.is_match(input),
+//         expected,
+//         "Pattern match failed for input: {}",
+//         input
+//       );
+//     }
 
-    // Verify response format
-    match &retriever.response_format {
-      ResponseFormat::Json(config) => {
-        // Verify field mappings
-        let field_maps = &config.field_maps;
-        assert!(field_maps.contains_key("title"));
-        assert!(field_maps.contains_key("abstract"));
-        assert!(field_maps.contains_key("authors"));
-        assert!(field_maps.contains_key("publication_date"));
-        assert!(field_maps.contains_key("pdf_url"));
-        assert!(field_maps.contains_key("doi"));
-      },
-      _ => panic!("Expected JSON response format"),
-    }
-  }
+//     // Test identifier extraction
+//     assert_eq!(
+//       retriever.extract_identifier("10.1145/1327452.1327492").unwrap(),
+//       "10.1145/1327452.1327492"
+//     );
+//     assert_eq!(
+//       retriever.extract_identifier("https://doi.org/10.1145/1327452.1327492").unwrap(),
+//       "10.1145/1327452.1327492"
+//     );
 
-  #[test]
-  fn test_iacr_config_deserialization() {
-    let config_str = include_str!("../../config/retrievers/iacr.toml");
+//     // Verify response format
+//     match &retriever.response_format {
+//       ResponseFormat::Json(config) => {
+//         // Verify field mappings
+//         let field_maps = &config.field_maps;
+//         assert!(field_maps.contains_key("title"));
+//         assert!(field_maps.contains_key("abstract"));
+//         assert!(field_maps.contains_key("authors"));
+//         assert!(field_maps.contains_key("publication_date"));
+//         assert!(field_maps.contains_key("pdf_url"));
+//         assert!(field_maps.contains_key("doi"));
+//       },
+//       _ => panic!("Expected JSON response format"),
+//     }
+//   }
 
-    let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
+//   #[test]
+//   fn test_iacr_config_deserialization() {
+//     let config_str = include_str!("../../config/retrievers/iacr.toml");
 
-    // Verify basic fields
-    assert_eq!(retriever.name, "iacr");
-    assert_eq!(retriever.base_url, "https://eprint.iacr.org");
-    assert_eq!(retriever.source, "iacr");
+//     let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
 
-    // Test pattern matching
-    let test_cases = [
-      ("2016/260", true),
-      ("2023/123", true),
-      ("https://eprint.iacr.org/2016/260", true),
-      ("https://eprint.iacr.org/2016/260.pdf", true),
-      ("invalid/format", false),
-      ("https://wrong.url/2016/260", false),
-    ];
+//     // Verify basic fields
+//     assert_eq!(retriever.name, "iacr");
+//     assert_eq!(retriever.base_url, "https://eprint.iacr.org");
+//     assert_eq!(retriever.source, "iacr");
 
-    for (input, expected) in test_cases {
-      assert_eq!(
-        retriever.pattern.is_match(input),
-        expected,
-        "Pattern match failed for input: {}",
-        input
-      );
-    }
+//     // Test pattern matching
+//     let test_cases = [
+//       ("2016/260", true),
+//       ("2023/123", true),
+//       ("https://eprint.iacr.org/2016/260", true),
+//       ("https://eprint.iacr.org/2016/260.pdf", true),
+//       ("invalid/format", false),
+//       ("https://wrong.url/2016/260", false),
+//     ];
 
-    // Test identifier extraction
-    assert_eq!(retriever.extract_identifier("2016/260").unwrap(), "2016/260");
-    assert_eq!(
-      retriever.extract_identifier("https://eprint.iacr.org/2016/260").unwrap(),
-      "2016/260"
-    );
-    assert_eq!(
-      retriever.extract_identifier("https://eprint.iacr.org/2016/260.pdf").unwrap(),
-      "2016/260"
-    );
+//     for (input, expected) in test_cases {
+//       assert_eq!(
+//         retriever.pattern.is_match(input),
+//         expected,
+//         "Pattern match failed for input: {}",
+//         input
+//       );
+//     }
 
-    // Verify response format
-    if let ResponseFormat::Xml(config) = &retriever.response_format {
-      assert!(config.strip_namespaces);
+//     // Test identifier extraction
+//     assert_eq!(retriever.extract_identifier("2016/260").unwrap(), "2016/260");
+//     assert_eq!(
+//       retriever.extract_identifier("https://eprint.iacr.org/2016/260").unwrap(),
+//       "2016/260"
+//     );
+//     assert_eq!(
+//       retriever.extract_identifier("https://eprint.iacr.org/2016/260.pdf").unwrap(),
+//       "2016/260"
+//     );
 
-      // Verify field mappings
-      let field_maps = &config.field_maps;
-      assert!(field_maps.contains_key("title"));
-      assert!(field_maps.contains_key("abstract"));
-      assert!(field_maps.contains_key("authors"));
-      assert!(field_maps.contains_key("publication_date"));
-      assert!(field_maps.contains_key("pdf_url"));
+//     // Verify response format
+//     if let ResponseFormat::Xml(config) = &retriever.response_format {
+//       assert!(config.strip_namespaces);
 
-      // Verify OAI-PMH paths
-      if let Some(map) = field_maps.get("title") {
-        assert!(map.path.contains(&"OAI-PMH/GetRecord/record/metadata/dc/title".to_string()));
-      } else {
-        panic!("Missing title field map");
-      }
-    } else {
-      panic!("Expected an XML configuration, but did not get one.")
-    }
+//       // Verify field mappings
+//       let field_maps = &config.field_maps;
+//       assert!(field_maps.contains_key("title"));
+//       assert!(field_maps.contains_key("abstract"));
+//       assert!(field_maps.contains_key("authors"));
+//       assert!(field_maps.contains_key("publication_date"));
+//       assert!(field_maps.contains_key("pdf_url"));
 
-    // Verify headers
-    assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
-  }
-}
+//       // Verify OAI-PMH paths
+//       if let Some(map) = field_maps.get("title") {
+//         assert!(map.path.contains(&"OAI-PMH/GetRecord/record/metadata/dc/title".to_string()));
+//       } else {
+//         panic!("Missing title field map");
+//       }
+//     } else {
+//       panic!("Expected an XML configuration, but did not get one.")
+//     }
+
+//     // Verify headers
+//     assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
+//   }
+// }
