@@ -176,22 +176,23 @@ where D: serde::Deserializer<'de> {
   match config_ref {
     ResourceConfigRef::Inline(config) => Ok(config),
     ResourceConfigRef::Path(resource_name) => {
-      // Add .toml extension if not present
-      let resource_file = if !resource_name.ends_with(".toml") {
-        format!("{}.toml", resource_name)
-      } else {
-        resource_name
-      };
+      // Try loading from the global environment path
+      let env_path = Environment::resolve_resource_path(&resource_name);
 
-      // First try using Environment to resolve path
-      let env_path = Environment::resolve_resource_path(&resource_file);
       if env_path.exists() {
         let content = std::fs::read_to_string(&env_path).map_err(serde::de::Error::custom)?;
         return toml::from_str(&content).map_err(serde::de::Error::custom);
       }
 
-      // Fallback for tests
-      let fallback_path = PathBuf::from("config/resources").join(&resource_file);
+      // If global path doesn't exist, try the local fallback
+      // This is mainly useful for development and testing
+      let fallback_path =
+        PathBuf::from("config/resources").join(if resource_name.ends_with(".toml") {
+          resource_name.to_string()
+        } else {
+          format!("{}.toml", resource_name)
+        });
+
       let content = std::fs::read_to_string(&fallback_path).map_err(|_| {
         serde::de::Error::custom(format!(
           "Resource not found at either {} or {}",
@@ -199,6 +200,7 @@ where D: serde::Deserializer<'de> {
           fallback_path.display()
         ))
       })?;
+
       toml::from_str(&content).map_err(serde::de::Error::custom)
     },
   }

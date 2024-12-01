@@ -216,7 +216,7 @@ pub async fn validate_retriever(path: &PathBuf, input: &Option<String>) {
       Err(e) => error!("Pattern matching failed: {}", e),
     }
   } else {
-    info!("No test input provided - skipping retrieval tests");
+    warn!("No test input provided - skipping retrieval tests");
     info!("To test retrieval, provide an identifier like: 2301.07041");
   }
 }

@@ -293,6 +293,7 @@ pub struct Config {
 /// # Ok(())
 /// # }
 /// ```
+// TODO: Add an `Environment` in here.
 #[derive(Debug, Clone)]
 pub struct Learner {
   /// Active configuration
