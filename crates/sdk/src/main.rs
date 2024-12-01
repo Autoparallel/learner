@@ -2,7 +2,7 @@ mod validate;
 
 use std::path::{Path, PathBuf};
 
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use learner::{environment::Environment, prelude::*};
 use tracing::{debug, error, info, warn};
 
@@ -11,6 +11,16 @@ use tracing::{debug, error, info, warn};
 struct LearnerSdk {
   #[command(subcommand)]
   command: Commands,
+
+  /// Verbose mode (-v, -vv, -vvv) for different levels of logging detail
+  #[arg(
+      short,
+      long,
+      action = ArgAction::Count,
+      global = true,
+      help = "Increase logging verbosity"
+  )]
+  verbose: u8,
 }
 
 #[derive(Subcommand)]
@@ -63,16 +73,22 @@ fn find_config_dir(path: &Path) -> Option<(PathBuf, String)> {
 
 #[tokio::main]
 async fn main() {
-  // Set up logging with a clean format focused on user feedback
+  let cli = LearnerSdk::parse();
+  let filter = match cli.verbose {
+    0 => "error",
+    1 => "warn",
+    2 => "info",
+    3 => "debug",
+    _ => "trace",
+  };
   tracing_subscriber::fmt()
+    .with_env_filter(filter)
     .without_time()
     .with_file(false)
     .with_line_number(false)
     .with_target(false)
     .with_max_level(tracing::Level::TRACE)
     .init();
-
-  let cli = LearnerSdk::parse();
 
   // Get the path from the command
   let path = match &cli.command {

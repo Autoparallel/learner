@@ -1196,6 +1196,7 @@ name = "learner-sdk"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "console",
  "learner",
  "regex",
  "reqwest",
