@@ -97,10 +97,10 @@ pub struct ValidationRules {
 
 impl ResourceConfig {
   /// Validates a set of values against this resource configuration
-  pub fn validate(&self, values: &Resource) -> Result<bool> {
+  pub fn validate(&self, resource: &Resource) -> Result<bool> {
     // Check required fields
     for field in &self.fields {
-      if field.required && !values.contains_key(&field.name) {
+      if field.required && !resource.contains_key(&field.name) {
         return Err(LearnerError::InvalidResource(format!(
           "Missing required field: {}",
           field.name
@@ -109,7 +109,7 @@ impl ResourceConfig {
     }
 
     // Validate each provided field
-    for (name, value) in values {
+    for (name, value) in resource {
       if let Some(field) = self.fields.iter().find(|f| f.name == *name) {
         // Validate field value against its definition
         self.validate_field(field, value)?;

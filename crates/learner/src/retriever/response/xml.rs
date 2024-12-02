@@ -50,168 +50,107 @@ pub struct XmlConfig {
 }
 
 impl ResponseProcessor for XmlConfig {
-  fn process_response(
-    &self,
-    data: &[u8],
-    // retriever_config: &RetrieverConfig,
-    resource_config: &ResourceConfig,
-  ) -> Result<Resource> {
-    todo!()
-    // // Handle namespace stripping
-    // let xml = if self.strip_namespaces {
-    //   strip_xml_namespaces(&String::from_utf8_lossy(data))
-    // } else {
-    //   String::from_utf8_lossy(data).to_string()
-    // };
+  fn process_response(&self, data: &[u8], resource_config: &ResourceConfig) -> Result<Resource> {
+    // Handle namespace stripping
+    let xml = if self.strip_namespaces {
+      strip_xml_namespaces(&String::from_utf8_lossy(data))
+    } else {
+      String::from_utf8_lossy(data).to_string()
+    };
 
-    // trace!("Processing XML response: {:#?}", &xml);
+    trace!("Processing XML response: {:#?}", &xml);
 
-    // // Extract raw XML content into path -> string mapping
-    // let content = self.extract_content(&xml)?;
-    // let mut resource = BTreeMap::new();
-
-    // // Process each field according to the resource configuration
-    // for field_def in &resource_config.fields {
-    //   // Look up the field mapping from retriever config
-    //   if let Some(field_map) = self.field_maps.get(&field_def.name) {
-    //     // Try to get the raw value using configured path
-    //     if let Some(raw_value) = content.get(&field_map.path) {
-    //       // Apply any configured transformations
-    //       let transformed_value = if let Some(transform) = &field_map.transform {
-    //         apply_transform(raw_value, transform)?
-    //       } else {
-    //         raw_value.clone()
-    //       };
-
-    //       // Convert string to appropriate TOML type based on field definition
-    //       let value = match field_def.field_type.as_str() {
-    //         "string" => Value::String(transformed_value),
-    //         "datetime" => {
-    //           let dt = DateTime::parse_from_rfc3339(&transformed_value).map_err(|e| {
-    //             LearnerError::ApiError(format!(
-    //               "Invalid date format for field '{}': {}",
-    //               field_def.name, e
-    //             ))
-    //           })?;
-    //           Value::String(chrono_to_toml_datetime(dt.with_timezone(&Utc)))
-    //         },
-    //         "array" => {
-    //           // For arrays, split on semicolon and create string array
-    //           let values =
-    //             transformed_value.split(';').map(|s|
-    // Value::String(s.trim().to_string())).collect();           Value::Array(values)
-    //         },
-    //         // Add other type conversions as needed
-    //         unsupported =>
-    //           return Err(LearnerError::ApiError(format!(
-    //             "Unsupported field type '{}' for field '{}'",
-    //             unsupported, field_def.name
-    //           ))),
-    //       };
-    //       resource.insert(field_def.name.clone(), value);
-    //     } else if field_def.required {
-    //       // Field was required but not found in response
-    //       return Err(LearnerError::ApiError(format!(
-    //         "Required field '{}' not found in response",
-    //         field_def.name
-    //       )));
-    //     } else if let Some(default) = &field_def.default {
-    //       // Use default value if available
-    //       resource.insert(field_def.name.clone(), default.clone());
-    //     }
-    //   }
-    // }
-
-    // Ok(resource)
+    // Extract raw XML content into JSON equivalent
+    let json = convert_to_json(&xml);
+    dbg!(process_json_value(&json, &self.field_maps, resource_config))
   }
 }
 
-impl XmlConfig {
-  /// Extracts field values from XML content using path-based navigation.
-  ///
-  /// Builds a map of path -> value pairs by walking the XML tree and
-  /// tracking element paths. Handles nested elements and text content.
-  ///
-  /// # Arguments
-  ///
-  /// * `xml` - XML content as string
-  ///
-  /// # Returns
-  ///
-  /// Returns a HashMap mapping XML paths to their text content.
-  fn extract_content(&self, xml: &str) -> Result<BTreeMap<String, String>> {
-    // let ser_xml: Vec<(String, Value)> = quick_xml::de::from_str(xml).unwrap();
-    // quick_xml::de::
-    // dbg!(ser_xml);
+use serde_json::{Map, Value};
 
-    let mut reader = Reader::from_str(xml);
+pub fn convert_to_json(xml: &str) -> Value {
+  let mut reader = Reader::from_str(xml);
+  let mut stack = Vec::new();
+  let mut current = Map::new();
 
-    let mut map = BTreeMap::new();
+  while let Ok(event) = reader.read_event() {
+    match event {
+      Event::Start(ref e) => {
+        let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
 
-    let mut current_key = Vec::new();
+        // Create new object for this element
+        let mut new_obj = Map::new();
 
-    while let Ok(event) = reader.read_event() {
-      match event {
-        Event::Start(ref e) => {
-          let tag = String::from_utf8_lossy(e.trim_ascii()).to_string();
-          current_key.push(tag);
-        },
-        Event::Text(e) => {
-          let value = e.unescape().unwrap_or_default().trim().to_string();
-          if !value.is_empty() {
-            let key = current_key.join(".");
-            map
-              .entry(key)
-              .and_modify(|existing| {
-                if let Value::Array(arr) = existing {
-                  arr.push(Value::String(value.clone()));
-                } else {
-                  *existing = Value::Array(vec![existing.clone(), Value::String(value.clone())]);
-                }
-              })
-              .or_insert(Value::String(value));
-          }
-        },
-        Event::End(_) => {
-          current_key.pop();
-        },
-        Event::Eof => break,
-        _ => (),
-      }
-    }
-
-    dbg!(map);
-
-    ////////////////////////////////////////////////////
-
-    let mut reader = Reader::from_str(xml);
-    let mut content = BTreeMap::new();
-    let mut path_stack = Vec::new();
-    let mut buf = Vec::new();
-
-    while let Ok(event) = reader.read_event_into(&mut buf) {
-      match event {
-        Event::Start(e) => {
-          path_stack.push(String::from_utf8_lossy(e.name().as_ref()).into_owned());
-        },
-        Event::Text(e) =>
-          if let Ok(text) = e.unescape() {
-            let text = text.trim();
-            if !text.is_empty() {
-              content.insert(path_stack.join("/"), text.to_string());
+        // Handle attributes
+        for attr in e.attributes().flatten() {
+          if let Ok(key) = String::from_utf8(attr.key.as_ref().to_vec()) {
+            if let Ok(value) = attr.unescape_value() {
+              new_obj.insert(format!("@{}", key), Value::String(value.into_owned()));
             }
-          },
-        Event::End(_) => {
-          path_stack.pop();
-        },
-        Event::Eof => break,
-        _ => (),
-      }
-      buf.clear();
-    }
+          }
+        }
 
-    Ok(content)
+        // Add this element to its parent
+        match current.get_mut(&tag) {
+          Some(Value::Array(_)) => {
+            // Element already exists as array, push onto it later
+            stack.push((tag, current, true));
+          },
+          Some(_) => {
+            // Element exists but not as array, convert to array
+            let existing = current.remove(&tag).unwrap();
+            current.insert(tag.clone(), Value::Array(vec![existing]));
+            stack.push((tag, current, true));
+          },
+          None => {
+            // First occurrence of this element
+            stack.push((tag, current, false));
+          },
+        }
+
+        current = new_obj;
+      },
+      Event::Text(e) => {
+        if let Ok(txt) = e.unescape() {
+          let text = txt.trim();
+          if !text.is_empty() {
+            if current.is_empty() {
+              // No attributes, just text content
+              current.insert("$text".to_string(), Value::String(text.to_string()));
+            } else {
+              // Has attributes, add text alongside them
+              current.insert("$text".to_string(), Value::String(text.to_string()));
+            }
+          }
+        }
+      },
+      Event::End(_) => {
+        if let Some((tag, mut parent, is_array)) = stack.pop() {
+          // Simplify if only text content
+          let value = if current.len() == 1 && current.contains_key("$text") {
+            current.remove("$text").unwrap()
+          } else {
+            Value::Object(current)
+          };
+
+          // Add to parent according to array status
+          if is_array {
+            if let Some(Value::Array(arr)) = parent.get_mut(&tag) {
+              arr.push(value);
+            }
+          } else {
+            parent.insert(tag, value);
+          }
+
+          current = parent;
+        }
+      },
+      Event::Eof => break,
+      _ => (),
+    }
   }
+
+  dbg!(Value::Object(current))
 }
 
 /// Removes XML namespace declarations and prefixes from content.

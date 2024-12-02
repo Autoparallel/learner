@@ -26,7 +26,7 @@ fields      = ["given", "family"]
 inner_paths = [{ new_key_name = "affiliation", path = "affiliation/0/name" }]
 type        = "CombineFields"
 
-[response_format.field_maps.publication_date]
+[response_format.field_maps.publication_dates]
 path = "message/created/date-time"
 
 [response_format.field_maps.pdf_url]

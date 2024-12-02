@@ -74,7 +74,6 @@ mod config;
 mod response;
 
 pub use config::*;
-use json::get_path_value;
 pub use response::*;
 
 /// Main entry point for paper retrieval operations.
@@ -300,88 +299,6 @@ where D: serde::Deserializer<'de> {
   let s: String = String::deserialize(deserializer)?;
   Regex::new(&s).map_err(serde::de::Error::custom)
 }
-
-// / Applies a transformation to a string value based on the transform type.
-// /
-// / Handles three types of transformations:
-// / - Regular expression replacements
-// / - Date format conversions
-// / - URL construction
-// /
-// / # Errors
-// /
-// / Returns a LearnerError if:
-// / - Regex pattern is invalid
-// / - Date parsing fails
-// / - Date format is invalid
-
-// fn apply_transform(value: &str, transform: &Transform) -> Result<String> {
-//   match transform {
-//     Transform::Replace { pattern, replacement } => Regex::new(pattern)
-//       .map_err(|e| LearnerError::ApiError(format!("Invalid regex: {}", e)))
-//       .map(|re| re.replace_all(value, replacement.as_str()).into_owned()),
-//     Transform::Date { from_format, to_format } =>
-//       chrono::NaiveDateTime::parse_from_str(value, from_format)
-//         .map_err(|e| LearnerError::ApiError(format!("Invalid date: {}", e)))
-//         .map(|dt| dt.format(to_format).to_string()),
-//     Transform::Url { base, suffix } =>
-//       Ok(format!("{}{}", base.replace("{value}", value), suffix.as_deref().unwrap_or(""))),
-//     Transform::CombineFields { fields, inner_paths } => {
-//       let json: serde_json::Value = serde_json::from_str(value)
-//         .map_err(|e| LearnerError::ApiError(format!("Failed to parse JSON: {}", e)))?;
-
-//       // Handle both single objects and arrays
-//       let result = if let Some(array) = json.as_array() {
-//         // Create array of objects with combined fields
-//         let combined: Vec<serde_json::Map<String, serde_json::Value>> = array
-//           .iter()
-//           .filter_map(|obj| {
-//             let mut map = serde_json::Map::new();
-//             dbg!(&obj);
-
-//             // Handle the name fields combination
-//             let parts: Vec<_> =
-//               fields.iter().filter_map(|field| obj.get(field)).filter_map(|v|
-// v.as_str()).collect();
-
-//             if !parts.is_empty() {
-//               map.insert("name".to_string(), serde_json::Value::String(parts.join(" ")));
-
-//               // Handle any additional inner paths
-//               if let Some(paths) = inner_paths {
-//                 dbg!(paths);
-//                 for path in paths {
-//                   if let Some(inner_val) = get_path_value(obj, &path.path) {
-//                     dbg!(inner_val);
-//                     if let Some(str_val) = inner_val.as_str() {
-//                       // Use the last component of the path as the field name
-//                       let field_name = path.new_key_name.clone();
-//                       map.insert(
-//                         field_name.to_string(),
-//                         serde_json::Value::String(str_val.to_string()),
-//                       );
-//                     }
-//                   }
-//                 }
-//               }
-
-//               Some(map)
-//             } else {
-//               None
-//             }
-//           })
-//           .collect();
-
-//         serde_json::Value::Array(combined.into_iter().map(serde_json::Value::Object).collect())
-//       } else {
-//         return Err(LearnerError::ApiError("Expected array for CombineFields".into()));
-//       };
-
-//       serde_json::to_string(&result)
-//         .map_err(|e| LearnerError::ApiError(format!("Failed to serialize result: {}", e)))
-//     },
-//   }
-// }
 
 // #[cfg(test)]
 // mod tests {

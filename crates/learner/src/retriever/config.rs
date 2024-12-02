@@ -85,7 +85,7 @@ impl RetrieverConfig {
   pub async fn retrieve_resource(
     &self,
     input: &str,
-    resource_config: ResourceConfig,
+    resource_config: &ResourceConfig,
   ) -> Result<Resource> {
     let identifier = self.extract_identifier(input)?;
 

@@ -16,9 +16,9 @@ path = "feed/entry/title"
 path = "feed/entry/summary"
 
 [response_format.field_maps.authors]
-path = "feed/entry/author/name"
+path = "feed/entry/author"
 
-[response_format.field_maps.publication_date]
+[response_format.field_maps.publication_dates]
 path = "feed/entry/published"
 
 [response_format.field_maps.pdf_url]

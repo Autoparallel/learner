@@ -20,9 +20,10 @@ async fn test_arxiv_retriever_integration() -> TestResult<()> {
   let resource: ResourceConfig = toml::from_str(&res_config_str).expect("Failed to parse config");
 
   // Test with a real arXiv paper
-  let paper = retriever.retrieve_resource("2301.07041", resource).await?;
+  let paper = retriever.retrieve_resource("2301.07041", &resource).await?;
 
   dbg!(&paper);
+  assert!(resource.validate(&paper)?);
 
   assert_eq!(
     paper.get("title").unwrap().as_str().unwrap(),
@@ -77,8 +78,8 @@ async fn test_iacr_retriever_integration() -> TestResult<()> {
   let resource: ResourceConfig = toml::from_str(&res_config_str).expect("Failed to parse config");
 
   // // Test with a real IACR paper
-  let paper = retriever.retrieve_resource("2016/260", resource).await.unwrap();
-
+  let paper = retriever.retrieve_resource("2016/260", &resource).await.unwrap();
+  assert!(resource.validate(&paper)?);
   dbg!(&paper);
 
   todo!("This likely needs cleaned up");
@@ -129,8 +130,8 @@ async fn test_doi_retriever_integration() -> TestResult<()> {
   let resource: ResourceConfig = toml::from_str(&res_config_str).expect("Failed to parse config");
 
   // Test with a real DOI paper
-  let paper = retriever.retrieve_resource("10.1145/1327452.1327492", resource).await?;
-
+  let paper = retriever.retrieve_resource("10.1145/1327452.1327492", &resource).await?;
+  assert!(resource.validate(&paper)?);
   dbg!(&paper);
   // assert!(!paper.title.is_empty());
   // assert!(!paper.authors.is_empty());

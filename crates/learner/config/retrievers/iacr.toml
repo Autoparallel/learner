@@ -18,7 +18,7 @@ path = "OAI-PMH/GetRecord/record/metadata/dc/description"
 [response_format.field_maps.authors]
 path = "OAI-PMH/GetRecord/record/metadata/dc/creator"
 
-[response_format.field_maps.publication_date]
+[response_format.field_maps.publication_dates]
 path = "OAI-PMH/GetRecord/record/metadata/dc/date"
 
 [response_format.field_maps.pdf_url]

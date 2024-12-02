@@ -34,13 +34,16 @@ field_type  = "string"
 name        = "abstract"
 required    = false
 
-# Publication date - datetime type
 [[fields]]
-description = "When the paper was published or last updated"
-field_type  = "string"
-name        = "publication_date"
+description = "Publication and update history"
+field_type  = "array"
+name        = "publication_dates"
 required    = false
-validation  = { datetime = true }
+
+[fields.type_definition.element_type]
+field_type = "string"
+name       = "date"
+validation = { datetime = true }
 
 # DOI field - string with pattern validation
 [[fields]]
