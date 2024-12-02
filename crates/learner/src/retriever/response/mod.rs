@@ -103,17 +103,40 @@ pub enum Transform {
     /// Optional suffix to append to the URL (e.g., ".pdf")
     suffix: Option<String>,
   },
-  // New transform for combining fields
-  CombineFields {
-    fields:      Vec<String>,            // Fields to combine for name
-    inner_paths: Option<Vec<InnerPath>>, // Additional paths to collect
+  Compose {
+    /// List of field paths or direct values to combine
+    sources: Vec<Source>,
+    /// How to format the combined result
+    format:  ComposeFormat,
   },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct InnerPath {
-  pub new_key_name: String,
-  pub path:         String,
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", content = "value")]
+pub enum Source {
+  /// Path to a field to extract
+  #[serde(rename = "path")]
+  Path(String),
+  /// A literal string value
+  #[serde(rename = "literal")]
+  Literal(String),
+  /// A field mapping with a new key name
+  #[serde(rename = "key_value")]
+  KeyValue { key: String, path: String },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type")]
+pub enum ComposeFormat {
+  /// Join fields with a delimiter
+  Join { delimiter: String },
+  /// Create an object with key-value pairs
+  Object,
+  /// Create an array of objects with specified structure
+  ArrayOfObjects {
+    /// How to structure each object
+    template: BTreeMap<String, String>,
+  },
 }
 
 /// Trait for processing API responses into Paper objects.
@@ -350,41 +373,103 @@ fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
       )))
     },
 
-    Transform::CombineFields { fields, inner_paths } => {
-      let arr = value.as_array().ok_or_else(|| {
-        LearnerError::ApiError("CombineFields transform requires array input".to_string())
-      })?;
-
-      let combined: Vec<Value> = arr
+    Transform::Compose { sources, format } => {
+      // Extract values from each source
+      let values: Vec<Value> = sources
         .iter()
-        .filter_map(|item| {
-          let obj = item.as_object()?;
-          let mut result = Map::new();
-
-          // Combine name fields
-          let parts: Vec<_> =
-            fields.iter().filter_map(|field| obj.get(field)).filter_map(|v| v.as_str()).collect();
-
-          if !parts.is_empty() {
-            result.insert("name".to_string(), Value::String(parts.join(" ")));
-
-            // Add any additional fields
-            if let Some(paths) = inner_paths {
-              for path in paths {
-                if let Ok(Some(inner_val)) = get_path_value(item, &[&path.path]) {
-                  result.insert(path.new_key_name.clone(), inner_val.clone());
-                }
-              }
-            }
-
-            Some(Value::Object(result))
-          } else {
-            None
-          }
+        .filter_map(|source| match source {
+          Source::Path(path) => {
+            let components: Vec<&str> = path.split('/').collect();
+            get_path_value(value, &components).ok().flatten()
+          },
+          Source::Literal(text) => Some(Value::String(text.clone())),
+          Source::KeyValue { key: _, path } => {
+            let components: Vec<&str> = path.split('/').collect();
+            get_path_value(value, &components).ok().flatten()
+          },
         })
         .collect();
 
-      Ok(Value::Array(combined))
+      // Apply the format to the collected values
+      match format {
+        ComposeFormat::Join { delimiter } => {
+          // Convert values to strings and join
+          let strings: Vec<String> = values
+            .iter()
+            .filter_map(|v| match v {
+              Value::String(s) => Some(s.clone()),
+              Value::Array(arr) if arr.len() == 1 => arr[0].as_str().map(|s| s.to_string()),
+              _ => None,
+            })
+            .collect();
+          Ok(Value::String(strings.join(delimiter)))
+        },
+
+        ComposeFormat::Object => {
+          let mut obj = Map::new();
+          for (source, value) in sources.iter().zip(values.iter()) {
+            if let Source::KeyValue { key, .. } = source {
+              obj.insert(key.clone(), value.clone());
+            }
+          }
+          Ok(Value::Object(obj))
+        },
+
+        ComposeFormat::ArrayOfObjects { template } => {
+          match value {
+            // Handle single string -> array of objects
+            Value::String(s) => {
+              let mut obj = Map::new();
+              for (key, template_value) in template {
+                let value = template_value.replace("{value}", s);
+                obj.insert(key.clone(), Value::String(value));
+              }
+              Ok(Value::Array(vec![Value::Object(obj)]))
+            },
+
+            // Handle array -> array of objects
+            Value::Array(arr) => {
+              dbg!(&arr);
+              let objects: Vec<Value> = arr
+                .iter()
+                .filter_map(|item| {
+                  dbg!(&item);
+                  let mut obj = Map::new();
+                  for (key, template_value) in template {
+                    let value = match item {
+                      Value::String(s) => template_value.replace("{value}", s),
+                      Value::Object(obj) => {
+                        dbg!(obj);
+                        let mut keys_and_vals = Vec::new();
+                        sources.iter().for_each(|source| {
+                          if let Source::KeyValue { key, path } = source {
+                            if let Some(val) = obj.get(path) {
+                              keys_and_vals.push((key, val))
+                            }
+                          }
+                        });
+                        dbg!(&key);
+                        keys_and_vals.into_iter().fold(template_value.clone(), |acc, (k, v)| {
+                          let replacement = format!("{{{k}}}");
+                          acc.replace(&replacement, v.as_str().unwrap_or_default())
+                        })
+                      },
+                      _ => return None,
+                    };
+                    obj.insert(key.clone(), Value::String(value));
+                  }
+                  Some(Value::Object(obj))
+                })
+                .collect();
+              Ok(Value::Array(objects))
+            },
+
+            _ => Err(LearnerError::ApiError(
+              "ArrayOfObjects transform requires string or array input".to_string(),
+            )),
+          }
+        },
+      }
     },
   }
 }

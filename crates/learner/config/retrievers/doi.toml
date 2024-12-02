@@ -9,7 +9,18 @@ source            = "doi"
 type = "json"
 
 [response_format.field_maps.title]
-path = "message/title/0"
+path = "message"
+[response_format.field_maps.title.transform]
+sources = [
+    { type = "path", value = "title/0" },
+    { type = "path", value = "subtitle/0" },
+]
+type = "Compose"
+
+[response_format.field_maps.title.transform.format]
+delimiter = ": "
+type      = "Join"
+
 
 [response_format.field_maps.abstract]
 path = "message/abstract"
@@ -22,9 +33,15 @@ type        = "Replace"
 [response_format.field_maps.authors]
 path = "message/author"
 [response_format.field_maps.authors.transform]
-fields      = ["given", "family"]
-inner_paths = [{ new_key_name = "affiliation", path = "affiliation/0/name" }]
-type        = "CombineFields"
+sources = [
+    { type = "key_value", value = { key = "family", path = "family" } },
+    { type = "key_value", value = { key = "given", path = "given" } },
+]
+type = "Compose"
+
+[response_format.field_maps.authors.transform.format]
+template = { name = "{given} {family}" }
+type     = "ArrayOfObjects"
 
 [response_format.field_maps.publication_dates]
 path = "message/created/date-time"
