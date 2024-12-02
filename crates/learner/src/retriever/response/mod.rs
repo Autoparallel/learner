@@ -174,12 +174,7 @@ pub trait ResponseProcessor: Send + Sync {
   /// Returns a Result containing either:
   /// - A fully populated Paper object
   /// - A LearnerError if parsing fails
-  fn process_response(
-    &self,
-    data: &[u8],
-    // retriever_config: RetrieverConfig,
-    resource_config: &ResourceConfig,
-  ) -> Result<Resource>;
+  fn process_response(&self, data: &[u8], resource_config: &ResourceConfig) -> Result<Resource>;
 }
 
 /// Process a JSON value according to field mappings and resource configuration

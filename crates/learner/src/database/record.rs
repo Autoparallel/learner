@@ -5,17 +5,19 @@ use super::*;
 /// A complete view of a resource with all associated data
 #[derive(Debug)]
 pub struct ResourceRecord {
-  pub resource:  ResourceConfig,
-  pub state:     ResourceState,
-  pub tags:      Vec<String>,
-  pub storage:   Option<StorageData>,
-  pub retrieval: Option<RetrievalData>,
+  pub resource:        Resource,
+  pub resource_config: ResourceConfig,
+  pub state:           ResourceState,
+  pub tags:            Vec<String>,
+  pub storage:         Option<StorageData>,
+  pub retrieval:       Option<RetrievalData>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ReadStatus {
-  Unread,
-  Reading {
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub enum Progress {
+  #[default]
+  Unopened,
+  Opened {
     progress: f32,
     // last_read:  DateTime<Utc>, // Track when reading sessions occur
     // total_time: Duration,      // Accumulate reading time
@@ -26,9 +28,9 @@ pub enum ReadStatus {
   },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ResourceState {
-  pub read_status:     ReadStatus,
+  pub read_status:     Progress,
   pub starred:         bool,
   pub rating:          Option<u8>,
   pub last_accessed:   Option<DateTime<Utc>>,

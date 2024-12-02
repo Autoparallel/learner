@@ -9,6 +9,8 @@ source            = "arxiv"
 strip_namespaces = true
 type             = "xml"
 
+
+# TODO: Could flatten out the `field_maps`?
 [response_format.field_maps.title]
 path = "feed/entry/title"
 
@@ -21,10 +23,10 @@ path = "feed/entry/author"
 [response_format.field_maps.publication_dates]
 path = "feed/entry/published"
 
-[response_format.field_maps.pdf_url]
+[retrieval_data.urls]
 path = "feed/entry/id"
 
-[response_format.field_maps.pdf_url.transform]
+[retrieval_data.urls.transform]
 pattern     = "/abs/"
 replacement = "/pdf/"
 type        = "Replace"

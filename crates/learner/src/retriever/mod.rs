@@ -1,73 +1,3 @@
-//! Paper retrieval and metadata extraction framework.
-//!
-//! This module provides a flexible, configuration-driven system for retrieving academic papers
-//! and their metadata from various sources. It supports both XML and JSON-based APIs through
-//! a common interface, with configurable field mapping and transformation capabilities.
-//!
-//! # Architecture
-//!
-//! The retriever system consists of several key components:
-//!
-//! - [`Retrievers`]: Main entry point for paper retrieval operations
-//! - [`RetrieverConfig`]: Configuration for specific paper sources
-//! - [`ResponseFormat`]: Format-specific parsing logic (XML/JSON)
-//! - [`ResponseProcessor`]: Trait for processing API responses
-//!
-//! # Features
-//!
-//! - Configuration-driven paper retrieval
-//! - Support for multiple paper sources
-//! - Flexible field mapping
-//! - Custom field transformations
-//! - Automatic source detection
-//!
-//! # Configuration
-//!
-//! Retrievers are configured using TOML files that specify:
-//!
-//! - API endpoints and authentication
-//! - Field mapping rules
-//! - Response format handling
-//! - Identifier patterns
-//!
-//! # Examples
-//!
-//! Configure and use a retriever:
-//!
-//! ```no_run
-//! use learner::{
-//!   prelude::*,
-//!   retriever::{RetrieverConfig, Retrievers},
-//! };
-//!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create a new retriever
-//! let retriever =
-//!   Retrievers::new().with_config_file("config/arxiv.toml")?.with_config_file("config/doi.toml")?;
-//!
-//! // Retrieve a paper (automatically detects source)
-//! let paper = retriever.get_paper("10.1145/1327452.1327492").await?;
-//! println!("Retrieved paper: {}", paper.title);
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! Load multiple configurations:
-//!
-//! ```no_run
-//! # use learner::retriever::Retrievers;
-//! # use learner::prelude::*;
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Load all TOML configs from a directory
-//! let retriever = Retrievers::new().with_config_dir("config/")?;
-//!
-//! // Retriever will automatically match source based on input format
-//! let arxiv_paper = retriever.get_paper("2301.07041").await?;
-//! let doi_paper = retriever.get_paper("10.1145/1327452.1327492").await?;
-//! # Ok(())
-//! # }
-//! ```
-
 use super::*;
 
 mod config;
@@ -76,28 +6,6 @@ mod response;
 pub use config::*;
 pub use response::*;
 
-/// Main entry point for paper retrieval operations.
-///
-/// The `Retriever` struct manages a collection of paper source configurations and
-/// provides a unified interface for retrieving papers from any configured source.
-/// It automatically detects the appropriate source based on the input identifier
-/// format.
-///
-/// # Examples
-///
-/// ```no_run
-/// # use learner::retriever::Retrievers;
-/// # use learner::prelude::*;
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let retriever = Retrievers::new().with_config_dir("config/")?;
-///
-/// // Retrieve papers from different sources
-/// let paper1 = retriever.get_paper("2301.07041").await?; // arXiv
-/// let paper2 = retriever.get_paper("2023/123").await?; // IACR
-/// let paper3 = retriever.get_paper("10.1145/1327452.1327492").await?; // DOI
-/// # Ok(())
-/// # }
-/// ```
 #[derive(Default, Debug, Clone)]
 pub struct Retrievers {
   /// The collection of configurations used for this [`Retriever`].
@@ -146,42 +54,7 @@ impl Retrievers {
   /// ```
   pub fn new() -> Self { Self::default() }
 
-  /// Attempts to retrieve a paper using any matching configuration.
-  ///
-  /// This method tries to match the input against all configured retrievers
-  /// and uses the first matching configuration to fetch the paper.
-  ///
-  /// # Arguments
-  ///
-  /// * `input` - Paper identifier or URL
-  ///
-  /// # Returns
-  ///
-  /// Returns a Result containing either:
-  /// - The retrieved Paper object
-  /// - A LearnerError if no matching configuration is found or retrieval fails
-  ///
-  /// # Errors
-  ///
-  /// This method will return an error if:
-  /// - No configuration matches the input format
-  /// - Multiple configurations match ambiguously
-  /// - Paper retrieval fails
-  ///
-  /// # Examples
-  ///
-  /// ```no_run
-  /// # use learner::retriever::Retrievers;
-  /// # use learner::prelude::*;
-  /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-  /// let retriever = Retrievers::new().with_config_dir("config/")?;
-  ///
-  /// // Retrieve from different sources
-  /// let paper1 = retriever.get_paper("2301.07041").await?;
-  /// let paper2 = retriever.get_paper("10.1145/1327452.1327492").await?;
-  /// # Ok(())
-  /// # }
-  /// ```
+  #[deprecated]
   pub async fn get_paper(&self, input: &str) -> Result<Paper> {
     let mut matches = Vec::new();
 
@@ -200,6 +73,13 @@ impl Retrievers {
     //     matches.into_iter().map(|c| c.name.clone()).collect(),
     //   )),
     // }
+  }
+
+  pub async fn get_resource(&self, input: &str) -> Result<Paper> {
+    todo!(
+      "Arguably, we don't even need this. We could instead just have this handled by `Learner` so \
+       the API is simpler"
+    )
   }
 
   /// Sanitizes and normalizes a paper identifier using configured retrieval patterns.
@@ -300,191 +180,190 @@ where D: serde::Deserializer<'de> {
   Regex::new(&s).map_err(serde::de::Error::custom)
 }
 
-// #[cfg(test)]
-// mod tests {
-//   use super::*;
+#[cfg(test)]
+mod tests {
+  use super::*;
 
-//   #[test]
-//   fn validate_arxiv_config() {
-//     let config_str = include_str!("../../config/retrievers/arxiv.toml");
+  #[test]
+  fn validate_arxiv_config() {
+    let config_str = include_str!("../../config/retrievers/arxiv.toml");
 
-//     let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
+    let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
 
-//     // Verify basic fields
-//     assert_eq!(retriever.name, "arxiv");
-//     assert_eq!(retriever.base_url, "http://export.arxiv.org");
-//     assert_eq!(retriever.source, "arxiv");
+    // Verify basic fields
+    assert_eq!(retriever.name, "arxiv");
+    assert_eq!(retriever.base_url, "http://export.arxiv.org");
+    assert_eq!(retriever.source, "arxiv");
 
-//     // Test pattern matching
-//     assert!(retriever.pattern.is_match("2301.07041"));
-//     assert!(retriever.pattern.is_match("math.AG/0601001"));
-//     assert!(retriever.pattern.is_match("https://arxiv.org/abs/2301.07041"));
-//     assert!(retriever.pattern.is_match("https://arxiv.org/pdf/2301.07041"));
-//     assert!(retriever.pattern.is_match("https://arxiv.org/abs/math.AG/0601001"));
-//     assert!(retriever.pattern.is_match("https://arxiv.org/abs/math/0404443"));
+    // Test pattern matching
+    assert!(retriever.pattern.is_match("2301.07041"));
+    assert!(retriever.pattern.is_match("math.AG/0601001"));
+    assert!(retriever.pattern.is_match("https://arxiv.org/abs/2301.07041"));
+    assert!(retriever.pattern.is_match("https://arxiv.org/pdf/2301.07041"));
+    assert!(retriever.pattern.is_match("https://arxiv.org/abs/math.AG/0601001"));
+    assert!(retriever.pattern.is_match("https://arxiv.org/abs/math/0404443"));
 
-//     // Test identifier extraction
-//     assert_eq!(retriever.extract_identifier("2301.07041").unwrap(), "2301.07041");
-//     assert_eq!(
-//       retriever.extract_identifier("https://arxiv.org/abs/2301.07041").unwrap(),
-//       "2301.07041"
-//     );
-//     assert_eq!(retriever.extract_identifier("math.AG/0601001").unwrap(), "math.AG/0601001");
+    // Test identifier extraction
+    assert_eq!(retriever.extract_identifier("2301.07041").unwrap(), "2301.07041");
+    assert_eq!(
+      retriever.extract_identifier("https://arxiv.org/abs/2301.07041").unwrap(),
+      "2301.07041"
+    );
+    assert_eq!(retriever.extract_identifier("math.AG/0601001").unwrap(), "math.AG/0601001");
 
-//     // Verify response format
+    // Verify response format
 
-//     if let ResponseFormat::Xml(config) = &retriever.response_format {
-//       assert!(config.strip_namespaces);
+    if let ResponseFormat::Xml(config) = &retriever.response_format {
+      assert!(config.strip_namespaces);
 
-//       // Verify field mappings
-//       let field_maps = &config.field_maps;
-//       assert!(field_maps.contains_key("title"));
-//       assert!(field_maps.contains_key("abstract"));
-//       assert!(field_maps.contains_key("authors"));
-//       assert!(field_maps.contains_key("publication_date"));
-//       assert!(field_maps.contains_key("pdf_url"));
+      // Verify field mappings
+      let field_maps = &config.field_maps;
+      assert!(field_maps.contains_key("title"));
+      assert!(field_maps.contains_key("abstract"));
+      assert!(field_maps.contains_key("authors"));
+      assert!(field_maps.contains_key("publication_date"));
+      assert!(field_maps.contains_key("pdf_url"));
 
-//       // Verify PDF transform
-//       if let Some(map) = field_maps.get("pdf_url") {
-//         match &map.transform {
-//           Some(Transform::Replace { pattern, replacement }) => {
-//             assert_eq!(pattern, "/abs/");
-//             assert_eq!(replacement, "/pdf/");
-//           },
-//           _ => panic!("Expected Replace transform for pdf_url"),
-//         }
-//       } else {
-//         panic!("Missing pdf_url field map");
-//       }
-//     } else {
-//       panic!("Expected an XML configuration, but did not get one.")
-//     }
+      // Verify PDF transform
+      if let Some(map) = field_maps.get("pdf_url") {
+        match &map.transform {
+          Some(Transform::Replace { pattern, replacement }) => {
+            assert_eq!(pattern, "/abs/");
+            assert_eq!(replacement, "/pdf/");
+          },
+          _ => panic!("Expected Replace transform for pdf_url"),
+        }
+      } else {
+        panic!("Missing pdf_url field map");
+      }
+    } else {
+      panic!("Expected an XML configuration, but did not get one.")
+    }
 
-//     // Verify headers
-//     assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
-//   }
+    // Verify headers
+    assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
+  }
 
-//   // TODO: Fix this
-//   #[test]
-//   fn test_doi_config_deserialization() {
-//     let config_str = include_str!("../../config/retrievers/doi.toml");
+  #[test]
+  fn test_doi_config_deserialization() {
+    let config_str = include_str!("../../config/retrievers/doi.toml");
 
-//     let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
+    let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
 
-//     dbg!(&retriever);
+    dbg!(&retriever);
 
-//     // Verify basic fields
-//     assert_eq!(retriever.name, "doi");
-//     assert_eq!(retriever.base_url, "https://api.crossref.org/works");
-//     assert_eq!(retriever.source, "doi");
+    // Verify basic fields
+    assert_eq!(retriever.name, "doi");
+    assert_eq!(retriever.base_url, "https://api.crossref.org/works");
+    assert_eq!(retriever.source, "doi");
 
-//     // Test pattern matching
-//     let test_cases = [
-//       ("10.1145/1327452.1327492", true),
-//       ("https://doi.org/10.1145/1327452.1327492", true),
-//       ("invalid-doi", false),
-//       ("https://wrong.url/10.1145/1327452.1327492", false),
-//     ];
+    // Test pattern matching
+    let test_cases = [
+      ("10.1145/1327452.1327492", true),
+      ("https://doi.org/10.1145/1327452.1327492", true),
+      ("invalid-doi", false),
+      ("https://wrong.url/10.1145/1327452.1327492", false),
+    ];
 
-//     for (input, expected) in test_cases {
-//       assert_eq!(
-//         retriever.pattern.is_match(input),
-//         expected,
-//         "Pattern match failed for input: {}",
-//         input
-//       );
-//     }
+    for (input, expected) in test_cases {
+      assert_eq!(
+        retriever.pattern.is_match(input),
+        expected,
+        "Pattern match failed for input: {}",
+        input
+      );
+    }
 
-//     // Test identifier extraction
-//     assert_eq!(
-//       retriever.extract_identifier("10.1145/1327452.1327492").unwrap(),
-//       "10.1145/1327452.1327492"
-//     );
-//     assert_eq!(
-//       retriever.extract_identifier("https://doi.org/10.1145/1327452.1327492").unwrap(),
-//       "10.1145/1327452.1327492"
-//     );
+    // Test identifier extraction
+    assert_eq!(
+      retriever.extract_identifier("10.1145/1327452.1327492").unwrap(),
+      "10.1145/1327452.1327492"
+    );
+    assert_eq!(
+      retriever.extract_identifier("https://doi.org/10.1145/1327452.1327492").unwrap(),
+      "10.1145/1327452.1327492"
+    );
 
-//     // Verify response format
-//     match &retriever.response_format {
-//       ResponseFormat::Json(config) => {
-//         // Verify field mappings
-//         let field_maps = &config.field_maps;
-//         assert!(field_maps.contains_key("title"));
-//         assert!(field_maps.contains_key("abstract"));
-//         assert!(field_maps.contains_key("authors"));
-//         assert!(field_maps.contains_key("publication_date"));
-//         assert!(field_maps.contains_key("pdf_url"));
-//         assert!(field_maps.contains_key("doi"));
-//       },
-//       _ => panic!("Expected JSON response format"),
-//     }
-//   }
+    // Verify response format
+    match &retriever.response_format {
+      ResponseFormat::Json(config) => {
+        // Verify field mappings
+        let field_maps = &config.field_maps;
+        assert!(field_maps.contains_key("title"));
+        assert!(field_maps.contains_key("abstract"));
+        assert!(field_maps.contains_key("authors"));
+        assert!(field_maps.contains_key("publication_date"));
+        assert!(field_maps.contains_key("pdf_url"));
+        assert!(field_maps.contains_key("doi"));
+      },
+      _ => panic!("Expected JSON response format"),
+    }
+  }
 
-//   #[test]
-//   fn test_iacr_config_deserialization() {
-//     let config_str = include_str!("../../config/retrievers/iacr.toml");
+  #[test]
+  fn test_iacr_config_deserialization() {
+    let config_str = include_str!("../../config/retrievers/iacr.toml");
 
-//     let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
+    let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
 
-//     // Verify basic fields
-//     assert_eq!(retriever.name, "iacr");
-//     assert_eq!(retriever.base_url, "https://eprint.iacr.org");
-//     assert_eq!(retriever.source, "iacr");
+    // Verify basic fields
+    assert_eq!(retriever.name, "iacr");
+    assert_eq!(retriever.base_url, "https://eprint.iacr.org");
+    assert_eq!(retriever.source, "iacr");
 
-//     // Test pattern matching
-//     let test_cases = [
-//       ("2016/260", true),
-//       ("2023/123", true),
-//       ("https://eprint.iacr.org/2016/260", true),
-//       ("https://eprint.iacr.org/2016/260.pdf", true),
-//       ("invalid/format", false),
-//       ("https://wrong.url/2016/260", false),
-//     ];
+    // Test pattern matching
+    let test_cases = [
+      ("2016/260", true),
+      ("2023/123", true),
+      ("https://eprint.iacr.org/2016/260", true),
+      ("https://eprint.iacr.org/2016/260.pdf", true),
+      ("invalid/format", false),
+      ("https://wrong.url/2016/260", false),
+    ];
 
-//     for (input, expected) in test_cases {
-//       assert_eq!(
-//         retriever.pattern.is_match(input),
-//         expected,
-//         "Pattern match failed for input: {}",
-//         input
-//       );
-//     }
+    for (input, expected) in test_cases {
+      assert_eq!(
+        retriever.pattern.is_match(input),
+        expected,
+        "Pattern match failed for input: {}",
+        input
+      );
+    }
 
-//     // Test identifier extraction
-//     assert_eq!(retriever.extract_identifier("2016/260").unwrap(), "2016/260");
-//     assert_eq!(
-//       retriever.extract_identifier("https://eprint.iacr.org/2016/260").unwrap(),
-//       "2016/260"
-//     );
-//     assert_eq!(
-//       retriever.extract_identifier("https://eprint.iacr.org/2016/260.pdf").unwrap(),
-//       "2016/260"
-//     );
+    // Test identifier extraction
+    assert_eq!(retriever.extract_identifier("2016/260").unwrap(), "2016/260");
+    assert_eq!(
+      retriever.extract_identifier("https://eprint.iacr.org/2016/260").unwrap(),
+      "2016/260"
+    );
+    assert_eq!(
+      retriever.extract_identifier("https://eprint.iacr.org/2016/260.pdf").unwrap(),
+      "2016/260"
+    );
 
-//     // Verify response format
-//     if let ResponseFormat::Xml(config) = &retriever.response_format {
-//       assert!(config.strip_namespaces);
+    // Verify response format
+    if let ResponseFormat::Xml(config) = &retriever.response_format {
+      assert!(config.strip_namespaces);
 
-//       // Verify field mappings
-//       let field_maps = &config.field_maps;
-//       assert!(field_maps.contains_key("title"));
-//       assert!(field_maps.contains_key("abstract"));
-//       assert!(field_maps.contains_key("authors"));
-//       assert!(field_maps.contains_key("publication_date"));
-//       assert!(field_maps.contains_key("pdf_url"));
+      // Verify field mappings
+      let field_maps = &config.field_maps;
+      assert!(field_maps.contains_key("title"));
+      assert!(field_maps.contains_key("abstract"));
+      assert!(field_maps.contains_key("authors"));
+      assert!(field_maps.contains_key("publication_date"));
+      assert!(field_maps.contains_key("pdf_url"));
 
-//       // Verify OAI-PMH paths
-//       if let Some(map) = field_maps.get("title") {
-//         assert!(map.path.contains(&"OAI-PMH/GetRecord/record/metadata/dc/title".to_string()));
-//       } else {
-//         panic!("Missing title field map");
-//       }
-//     } else {
-//       panic!("Expected an XML configuration, but did not get one.")
-//     }
+      // Verify OAI-PMH paths
+      if let Some(map) = field_maps.get("title") {
+        assert!(map.path.contains(&"OAI-PMH/GetRecord/record/metadata/dc/title".to_string()));
+      } else {
+        panic!("Missing title field map");
+      }
+    } else {
+      panic!("Expected an XML configuration, but did not get one.")
+    }
 
-//     // Verify headers
-//     assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
-//   }
-// }
+    // Verify headers
+    assert_eq!(retriever.headers.get("Accept").unwrap(), "application/xml");
+  }
+}

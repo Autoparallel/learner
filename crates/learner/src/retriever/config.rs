@@ -1,3 +1,4 @@
+use record::{ResourceRecord, ResourceState, RetrievalData};
 use resource::Resource;
 
 use super::*;
@@ -31,9 +32,9 @@ use super::*;
 #[derive(Debug, Clone, Deserialize)]
 pub struct RetrieverConfig {
   /// Name of this retriever configuration
-  pub name:              String,
+  pub name: String,
+
   // TODO (autoparallel): Ultimately this will have to peer into the `Resources` to be useful
-  /// The type of resource this retriever should yield
   pub resource:          String,
   /// Base URL for API requests
   pub base_url:          String,
@@ -44,11 +45,13 @@ pub struct RetrieverConfig {
   pub source:            String,
   /// Template for constructing API endpoint URLs
   pub endpoint_template: String,
-  /// Format and parsing configuration for API responses
+  // TODO: This is now more like "how to get the thing to map into the resource"
   pub response_format:   ResponseFormat,
   /// Optional HTTP headers for API requests
   #[serde(default)]
   pub headers:           BTreeMap<String, String>,
+
+  pub retrieval_data: BTreeMap<String, BTreeMap<String, FieldMap>>,
 }
 
 impl Identifiable for RetrieverConfig {
@@ -86,7 +89,7 @@ impl RetrieverConfig {
     &self,
     input: &str,
     resource_config: &ResourceConfig,
-  ) -> Result<Resource> {
+  ) -> Result<ResourceRecord> {
     let identifier = self.extract_identifier(input)?;
 
     // Send request and get response
@@ -112,7 +115,7 @@ impl RetrieverConfig {
     };
 
     // Process response and get resource
-    let mut resource = processor.process_response(&data, &resource_config)?;
+    let mut resource = processor.process_response(&data, resource_config)?;
 
     // Add source metadata
     resource.insert("source".into(), Value::String(self.source.clone()));
@@ -120,7 +123,13 @@ impl RetrieverConfig {
 
     // Validate full resource against config
     resource_config.validate(&resource)?;
-
-    Ok(resource)
+    Ok(ResourceRecord {
+      resource,
+      resource_config: resource_config.clone(),
+      retrieval: None,
+      state: ResourceState::default(),
+      storage: None,
+      tags: Vec::new(),
+    })
   }
 }
