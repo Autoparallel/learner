@@ -82,7 +82,7 @@ async fn test_iacr_retriever_integration() -> TestResult<()> {
   assert!(resource.validate(&paper)?);
   dbg!(&paper);
 
-  todo!("This likely needs cleaned up");
+  todo!("This isn't actually validating properly because right now the authors isn't right.");
   // assert!(!paper.title.is_empty());
   // assert!(!paper.authors.is_empty());
   // assert!(!paper.abstract_text.is_empty());
