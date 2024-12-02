@@ -343,6 +343,7 @@ fn get_path_value(json: &Value, path: &[&str]) -> Result<Option<Value>> {
 
 /// Apply a transform to a JSON value
 fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
+  dbg!(&value);
   match transform {
     Transform::Replace { pattern, replacement } => {
       let text = value.as_str().ok_or_else(|| {
@@ -390,6 +391,8 @@ fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
         })
         .collect();
 
+      dbg!(&values);
+
       // Apply the format to the collected values
       match format {
         ComposeFormat::Join { delimiter } => {
@@ -406,12 +409,17 @@ fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
         },
 
         ComposeFormat::Object => {
+          dbg!("inside here");
           let mut obj = Map::new();
+          dbg!(&sources);
           for (source, value) in sources.iter().zip(values.iter()) {
+            dbg!(&source);
             if let Source::KeyValue { key, .. } = source {
+              dbg!(key);
               obj.insert(key.clone(), value.clone());
             }
           }
+          dbg!(&obj);
           Ok(Value::Object(obj))
         },
 

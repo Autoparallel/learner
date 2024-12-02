@@ -16,8 +16,12 @@ path = "OAI-PMH/GetRecord/record/metadata/dc/title"
 path = "OAI-PMH/GetRecord/record/metadata/dc/description"
 
 [response_format.field_maps.authors]
-path = "OAI-PMH/GetRecord/record/metadata/dc/creator"
-
+path = "OAI-PMH/GetRecord/record/metadata/dc"
+[response_format.field_maps.authors.transform]
+sources = [{ type = "key_value", value = { key = "name", path = "creator" } }]
+type    = "Compose"
+[response_format.field_maps.authors.transform.format]
+type = "Object"
 
 [response_format.field_maps.publication_dates]
 path = "OAI-PMH/GetRecord/record/metadata/dc/date"
