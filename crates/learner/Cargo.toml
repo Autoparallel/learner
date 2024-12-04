@@ -13,6 +13,7 @@ version              = "0.9.1"
 [dependencies]
 async-trait    = { workspace = true }
 chrono         = { workspace = true }
+config         = { workspace = true }
 dirs           = { workspace = true }
 futures        = { workspace = true }
 lazy_static    = { workspace = true }

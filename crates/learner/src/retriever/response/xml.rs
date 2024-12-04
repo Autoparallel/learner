@@ -40,7 +40,7 @@ use super::*;
 ///   })]),
 /// };
 /// ```
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XmlConfig {
   /// Whether to remove XML namespace declarations and prefixes
   #[serde(default)]

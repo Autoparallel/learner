@@ -2,7 +2,7 @@ use serde_json::{self};
 
 use super::*;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonConfig {
   pub field_maps: BTreeMap<String, FieldMap>,
 }

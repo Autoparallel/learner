@@ -31,7 +31,7 @@ pub mod xml;
 /// [response_format.field_maps]
 /// title = { path = "message/title/0" }
 /// ```
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ResponseFormat {
   /// XML response parser configuration
@@ -53,7 +53,7 @@ pub enum ResponseFormat {
 /// path = "entry/title"
 /// transform = { type = "replace", pattern = "\\s+", replacement = " " }
 /// ```
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldMap {
   /// Path to field in response (e.g., JSON path or XPath)
   pub path:      String,
@@ -79,7 +79,7 @@ pub struct FieldMap {
 /// # Construct full URL
 /// transform = { type = "url", base = "https://example.com/", suffix = ".pdf" }
 /// ```
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Transform {
   /// Replace text using regex pattern
@@ -111,7 +111,7 @@ pub enum Transform {
   },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value")]
 pub enum Source {
   /// Path to a field to extract
@@ -125,7 +125,7 @@ pub enum Source {
   KeyValue { key: String, path: String },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ComposeFormat {
   /// Join fields with a delimiter

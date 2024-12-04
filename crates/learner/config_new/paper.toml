@@ -1,0 +1,12 @@
+# paper.toml
+description = "Academic paper configuration"
+extends     = ["base_resource"]
+name        = "paper"
+
+[item]
+required_fields = ["title", "authors", "publication_date", "abstract_text"]
+resource_type   = "paper"
+
+[item.abstract_text]
+field_type = "string"
+required   = true

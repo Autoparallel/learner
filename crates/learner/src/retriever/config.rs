@@ -50,8 +50,9 @@ pub struct RetrieverConfig {
   /// Optional HTTP headers for API requests
   #[serde(default)]
   pub headers:           BTreeMap<String, String>,
-
-  pub retrieval_data: BTreeMap<String, BTreeMap<String, FieldMap>>,
+  // TODO: need to have these be associated somehow, actually resource should probably be in record
+  // pub resource_config: ResourceConfig,
+  // pub record_config:   RecordConfig,
 }
 
 impl Identifiable for RetrieverConfig {
