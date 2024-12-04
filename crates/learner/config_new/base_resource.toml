@@ -2,8 +2,7 @@ description = "Base configuration for all academic resources"
 name        = "base_resource"
 
 [item]
-required_fields = ["title", "authors"]
-resource_type   = "base"
+resource_type = "base"
 
 # Define complete field definitions as inline tables
 abstract_text    = { field_type = "string", required = false }

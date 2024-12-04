@@ -42,17 +42,27 @@ pub struct Config<T> {
   pub item:              T,
 }
 
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub struct Resource {
+//   /// Required fields for any academic resource
+//   pub title:            FieldDefinition,
+//   pub authors:          FieldDefinition,
+//   pub publication_date: FieldDefinition,
+//   pub abstract_text:    Option<FieldDefinition>,
+
+//   /// Resource-type specific requirements
+//   pub resource_type:   String, // paper, book, thesis, etc.
+//   pub required_fields: Vec<String>,
+// }
+
+// TODO:  use this (may have to change back the fielddefinition now)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resource {
-  /// Required fields for any academic resource
-  pub title:            FieldDefinition,
-  pub authors:          FieldDefinition,
-  pub publication_date: FieldDefinition,
-  pub abstract_text:    Option<FieldDefinition>,
-
-  /// Resource-type specific requirements
-  pub resource_type:   String, // paper, book, thesis, etc.
-  pub required_fields: Vec<String>,
+  pub resource_type: String,
+  /// Field definitions with optional metadata
+  #[serde(default)]
+  #[serde(flatten)]
+  pub fields:        BTreeMap<String, FieldDefinition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
