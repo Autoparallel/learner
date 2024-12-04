@@ -1,7 +1,30 @@
-use resource::FieldDefinition;
+use resource::{TypeDefinition, ValidationRules};
+// use resource::FieldDefinition;
 use serde::de::DeserializeOwned;
 
 use super::*;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FieldDefinition {
+  //   /// Name of the field
+  //   pub name:        String,
+  /// Type of the field (should be a JSON Value type)
+  pub field_type:  String,
+  /// Whether this field must be present
+  #[serde(default)]
+  pub required:    bool,
+  /// Human-readable description
+  #[serde(default)]
+  pub description: Option<String>,
+  /// Default value if field is absent
+  #[serde(default)]
+  pub default:     Option<Value>,
+  /// Optional validation rules
+  #[serde(default)]
+  pub validation:  Option<ValidationRules>,
+
+  pub type_definition: Option<TypeDefinition>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config<T> {

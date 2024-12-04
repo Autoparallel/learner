@@ -6,7 +6,7 @@ required_fields = ["title", "authors"]
 resource_type   = "base"
 
 # Define complete field definitions as inline tables
-abstract_text    = { name = "abstract", field_type = "string", required = false }
-authors          = { name = "authors", field_type = "array", required = true, validation = { min_items = 1 } }
-publication_date = { name = "publication_date", field_type = "string", required = true, validation = { datetime = true } }
-title            = { name = "title", field_type = "string", required = true, validation = { min_length = 1, max_length = 500 } }
+abstract_text    = { field_type = "string", required = false }
+authors          = { field_type = "array", required = true, validation = { min_items = 1 } }
+publication_date = { field_type = "string", required = true, validation = { datetime = true } }
+title            = { field_type = "string", required = true, validation = { min_length = 1, max_length = 500 } }
