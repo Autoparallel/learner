@@ -1,4 +1,4 @@
-use learner::retriever::RetrieverConfig;
+use learner::retriever::Retriever;
 
 use super::*;
 

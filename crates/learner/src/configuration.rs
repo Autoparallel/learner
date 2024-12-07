@@ -1,8 +1,21 @@
 use resource::{TypeDefinition, ValidationRules};
-// use resource::FieldDefinition;
 use serde::de::DeserializeOwned;
 
 use super::*;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config<T> {
+  /// Name of this configuration
+  pub name:              String,
+  /// Optional description
+  #[serde(default)]
+  pub description:       Option<String>,
+  #[serde(default)]
+  pub additional_fields: BTreeMap<String, Value>,
+  /// The specific configuration type
+  #[serde(flatten)]
+  pub item:              T,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldDefinition {
@@ -25,37 +38,6 @@ pub struct FieldDefinition {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Config<T> {
-  /// Name of this configuration
-  pub name:        String,
-  /// Optional description
-  #[serde(default)]
-  pub description: Option<String>,
-  #[serde(default)]
-  pub extends:     Option<Vec<String>>,
-
-  #[serde(default)]
-  pub additional_fields: BTreeMap<String, Value>,
-  /// The specific configuration type
-  #[serde(flatten)]
-  pub item:              T,
-}
-
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// pub struct Resource {
-//   /// Required fields for any academic resource
-//   pub title:            FieldDefinition,
-//   pub authors:          FieldDefinition,
-//   pub publication_date: FieldDefinition,
-//   pub abstract_text:    Option<FieldDefinition>,
-
-//   /// Resource-type specific requirements
-//   pub resource_type:   String, // paper, book, thesis, etc.
-//   pub required_fields: Vec<String>,
-// }
-
-// TODO:  use this (may have to change back the fielddefinition now)
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resource {
   /// Field definitions with optional metadata
   #[serde(default)]
@@ -63,67 +45,7 @@ pub struct Resource {
   pub fields: BTreeMap<String, FieldDefinition>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Record {
-  /// The resource type this record manages
-  pub resource: Resource,
-
-  /// State tracking configuration
-  pub state_tracking: State,
-
-  /// Storage configuration
-  pub storage: Storage,
-
-  /// Retrieval configuration
-  pub retrieval: Retrieval,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Retriever {
-  /// The record type this retriever populates
-  pub record_type: String,
-
-  /// API configuration
-  pub base_url:          String,
-  pub endpoint_template: String,
-  pub pattern:           String,
-  #[serde(default)]
-  pub headers:           BTreeMap<String, String>,
-
-  /// How to process responses
-  pub response_format: ResponseFormat,
-
-  /// Field mappings
-  pub resource_mappings: BTreeMap<String, FieldMap>,
-  pub record_mappings:   BTreeMap<String, FieldMap>,
-}
-
-/// Configuration for state tracking
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct State {
-  pub progress_tracking: bool,
-  pub rating_system:     Option<u8>,
-  pub allow_notes:       bool,
-  pub track_access_time: bool,
-}
-
-/// Configuration for storage
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Storage {
-  pub required_files:     Vec<String>,
-  pub track_checksums:    bool,
-  pub track_file_history: bool,
-}
-
-/// Configuration for retrieval metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Retrieval {
-  pub track_urls:    bool,
-  pub verify_access: bool,
-  pub url_types:     Vec<String>,
-  pub access_types:  Vec<String>,
-}
-
+// TODO: These two traits can probably be removed
 pub trait Identifiable {
   fn name(&self) -> String;
 }
@@ -166,74 +88,49 @@ pub trait Configurable: Sized {
   }
 }
 
-/// Helper for managing configurations with inheritance
 pub struct ConfigurationManager {
   builder:        config::ConfigBuilder<config::builder::DefaultState>,
   loaded_configs: BTreeMap<String, Value>,
+  // Track config paths for loading extends
+  config_paths:   PathBuf,
 }
 
 impl ConfigurationManager {
-  pub fn new() -> Self {
-    Self { builder: config::Config::builder(), loaded_configs: BTreeMap::new() }
+  pub fn new(config_path: impl AsRef<Path>) -> Self {
+    Self {
+      builder:        config::Config::builder(),
+      loaded_configs: BTreeMap::new(),
+      config_paths:   config_path.as_ref().to_path_buf(),
+    }
   }
 
-  // TODO: Remove unwraps
   pub fn load_config<T>(&mut self, path: impl AsRef<Path>) -> Result<Config<T>>
-  where T: Serialize + DeserializeOwned + std::fmt::Debug {
+  where T: DeserializeOwned + std::fmt::Debug {
     let path = path.as_ref();
-    let content =
-      std::fs::read_to_string(path).map_err(|e| config::ConfigError::Foreign(Box::new(e))).unwrap();
+    let content = std::fs::read_to_string(path)?;
 
-    // Try to parse and provide detailed error information
-    match toml::from_str::<Config<T>>(&content) {
-      Ok(config) => {
-        let value = serde_json::to_value(&config)
-          .map_err(|e| config::ConfigError::Foreign(Box::new(e)))
-          .unwrap();
-        self.loaded_configs.insert(config.name.clone(), value);
-        Ok(config)
-      },
-      Err(e) => {
-        println!("Failed to parse configuration file: {}", path.display());
-        println!("Error: {}", e);
-        println!("\nExpected structure for {} configuration:", std::any::type_name::<T>());
-        panic!()
-        // Print example structure if we're parsing a Resource
-        // if std::any::type_name::<T>() == std::any::type_name::<Resource>() {
-        //   Resource::print_example_structure();
-        // }
-        // Err(config::ConfigError::Foreign(Box::new(e)))
-      },
-    }
-  }
+    // Parse into toml::Value first
+    let mut raw_config: toml::Value = toml::from_str(&content)?;
 
-  fn merge_configs(&self, base: Value, override_with: Value) -> Result<Value> {
-    use serde_json::Value::*;
+    // If this is a Retriever config, handle resource reference
+    if std::any::type_name::<T>() == std::any::type_name::<Retriever>() {
+      if let Some(toml::Value::String(resource_name)) = raw_config.get("resource") {
+        // Load the referenced resource
+        let resource_path = self.config_paths.join(format!("{resource_name}.toml"));
+        let resource_config: Config<Resource> = self.load_config(&resource_path)?;
 
-    match (base, override_with) {
-      (Object(mut base_map), Object(override_map)) => {
-        for (k, v) in override_map {
-          match base_map.get(&k) {
-            Some(base_value) => {
-              let merged = self.merge_configs(base_value.clone(), v)?;
-              base_map.insert(k, merged);
-            },
-            None => {
-              base_map.insert(k, v);
-            },
-          }
+        // Replace the string reference with the actual resource
+        if let Some(table) = raw_config.as_table_mut() {
+          // TODO: Fix unwrap
+          table.insert("resource".into(), toml::Value::try_from(resource_config.item).unwrap());
         }
-        Ok(Object(base_map))
-      },
-      // Arrays could be merged if needed
-      (Array(mut base_arr), Array(override_arr)) => {
-        // For now, just append new items
-        base_arr.extend(override_arr);
-        Ok(Array(base_arr))
-      },
-      // For all other cases, override takes precedence
-      (_, override_with) => Ok(override_with),
+      }
     }
+
+    // Convert to final type through intermediate JSON representation
+    let json_value = serde_json::to_value(&raw_config)?;
+    let typed_config: Config<T> = serde_json::from_value(json_value)?;
+    Ok(typed_config)
   }
 }
 
@@ -243,13 +140,13 @@ mod tests {
 
   #[test]
   fn test_config_extension() {
-    let mut manager = ConfigurationManager::new();
+    let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
 
     // Load configurations in order
     let paper: Config<Resource> = dbg!(manager.load_config("config_new/paper.toml").unwrap());
 
-    let paper_record: Config<Record> =
-      dbg!(manager.load_config("config_new/paper_record.toml").unwrap());
+    let arxiv_retriever: Config<Retriever> =
+      dbg!(manager.load_config("config_new/arxiv.toml").unwrap());
 
     // The paper_record now has all fields from base_resource and paper,
     // plus its own record-specific configuration

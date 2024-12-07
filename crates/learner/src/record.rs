@@ -1,16 +1,19 @@
-use resource::ResourceConfig;
-
 use super::*;
 
-/// A complete view of a resource with all associated data
-#[derive(Debug)]
-pub struct ResourceRecord {
-  pub resource:        Resource,
-  pub resource_config: ResourceConfig,
-  pub state:           ResourceState,
-  pub tags:            Vec<String>,
-  pub storage:         Option<StorageData>,
-  pub retrieval:       Option<RetrievalData>,
+// TODO: Might want to put `Config<Resource>`, etc.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Record {
+  /// The resource type this record manages
+  pub resource: Resource,
+
+  /// State tracking configuration
+  pub state: State,
+
+  /// Storage configuration
+  pub storage: StorageData,
+
+  /// Retrieval configuration
+  pub retrieval: RetrievalData,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -29,7 +32,7 @@ pub enum Progress {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ResourceState {
+pub struct State {
   pub read_status:     Progress,
   pub starred:         bool,
   pub rating:          Option<u8>,
@@ -37,6 +40,7 @@ pub struct ResourceState {
   pub notes:           Option<String>,
   pub citation_key:    Option<String>,
   // pub importance:      Option<u8>, // Different from rating - how crucial is this?
+  pub tags:            Vec<String>,
   pub tags_updated_at: Option<DateTime<Utc>>, // Track tag management
 }
 

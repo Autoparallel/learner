@@ -45,8 +45,8 @@ pub struct XmlConfig {
   /// Whether to remove XML namespace declarations and prefixes
   #[serde(default)]
   pub strip_namespaces: bool,
-  /// XML path mappings for paper metadata fields
-  pub field_maps:       BTreeMap<String, FieldMap>,
+  // / XML path mappings for paper metadata fields
+  // pub field_maps:       BTreeMap<String, FieldMap>,
 }
 
 impl ResponseProcessor for XmlConfig {

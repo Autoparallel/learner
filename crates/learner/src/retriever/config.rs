@@ -1,36 +1,9 @@
-use record::{ResourceRecord, ResourceState, RetrievalData};
 use resource::Resource;
 
 use super::*;
 
-/// Configuration for a specific paper source retriever.
-///
-/// This struct defines how to interact with a particular paper source's API,
-/// including URL patterns, authentication, and response parsing rules.
-///
-/// # Examples
-///
-/// Example TOML configuration:
-///
-/// ```toml
-/// name = "arxiv"
-/// base_url = "http://export.arxiv.org/api/query"
-/// pattern = "^\\d{4}\\.\\d{4,5}$"
-/// source = "arxiv"
-/// endpoint_template = "http://export.arxiv.org/api/query?id_list={identifier}"
-///
-/// [response_format]
-/// type = "xml"
-/// strip_namespaces = true
-///
-/// [response_format.field_maps]
-/// title = { path = "entry/title" }
-/// abstract = { path = "entry/summary" }
-/// publication_date = { path = "entry/published" }
-/// authors = { path = "entry/author/name" }
-/// ```
 #[derive(Debug, Clone, Deserialize)]
-pub struct RetrieverConfig {
+pub struct Retriever {
   /// Name of this retriever configuration
   pub name: String,
 
@@ -51,15 +24,15 @@ pub struct RetrieverConfig {
   #[serde(default)]
   pub headers:           BTreeMap<String, String>,
   // TODO: need to have these be associated somehow, actually resource should probably be in record
-  // pub resource_config: ResourceConfig,
-  // pub record_config:   RecordConfig,
+  pub resource_mappings: BTreeMap<String, FieldMap>,
+  pub record_mappings:   BTreeMap<String, FieldMap>,
 }
 
-impl Identifiable for RetrieverConfig {
+impl Identifiable for Retriever {
   fn name(&self) -> String { self.name.clone() }
 }
 
-impl RetrieverConfig {
+impl Retriever {
   /// Extracts the canonical identifier from an input string.
   ///
   /// Uses the configured regex pattern to extract the standardized
@@ -90,7 +63,7 @@ impl RetrieverConfig {
     &self,
     input: &str,
     resource_config: &ResourceConfig,
-  ) -> Result<ResourceRecord> {
+  ) -> Result<Resource> {
     let identifier = self.extract_identifier(input)?;
 
     // Send request and get response
@@ -124,13 +97,14 @@ impl RetrieverConfig {
 
     // Validate full resource against config
     resource_config.validate(&resource)?;
-    Ok(ResourceRecord {
-      resource,
-      resource_config: resource_config.clone(),
-      retrieval: None,
-      state: ResourceState::default(),
-      storage: None,
-      tags: Vec::new(),
-    })
+    Ok(resource)
+    // Ok(Record {
+    //   resource,
+    //   resource_config: resource_config.clone(),
+    //   retrieval: None,
+    //   state: ResourceState::default(),
+    //   storage: None,
+    //   tags: Vec::new(),
+    // })
   }
 }

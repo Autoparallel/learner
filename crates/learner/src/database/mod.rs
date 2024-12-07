@@ -57,7 +57,7 @@ use tokio_rusqlite::Connection;
 use super::*;
 
 mod instruction;
-pub mod record;
+
 #[cfg(test)] mod tests;
 
 pub use self::instruction::{

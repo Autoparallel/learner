@@ -6,14 +6,15 @@ mod response;
 pub use config::*;
 pub use response::*;
 
+// TODO: This should be `BTreeMap<String, Config<Retriever>>`
 #[derive(Default, Debug, Clone)]
 pub struct Retrievers {
-  /// The collection of configurations used for this [`Retriever`].
-  configs: BTreeMap<String, RetrieverConfig>,
+  /// The collection of configurations used for this [`Retrievers`].
+  configs: BTreeMap<String, Retriever>,
 }
 
 impl Configurable for Retrievers {
-  type Config = RetrieverConfig;
+  type Config = Retriever;
 
   fn as_map(&mut self) -> &mut BTreeMap<String, Self::Config> { &mut self.configs }
 }
@@ -188,7 +189,7 @@ mod tests {
   fn validate_arxiv_config() {
     let config_str = include_str!("../../config/retrievers/arxiv.toml");
 
-    let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
+    let retriever: Retriever = toml::from_str(config_str).expect("Failed to parse config");
 
     // Verify basic fields
     assert_eq!(retriever.name, "arxiv");
@@ -248,7 +249,7 @@ mod tests {
   fn test_doi_config_deserialization() {
     let config_str = include_str!("../../config/retrievers/doi.toml");
 
-    let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
+    let retriever: Retriever = toml::from_str(config_str).expect("Failed to parse config");
 
     dbg!(&retriever);
 
@@ -304,7 +305,7 @@ mod tests {
   fn test_iacr_config_deserialization() {
     let config_str = include_str!("../../config/retrievers/iacr.toml");
 
-    let retriever: RetrieverConfig = toml::from_str(config_str).expect("Failed to parse config");
+    let retriever: Retriever = toml::from_str(config_str).expect("Failed to parse config");
 
     // Verify basic fields
     assert_eq!(retriever.name, "iacr");
