@@ -289,7 +289,7 @@ mod tests {
     match &retriever.response_format {
       ResponseFormat::Json => {
         // Verify field mappings
-        let field_maps = &retriever.record_mappings;
+        let field_maps = &retriever.resource_mappings;
         assert!(field_maps.contains_key("title"));
         assert!(field_maps.contains_key("abstract"));
         assert!(field_maps.contains_key("authors"));

@@ -39,12 +39,12 @@ pub struct State {
   pub last_accessed:   Option<DateTime<Utc>>,
   pub notes:           Option<String>,
   pub citation_key:    Option<String>,
-  // pub importance:      Option<u8>, // Different from rating - how crucial is this?
+  pub importance:      Option<u8>,
   pub tags:            Vec<String>,
-  pub tags_updated_at: Option<DateTime<Utc>>, // Track tag management
+  pub tags_updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RetrievalData {
   pub source:            Option<String>,
   pub source_identifier: Option<String>,

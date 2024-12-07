@@ -38,7 +38,7 @@ pub struct FieldDefinition {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Resource {
+pub struct ResourceTemplate {
   /// Field definitions with optional metadata
   #[serde(default)]
   #[serde(flatten)]
@@ -117,7 +117,7 @@ impl ConfigurationManager {
       if let Some(toml::Value::String(resource_name)) = raw_config.get("resource") {
         // Load the referenced resource
         let resource_path = self.config_paths.join(format!("{resource_name}.toml"));
-        let resource_config: Config<Resource> = self.load_config(&resource_path)?;
+        let resource_config: Config<ResourceTemplate> = self.load_config(&resource_path)?;
 
         // Replace the string reference with the actual resource
         if let Some(table) = raw_config.as_table_mut() {

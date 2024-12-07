@@ -1,34 +1,40 @@
 // use resource::Resource;
 
+use configuration::ResourceTemplate;
+use record::RetrievalData;
+
 use super::*;
 
 // TODO: fix all the stuff that had to do with `Retriever.name`
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Retriever {
-  pub resource: Resource,
+  pub resource:       ResourceTemplate,
+  #[serde(skip)]
+  #[serde(default)]
+  pub retrieval_data: RetrievalData,
 
   // TODO: Should own a `Record`
   /// Base URL for API requests
-  pub base_url:          String,
+  pub base_url:           String,
   /// Regex pattern for matching and extracting paper identifiers
   #[serde(deserialize_with = "deserialize_regex")]
-  pub pattern:           Regex,
+  pub pattern:            Regex,
   /// Source identifier for papers from this retriever
-  pub source:            String,
+  pub source:             String,
   /// Template for constructing API endpoint URLs
-  pub endpoint_template: String,
+  pub endpoint_template:  String,
   // TODO: This is now more like "how to get the thing to map into the resource"
   // #[serde(flatten)]
-  pub response_format:   ResponseFormat,
+  pub response_format:    ResponseFormat,
   /// Optional HTTP headers for API requests
   #[serde(default)]
-  pub headers:           BTreeMap<String, String>,
+  pub headers:            BTreeMap<String, String>,
   // TODO: need to have these be associated somehow, actually resource should probably be in record
   #[serde(default)]
-  pub resource_mappings: BTreeMap<String, FieldMap>,
+  pub resource_mappings:  BTreeMap<String, FieldMap>,
   #[serde(default)]
-  pub record_mappings:   BTreeMap<String, FieldMap>,
+  pub retrieval_mappings: BTreeMap<String, FieldMap>,
 }
 
 // impl Identifiable for Retriever {

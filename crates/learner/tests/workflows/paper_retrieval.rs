@@ -16,7 +16,7 @@ async fn test_arxiv_retriever_integration() -> TestResult<()> {
     file",
   );
 
-  let retriever: RetrieverConfig = toml::from_str(&ret_config_str).expect("Failed to parse config");
+  let retriever: Retriever = toml::from_str(&ret_config_str).expect("Failed to parse config");
   let resource: ResourceConfig = toml::from_str(&res_config_str).expect("Failed to parse config");
 
   // Test with a real arXiv paper
@@ -47,7 +47,7 @@ async fn test_arxiv_pdf_from_paper() -> TestResult<()> {
         file",
   );
 
-  let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
+  let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
 
   todo!()
   // // Test with a real arXiv paper
@@ -74,7 +74,7 @@ async fn test_iacr_retriever_integration() -> TestResult<()> {
     file",
   );
 
-  let retriever: RetrieverConfig = toml::from_str(&ret_config_str).expect("Failed to parse config");
+  let retriever: Retriever = toml::from_str(&ret_config_str).expect("Failed to parse config");
   let resource: ResourceConfig = toml::from_str(&res_config_str).expect("Failed to parse config");
 
   // // Test with a real IACR paper
@@ -100,7 +100,7 @@ async fn test_iacr_pdf_from_paper() -> TestResult<()> {
   let config_str =
     fs::read_to_string("config/retrievers/iacr.toml").expect("Failed to read config file");
 
-  let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
+  let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
 
   todo!()
   // // Test with a real arXiv paper
@@ -127,7 +127,7 @@ async fn test_doi_retriever_integration() -> TestResult<()> {
     file",
   );
 
-  let retriever: RetrieverConfig = toml::from_str(&ret_config_str).expect("Failed to parse config");
+  let retriever: Retriever = toml::from_str(&ret_config_str).expect("Failed to parse config");
   let resource: ResourceConfig = toml::from_str(&res_config_str).expect("Failed to parse config");
 
   // Test with a real DOI paper
@@ -152,7 +152,7 @@ async fn test_doi_pdf_from_paper() -> TestResult<()> {
   let config_str =
     fs::read_to_string("config/retrievers/doi.toml").expect("Failed to read config file");
 
-  let retriever: RetrieverConfig = toml::from_str(&config_str).expect("Failed to parse config");
+  let retriever: Retriever = toml::from_str(&config_str).expect("Failed to parse config");
   todo!()
   // Test with a real arXiv paper
   // let paper = retriever.retrieve_paper("10.1145/1327452.1327492").await?;
