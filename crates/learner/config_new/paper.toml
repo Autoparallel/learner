@@ -1,12 +1,7 @@
-# paper.toml
-description = "Academic paper configuration"
-extends     = ["base_resource"]
+description = "Configuration for a paper"
 name        = "paper"
 
-[item]
-required_fields = ["title", "authors", "publication_date", "abstract_text"]
-resource_type   = "paper"
-
-[item.abstract_text]
-field_type = "string"
-required   = true
+abstract_text    = { field_type = "string", required = false }
+authors          = { field_type = "array", required = true, validation = { min_items = 1 } }
+publication_date = { field_type = "string", required = true, validation = { datetime = true } }
+title            = { field_type = "string", required = true, validation = { min_length = 1, max_length = 500 } }

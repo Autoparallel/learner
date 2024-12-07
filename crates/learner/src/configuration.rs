@@ -6,8 +6,6 @@ use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldDefinition {
-  //   /// Name of the field
-  //   pub name:        String,
   /// Type of the field (should be a JSON Value type)
   pub field_type:  String,
   /// Whether this field must be present
@@ -39,6 +37,7 @@ pub struct Config<T> {
   #[serde(default)]
   pub additional_fields: BTreeMap<String, Value>,
   /// The specific configuration type
+  #[serde(flatten)]
   pub item:              T,
 }
 
@@ -58,11 +57,10 @@ pub struct Config<T> {
 // TODO:  use this (may have to change back the fielddefinition now)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resource {
-  pub resource_type: String,
   /// Field definitions with optional metadata
   #[serde(default)]
   #[serde(flatten)]
-  pub fields:        BTreeMap<String, FieldDefinition>,
+  pub fields: BTreeMap<String, FieldDefinition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -248,13 +246,10 @@ mod tests {
     let mut manager = ConfigurationManager::new();
 
     // Load configurations in order
-    let base_resource: Config<Resource> =
-      dbg!(manager.load_config("config_new/base_resource.toml").unwrap());
+    let paper: Config<Resource> = dbg!(manager.load_config("config_new/paper.toml").unwrap());
 
-    // let paper: Config<Resource> = dbg!(manager.load_config("config_new/paper.toml").unwrap());
-
-    // let paper_record: Config<Record> =
-    //   dbg!(manager.load_config("config_new/paper_record.toml").unwrap());
+    let paper_record: Config<Record> =
+      dbg!(manager.load_config("config_new/paper_record.toml").unwrap());
 
     // The paper_record now has all fields from base_resource and paper,
     // plus its own record-specific configuration
