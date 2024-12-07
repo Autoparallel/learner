@@ -3,7 +3,6 @@ use serde_json::Map;
 
 use super::*;
 
-pub mod json;
 pub mod xml;
 
 /// Available response format handlers.
@@ -36,10 +35,13 @@ pub mod xml;
 pub enum ResponseFormat {
   /// XML response parser configuration
   #[serde(rename = "xml")]
-  Xml(xml::XmlConfig),
+  Xml {
+    #[serde(default)]
+    strip_namespaces: bool,
+  },
   /// JSON response parser configuration
   #[serde(rename = "json")]
-  Json(json::JsonConfig),
+  Json,
 }
 
 /// Field mapping configuration.
@@ -139,46 +141,8 @@ pub enum ComposeFormat {
   },
 }
 
-/// Trait for processing API responses into Paper objects.
-///
-/// Implementors of this trait handle the conversion of raw API response data
-/// into structured Paper metadata. The trait is implemented separately for
-/// different response formats (XML, JSON) to provide a unified interface for
-/// paper retrieval.
-///
-/// # Examples
-///
-/// ```no_run
-/// # use learner::{retriever::ResponseProcessor, resource::Paper};
-/// # use learner::error::LearnerError;
-/// struct CustomProcessor;
-///
-/// #[async_trait::async_trait]
-/// impl ResponseProcessor for CustomProcessor {
-///   async fn process_response(&self, data: &[u8]) -> Result<Paper, LearnerError> {
-///     // Parse response data and construct Paper
-///     todo!()
-///   }
-/// }
-/// ```
-// #[async_trait]
-pub trait ResponseProcessor: Send + Sync {
-  /// Process raw response data into a Paper object.
-  ///
-  /// # Arguments
-  ///
-  /// * `data` - Raw bytes from the API response
-  ///
-  /// # Returns
-  ///
-  /// Returns a Result containing either:
-  /// - A fully populated Paper object
-  /// - A LearnerError if parsing fails
-  fn process_response(&self, data: &[u8], resource_config: &ResourceConfig) -> Result<Resource>;
-}
-
 /// Process a JSON value according to field mappings and resource configuration
-fn process_json_value(
+pub fn process_json_value(
   json: &Value,
   field_maps: &BTreeMap<String, FieldMap>,
   resource_config: &ResourceConfig,

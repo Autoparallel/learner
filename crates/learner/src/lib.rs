@@ -227,7 +227,6 @@ pub mod prelude {
     configuration::{Configurable, Identifiable},
     database::DatabaseInstruction,
     error::LearnerError,
-    retriever::ResponseProcessor,
   };
 }
 
@@ -590,10 +589,11 @@ impl LearnerBuilder {
 
     let database = Database::open(&config.database_path).await?;
     database.set_storage_path(&config.storage_path).await?;
-    let retriever = Retrievers::new().with_config_dir(&config.retrievers_path)?;
+    todo!("This needs fixed now");
+    // let retriever = Retrievers::new().with_config_dir(&config.retrievers_path)?;
     let resources = Resources::new().with_config_dir(&config.resources_path)?;
 
-    Ok(Learner { config, database, retrievers: retriever, resources })
+    Ok(Learner { config, database, retrievers: Retrievers::new(), resources })
   }
 }
 
@@ -747,14 +747,14 @@ impl Learner {
   pub async fn init() -> Result<Self> { Self::with_config(Config::init()?).await }
 
   pub async fn retreive(&mut self, input: &str) -> Result<Resource> {
-    let mut matches = Vec::new();
+    // let mut matches = Vec::new();
 
-    // Find all configs that match the input
-    for (name, config) in self.retrievers.as_map().iter() {
-      if config.pattern.is_match(input) {
-        matches.push((name, config));
-      }
-    }
+    // // Find all configs that match the input
+    // for (name, config) in self.retrievers.as_map().iter() {
+    //   if config.pattern.is_match(input) {
+    //     matches.push((name, config));
+    //   }
+    // }
 
     todo!("Finish this")
     // match matches.len() {

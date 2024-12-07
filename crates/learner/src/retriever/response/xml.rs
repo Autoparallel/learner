@@ -19,57 +19,20 @@
 //! ```
 
 use quick_xml::{events::Event, Reader};
+use serde_json::{Map, Value};
 
 use super::*;
 
-/// Configuration for processing XML API responses.
-///
-/// Provides field mapping rules and namespace handling options to extract
-/// paper metadata from XML responses using path-based access patterns.
-///
-/// # Examples
-///
-/// ```no_run
-/// # use std::collections::HashMap;
-/// # use learner::retriever::{xml::XmlConfig, FieldMap};
-/// let config = XmlConfig {
-///   strip_namespaces: true,
-///   field_maps:       HashMap::from([("title".to_string(), FieldMap {
-///     path:      "entry/title".to_string(),
-///     transform: None,
-///   })]),
-/// };
-/// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct XmlConfig {
-  /// Whether to remove XML namespace declarations and prefixes
-  #[serde(default)]
-  pub strip_namespaces: bool,
-  // / XML path mappings for paper metadata fields
-  // pub field_maps:       BTreeMap<String, FieldMap>,
-}
+pub fn convert_to_json(data: &[u8], strip_namespaces: bool) -> Value {
+  // Handle namespace stripping
+  let xml = if strip_namespaces {
+    strip_xml_namespaces(&String::from_utf8_lossy(data))
+  } else {
+    String::from_utf8_lossy(data).to_string()
+  };
 
-impl ResponseProcessor for XmlConfig {
-  fn process_response(&self, data: &[u8], resource_config: &ResourceConfig) -> Result<Resource> {
-    // Handle namespace stripping
-    let xml = if self.strip_namespaces {
-      strip_xml_namespaces(&String::from_utf8_lossy(data))
-    } else {
-      String::from_utf8_lossy(data).to_string()
-    };
-
-    trace!("Processing XML response: {:#?}", &xml);
-
-    // Extract raw XML content into JSON equivalent
-    let json = convert_to_json(&xml);
-    dbg!(process_json_value(&json, &self.field_maps, resource_config))
-  }
-}
-
-use serde_json::{Map, Value};
-
-pub fn convert_to_json(xml: &str) -> Value {
-  let mut reader = Reader::from_str(xml);
+  trace!("Processing XML response: {:#?}", &xml);
+  let mut reader = Reader::from_str(&xml);
   let mut stack = Vec::new();
   let mut current = Map::new();
 

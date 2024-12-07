@@ -1,14 +1,14 @@
-use resource::Resource;
+// use resource::Resource;
 
 use super::*;
 
+// TODO: fix all the stuff that had to do with `Retriever.name`
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Retriever {
-  /// Name of this retriever configuration
-  pub name: String,
+  pub resource: Resource,
 
-  // TODO (autoparallel): Ultimately this will have to peer into the `Resources` to be useful
-  pub resource:          String,
+  // TODO: Should own a `Record`
   /// Base URL for API requests
   pub base_url:          String,
   /// Regex pattern for matching and extracting paper identifiers
@@ -19,18 +19,21 @@ pub struct Retriever {
   /// Template for constructing API endpoint URLs
   pub endpoint_template: String,
   // TODO: This is now more like "how to get the thing to map into the resource"
+  // #[serde(flatten)]
   pub response_format:   ResponseFormat,
   /// Optional HTTP headers for API requests
   #[serde(default)]
   pub headers:           BTreeMap<String, String>,
   // TODO: need to have these be associated somehow, actually resource should probably be in record
+  #[serde(default)]
   pub resource_mappings: BTreeMap<String, FieldMap>,
+  #[serde(default)]
   pub record_mappings:   BTreeMap<String, FieldMap>,
 }
 
-impl Identifiable for Retriever {
-  fn name(&self) -> String { self.name.clone() }
-}
+// impl Identifiable for Retriever {
+//   fn name(&self) -> String { self.name.clone() }
+// }
 
 impl Retriever {
   /// Extracts the canonical identifier from an input string.
@@ -68,7 +71,7 @@ impl Retriever {
 
     // Send request and get response
     let url = self.endpoint_template.replace("{identifier}", identifier);
-    debug!("Fetching from {} via: {}", self.name, url);
+    // debug!("Fetching from {} via: {}", self.name, url);
 
     let client = reqwest::Client::new();
     let mut request = client.get(&url);
@@ -80,16 +83,18 @@ impl Retriever {
 
     let response = request.send().await?;
     let data = response.bytes().await?;
-    trace!("{} response: {}", self.name, String::from_utf8_lossy(&data));
+
+    // trace!("{} response: {}", self.name, String::from_utf8_lossy(&data));
 
     // Process the response using configured processor
-    let processor = match &self.response_format {
-      ResponseFormat::Xml(config) => config as &dyn ResponseProcessor,
-      ResponseFormat::Json(config) => config as &dyn ResponseProcessor,
+    let json = match &self.response_format {
+      ResponseFormat::Xml { strip_namespaces } => xml::convert_to_json(&data, *strip_namespaces),
+      ResponseFormat::Json => serde_json::from_slice(&data)?,
     };
 
     // Process response and get resource
-    let mut resource = processor.process_response(&data, resource_config)?;
+    // TODO: this should probably be a method
+    let mut resource = process_json_value(&json, &self.resource_mappings, resource_config)?;
 
     // Add source metadata
     resource.insert("source".into(), Value::String(self.source.clone()));
