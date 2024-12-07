@@ -153,7 +153,7 @@ use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::Url;
-use resource::{Resource, ResourceConfig, Resources};
+use resource::{Resource, ResourceTemplate, Resources};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, trace, warn};
@@ -591,9 +591,9 @@ impl LearnerBuilder {
     database.set_storage_path(&config.storage_path).await?;
     todo!("This needs fixed now");
     // let retriever = Retrievers::new().with_config_dir(&config.retrievers_path)?;
-    let resources = Resources::new().with_config_dir(&config.resources_path)?;
+    // let resources = Resources::new().with_config_dir(&config.resources_path)?;
 
-    Ok(Learner { config, database, retrievers: Retrievers::new(), resources })
+    Ok(Learner { config, database, retrievers: Retrievers::new(), resources: Resources::new() })
   }
 }
 

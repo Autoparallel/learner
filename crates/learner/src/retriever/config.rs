@@ -1,7 +1,7 @@
 // use resource::Resource;
 
-use configuration::ResourceTemplate;
 use record::RetrievalData;
+use resource::ResourceTemplate;
 
 use super::*;
 
@@ -103,10 +103,10 @@ impl Retriever {
     resource.insert("source_identifier".into(), Value::String(identifier.to_string()));
 
     // Validate full resource against config
-    // self.resource.validate(&resource)?;
-    // Ok(resource)
+    self.resource.validate(&resource)?;
+    Ok(resource)
 
-    todo!()
+    // todo!()
 
     // Ok(Record {
     //   resource,

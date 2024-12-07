@@ -1,5 +1,7 @@
 use super::*;
 
+// TODO: We probably want a `RecordTemplate` just like we have for `Resource`. Perhaps we can just
+// have a general `Template` and make this like a "template engine"
 // TODO: Might want to put `Config<Resource>`, etc.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {

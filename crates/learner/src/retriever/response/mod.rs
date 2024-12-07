@@ -1,5 +1,4 @@
-use configuration::ResourceTemplate;
-use resource::FieldDefinition;
+use resource::{FieldDefinition, ResourceTemplate};
 use serde_json::Map;
 
 use super::*;

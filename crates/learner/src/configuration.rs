@@ -17,6 +17,11 @@ pub struct Config<T> {
   pub item:              T,
 }
 
+// TODO: this is honestly probably dumb and needs refactored
+impl<T> Config<T> {
+  pub fn inner(&self) -> &T { &self.item }
+}
+
 // #[derive(Debug, Clone, Serialize, Deserialize)]
 // pub struct FieldDefinition {
 //   /// Type of the field (should be a JSON Value type)
@@ -36,33 +41,6 @@ pub struct Config<T> {
 
 //   pub type_definition: Option<TypeDefinition>,
 // }
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ResourceTemplate {
-  /// Field definitions with optional metadata
-  #[serde(default)]
-  //   #[serde(flatten)]
-  pub fields: Vec<FieldDefinition>,
-}
-
-impl<'de> Deserialize<'de> for ResourceTemplate {
-  fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-  where D: serde::Deserializer<'de> {
-    // First deserialize into a map
-    let map: BTreeMap<String, FieldDefinition> = BTreeMap::deserialize(deserializer)?;
-
-    // Convert the map into a Vec, setting the name from the key
-    let fields = map
-      .into_iter()
-      .map(|(key, mut field_def)| {
-        field_def.name = key;
-        field_def
-      })
-      .collect();
-
-    Ok(ResourceTemplate { fields })
-  }
-}
 
 // TODO: These two traits can probably be removed
 pub trait Identifiable {
@@ -166,6 +144,8 @@ impl ConfigurationManager {
 
 #[cfg(test)]
 mod tests {
+  use resource::ResourceTemplate;
+
   use super::*;
 
   #[test]

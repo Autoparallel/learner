@@ -14,33 +14,37 @@ pub type Resource = BTreeMap<String, Value>;
 
 #[derive(Debug, Clone, Default)]
 pub struct Resources {
-  configs: BTreeMap<String, ResourceConfig>,
+  templates: BTreeMap<String, ResourceTemplate>,
 }
 
 impl Resources {
   pub fn new() -> Self { Self::default() }
 }
 
-impl Configurable for Resources {
-  type Config = ResourceConfig;
-
-  fn as_map(&mut self) -> &mut BTreeMap<String, Self::Config> { &mut self.configs }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceConfig {
-  /// The type identifier for this resource
-  pub name:        String,
-  /// Optional description of this resource type
-  #[serde(default)]
-  pub description: Option<String>,
+#[derive(Debug, Clone, Serialize)]
+pub struct ResourceTemplate {
   /// Field definitions with optional metadata
   #[serde(default)]
-  pub fields:      Vec<FieldDefinition>,
+  //   #[serde(flatten)]
+  pub fields: Vec<FieldDefinition>,
 }
+impl<'de> Deserialize<'de> for ResourceTemplate {
+  fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+  where D: serde::Deserializer<'de> {
+    // First deserialize into a map
+    let map: BTreeMap<String, FieldDefinition> = BTreeMap::deserialize(deserializer)?;
 
-impl Identifiable for ResourceConfig {
-  fn name(&self) -> String { self.name.clone() }
+    // Convert the map into a Vec, setting the name from the key
+    let fields = map
+      .into_iter()
+      .map(|(key, mut field_def)| {
+        field_def.name = key;
+        field_def
+      })
+      .collect();
+
+    Ok(ResourceTemplate { fields })
+  }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,7 +100,7 @@ pub struct ValidationRules {
   pub datetime:    Option<bool>,        // Validates RFC3339 format
 }
 
-impl ResourceConfig {
+impl ResourceTemplate {
   /// Validates a set of values against this resource configuration
   pub fn validate(&self, resource: &Resource) -> Result<bool> {
     // Check required fields
@@ -302,7 +306,7 @@ mod tests {
   #[test]
   fn validate_paper_configuration() {
     let config = include_str!("../../config/resources/paper.toml");
-    let config: ResourceConfig = toml::from_str(config).unwrap();
+    let config: ResourceTemplate = toml::from_str(config).unwrap();
 
     let date = datetime_to_json(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
@@ -333,7 +337,7 @@ mod tests {
   #[test]
   fn validate_book_configuration() {
     let config = include_str!("../../config/resources/book.toml");
-    let config: ResourceConfig = toml::from_str(config).unwrap();
+    let config: ResourceTemplate = toml::from_str(config).unwrap();
 
     let date = datetime_to_json(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
@@ -351,7 +355,7 @@ mod tests {
   #[test]
   fn validate_thesis_configuration() {
     let config = include_str!("../../config/resources/thesis.toml");
-    let config: ResourceConfig = toml::from_str(config).unwrap();
+    let config: ResourceTemplate = toml::from_str(config).unwrap();
 
     let date = datetime_to_json(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap());
 
@@ -374,10 +378,8 @@ mod tests {
 
   #[test]
   fn test_datetime_validation() {
-    let mut config = ResourceConfig {
-      name:        "test".into(),
-      description: None,
-      fields:      vec![FieldDefinition {
+    let mut config = ResourceTemplate {
+      fields: vec![FieldDefinition {
         name:            "timestamp".into(),
         field_type:      "string".into(),
         required:        true,
