@@ -46,6 +46,7 @@ impl Identifiable for ResourceConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldDefinition {
   /// Name of the field
+  #[serde(skip_deserializing)]
   pub name:        String,
   /// Type of the field (should be a JSON Value type)
   pub field_type:  String,

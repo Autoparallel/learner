@@ -10,7 +10,7 @@ use super::*;
 #[derive(Debug, Clone, Deserialize)]
 pub struct Retriever {
   pub resource:       ResourceTemplate,
-  #[serde(skip)]
+  #[serde(skip_deserializing)]
   #[serde(default)]
   pub retrieval_data: RetrievalData,
 
@@ -68,11 +68,7 @@ impl Retriever {
   // TODO: perhaps this just isn't even implemented here and is instead implemented on `Learner`.
   // Could consider an `api.rs` module to extend more learner functionality there.
   #[allow(missing_docs)]
-  pub async fn retrieve_resource(
-    &self,
-    input: &str,
-    resource_config: &ResourceConfig,
-  ) -> Result<Resource> {
+  pub async fn retrieve_resource(&self, input: &str) -> Result<Resource> {
     let identifier = self.extract_identifier(input)?;
 
     // Send request and get response
@@ -100,15 +96,18 @@ impl Retriever {
 
     // Process response and get resource
     // TODO: this should probably be a method
-    let mut resource = process_json_value(&json, &self.resource_mappings, resource_config)?;
+    let mut resource = process_json_value(&json, &self.resource_mappings, &self.resource)?;
 
     // Add source metadata
     resource.insert("source".into(), Value::String(self.source.clone()));
     resource.insert("source_identifier".into(), Value::String(identifier.to_string()));
 
     // Validate full resource against config
-    resource_config.validate(&resource)?;
-    Ok(resource)
+    // self.resource.validate(&resource)?;
+    // Ok(resource)
+
+    todo!()
+
     // Ok(Record {
     //   resource,
     //   resource_config: resource_config.clone(),

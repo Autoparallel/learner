@@ -1,3 +1,4 @@
+use configuration::ResourceTemplate;
 use resource::FieldDefinition;
 use serde_json::Map;
 
@@ -145,7 +146,7 @@ pub enum ComposeFormat {
 pub fn process_json_value(
   json: &Value,
   field_maps: &BTreeMap<String, FieldMap>,
-  resource_config: &ResourceConfig,
+  resource_config: &ResourceTemplate,
 ) -> Result<Resource> {
   let mut resource = Resource::new();
 

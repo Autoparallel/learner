@@ -1,4 +1,4 @@
-use resource::{TypeDefinition, ValidationRules};
+use resource::{FieldDefinition, TypeDefinition, ValidationRules};
 use serde::de::DeserializeOwned;
 
 use super::*;
@@ -17,32 +17,51 @@ pub struct Config<T> {
   pub item:              T,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FieldDefinition {
-  /// Type of the field (should be a JSON Value type)
-  pub field_type:  String,
-  /// Whether this field must be present
-  #[serde(default)]
-  pub required:    bool,
-  /// Human-readable description
-  #[serde(default)]
-  pub description: Option<String>,
-  /// Default value if field is absent
-  #[serde(default)]
-  pub default:     Option<Value>,
-  /// Optional validation rules
-  #[serde(default)]
-  pub validation:  Option<ValidationRules>,
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub struct FieldDefinition {
+//   /// Type of the field (should be a JSON Value type)
+//   pub field_type:  String,
+//   /// Whether this field must be present
+//   #[serde(default)]
+//   pub required:    bool,
+//   /// Human-readable description
+//   #[serde(default)]
+//   pub description: Option<String>,
+//   /// Default value if field is absent
+//   #[serde(default)]
+//   pub default:     Option<Value>,
+//   /// Optional validation rules
+//   #[serde(default)]
+//   pub validation:  Option<ValidationRules>,
 
-  pub type_definition: Option<TypeDefinition>,
-}
+//   pub type_definition: Option<TypeDefinition>,
+// }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ResourceTemplate {
   /// Field definitions with optional metadata
   #[serde(default)]
-  #[serde(flatten)]
-  pub fields: BTreeMap<String, FieldDefinition>,
+  //   #[serde(flatten)]
+  pub fields: Vec<FieldDefinition>,
+}
+
+impl<'de> Deserialize<'de> for ResourceTemplate {
+  fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+  where D: serde::Deserializer<'de> {
+    // First deserialize into a map
+    let map: BTreeMap<String, FieldDefinition> = BTreeMap::deserialize(deserializer)?;
+
+    // Convert the map into a Vec, setting the name from the key
+    let fields = map
+      .into_iter()
+      .map(|(key, mut field_def)| {
+        field_def.name = key;
+        field_def
+      })
+      .collect();
+
+    Ok(ResourceTemplate { fields })
+  }
 }
 
 // TODO: These two traits can probably be removed
@@ -108,28 +127,39 @@ impl ConfigurationManager {
   where T: DeserializeOwned + std::fmt::Debug {
     let path = path.as_ref();
     let content = std::fs::read_to_string(path)?;
-
-    // Parse into toml::Value first
     let mut raw_config: toml::Value = toml::from_str(&content)?;
 
     // If this is a Retriever config, handle resource reference
     if std::any::type_name::<T>() == std::any::type_name::<Retriever>() {
       if let Some(toml::Value::String(resource_name)) = raw_config.get("resource") {
         // Load the referenced resource
-        let resource_path = self.config_paths.join(format!("{resource_name}.toml"));
-        let resource_config: Config<ResourceTemplate> = self.load_config(&resource_path)?;
+        let resource_path = self.config_paths.join(format!("{}.toml", resource_name));
+        let resource_content = std::fs::read_to_string(resource_path)?;
+        let resource_config: toml::Value = toml::from_str(&resource_content)?;
 
-        // Replace the string reference with the actual resource
+        // Get just the fields we need (ignore name, description etc)
+        let resource_fields = resource_config
+          .as_table()
+          .and_then(|t| {
+            Some(
+              t.iter()
+                .filter(|(k, _)| !["name", "description"].contains(&k.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<toml::map::Map<String, toml::Value>>(),
+            )
+          })
+          .ok_or_else(|| config::ConfigError::Message("Invalid resource config structure".into()))
+          .unwrap();
+
+        // Replace the string reference with the resource fields
         if let Some(table) = raw_config.as_table_mut() {
-          // TODO: Fix unwrap
-          table.insert("resource".into(), toml::Value::try_from(resource_config.item).unwrap());
+          table.insert("resource".into(), toml::Value::Table(resource_fields));
         }
       }
     }
 
-    // Convert to final type through intermediate JSON representation
-    let json_value = serde_json::to_value(&raw_config)?;
-    let typed_config: Config<T> = serde_json::from_value(json_value)?;
+    // Convert directly to final type
+    let typed_config: Config<T> = raw_config.try_into()?;
     Ok(typed_config)
   }
 }
@@ -143,7 +173,8 @@ mod tests {
     let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
 
     // Load configurations in order
-    let paper: Config<Resource> = dbg!(manager.load_config("config_new/paper.toml").unwrap());
+    let paper: Config<ResourceTemplate> =
+      dbg!(manager.load_config("config_new/paper.toml").unwrap());
 
     let arxiv_retriever: Config<Retriever> =
       dbg!(manager.load_config("config_new/arxiv.toml").unwrap());

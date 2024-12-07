@@ -231,7 +231,7 @@ pub async fn validate_retriever(path: &PathBuf, input: &Option<String>) {
         }
       }
     },
-    ResponseFormat::Json(config) => {
+    ResponseFormat::Json => {
       println!("Format: {}", style("JSON").cyan());
       println!("\nField Mappings:");
       for (field, map) in &config.field_maps {

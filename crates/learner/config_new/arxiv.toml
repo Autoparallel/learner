@@ -12,17 +12,17 @@ response_format = { type = "xml", strip_namespaces = true }
 
 
 # # TODO: Could flatten out the `field_maps`?
-[resource_mappings.title]
-path = "feed/entry/title"
+# [resource_mappings.title]
+# path = "feed/entry/title"
 
-[resource_mappings.abstract]
-path = "feed/entry/summary"
+# [resource_mappings.abstract]
+# path = "feed/entry/summary"
 
-[resource_mappings.authors]
-path = "feed/entry/author"
+# [resource_mappings.authors]
+# path = "feed/entry/author"
 
-[resource_mappings.publication_dates]
-path = "feed/entry/published"
+# [resource_mappings.publication_dates]
+# path = "feed/entry/published"
 
 # [retrieval_data.urls]
 # path = "feed/entry/id"
