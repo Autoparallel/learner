@@ -1,7 +1,5 @@
-use serde_json::Map;
-use template::{FieldDefinition, Resource, Template};
-
 use super::*;
+use crate::template::{FieldDefinition, Resource, Template};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Retriever {
@@ -16,12 +14,11 @@ pub struct Retriever {
   pub source:            String,
   /// Template for constructing API endpoint URLs
   pub endpoint_template: String,
-  // TODO: This is now more like "how to get the thing to map into the resource"
-  // #[serde(flatten)]
-  pub response_format:   ResponseFormat,
+
+  pub response_format: ResponseFormat,
   /// Optional HTTP headers for API requests
   #[serde(default)]
-  pub headers:           BTreeMap<String, String>,
+  pub headers:         BTreeMap<String, String>,
 
   #[serde(rename = "resource")]
   pub resource_template: Template,
@@ -78,7 +75,7 @@ impl Retriever {
 
     // Process the response using configured processor
     let json = match &self.response_format {
-      ResponseFormat::Xml { strip_namespaces } => xml::convert_to_json(&data, *strip_namespaces),
+      ResponseFormat::Xml { strip_namespaces } => xml_to_json(&data, *strip_namespaces),
       ResponseFormat::Json => serde_json::from_slice(&data)?,
     };
 

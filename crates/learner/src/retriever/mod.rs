@@ -5,7 +5,9 @@ mod response;
 
 pub use config::*;
 pub use response::*;
-use template::Resource;
+use serde_json::Map;
+
+use crate::template::Resource;
 
 // TODO: This should be `BTreeMap<String, Config<Retriever>>`
 #[derive(Default, Debug, Clone)]
