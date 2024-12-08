@@ -249,26 +249,23 @@ fn get_path_value(json: &Value, path: &[&str]) -> Option<Value> {
 
 /// Apply a transform to a JSON value
 fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
-  dbg!(&value);
   match transform {
     Transform::Replace { pattern, replacement } => {
       let text = value.as_str().ok_or_else(|| {
         LearnerError::ApiError("Replace transform requires string input".to_string())
       })?;
       let re =
-        Regex::new(pattern).map_err(|e| LearnerError::ApiError(format!("Invalid regex: {}", e)))?;
+        Regex::new(pattern).map_err(|e| LearnerError::ApiError(format!("Invalid regex: {e}")))?;
       Ok(Value::String(re.replace_all(text, replacement.as_str()).into_owned()))
     },
-
     Transform::Date { from_format, to_format } => {
       let text = value.as_str().ok_or_else(|| {
         LearnerError::ApiError("Date transform requires string input".to_string())
       })?;
       let dt = chrono::NaiveDateTime::parse_from_str(text, from_format)
-        .map_err(|e| LearnerError::ApiError(format!("Invalid date: {}", e)))?;
+        .map_err(|e| LearnerError::ApiError(format!("Invalid date: {e}")))?;
       Ok(Value::String(dt.format(to_format).to_string()))
     },
-
     Transform::Url { base, suffix } => {
       let text = value
         .as_str()
@@ -279,109 +276,82 @@ fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
         suffix.as_deref().unwrap_or("")
       )))
     },
-
     Transform::Compose { sources, format } => {
-      // Extract values from each source
       let values: Vec<Value> = sources
         .iter()
         .filter_map(|source| match source {
-          Source::Path(path) => {
+          Source::Path(path) | Source::KeyValue { key: _, path } => {
             let components: Vec<&str> = path.split('/').collect();
             get_path_value(value, &components)
           },
           Source::Literal(text) => Some(Value::String(text.clone())),
-          Source::KeyValue { key: _, path } => {
-            let components: Vec<&str> = path.split('/').collect();
-            get_path_value(value, &components)
-          },
         })
         .collect();
-
-      dbg!(&values);
-
-      // Apply the format to the collected values
       match format {
         ComposeFormat::Join { delimiter } => {
-          // Convert values to strings and join
           let strings: Vec<String> = values
             .iter()
             .filter_map(|v| match v {
               Value::String(s) => Some(s.clone()),
-              Value::Array(arr) if arr.len() == 1 => arr[0].as_str().map(|s| s.to_string()),
+              Value::Array(arr) if arr.len() == 1 =>
+                arr[0].as_str().map(std::string::ToString::to_string),
               _ => None,
             })
             .collect();
           Ok(Value::String(strings.join(delimiter)))
         },
-
         ComposeFormat::Object => {
-          dbg!("inside here");
           let mut obj = Map::new();
-          dbg!(&sources);
           for (source, value) in sources.iter().zip(values.iter()) {
-            dbg!(&source);
             if let Source::KeyValue { key, .. } = source {
-              dbg!(key);
               obj.insert(key.clone(), value.clone());
             }
           }
-          dbg!(&obj);
           Ok(Value::Object(obj))
         },
-
-        ComposeFormat::ArrayOfObjects { template } => {
-          match value {
-            // Handle single string -> array of objects
-            Value::String(s) => {
-              let mut obj = Map::new();
-              for (key, template_value) in template {
-                let value = template_value.replace("{value}", s);
-                obj.insert(key.clone(), Value::String(value));
-              }
-              Ok(Value::Array(vec![Value::Object(obj)]))
-            },
-
-            // Handle array -> array of objects
-            Value::Array(arr) => {
-              dbg!(&arr);
-              let objects: Vec<Value> = arr
-                .iter()
-                .filter_map(|item| {
-                  dbg!(&item);
-                  let mut obj = Map::new();
-                  for (key, template_value) in template {
-                    let value = match item {
-                      Value::String(s) => template_value.replace("{value}", s),
-                      Value::Object(obj) => {
-                        dbg!(obj);
-                        let mut keys_and_vals = Vec::new();
-                        sources.iter().for_each(|source| {
-                          if let Source::KeyValue { key, path } = source {
-                            if let Some(val) = obj.get(path) {
-                              keys_and_vals.push((key, val))
-                            }
+        ComposeFormat::ArrayOfObjects { template } => match value {
+          Value::String(s) => {
+            let mut obj = Map::new();
+            for (key, template_value) in template {
+              let value = template_value.replace("{value}", s);
+              obj.insert(key.clone(), Value::String(value));
+            }
+            Ok(Value::Array(vec![Value::Object(obj)]))
+          },
+          Value::Array(arr) => {
+            let objects: Vec<Value> = arr
+              .iter()
+              .filter_map(|item| {
+                let mut obj = Map::new();
+                for (key, template_value) in template {
+                  let value = match item {
+                    Value::String(s) => template_value.replace("{value}", s),
+                    Value::Object(obj) => {
+                      let mut keys_and_vals = Vec::new();
+                      for source in sources {
+                        if let Source::KeyValue { key, path } = source {
+                          if let Some(val) = obj.get(path) {
+                            keys_and_vals.push((key, val));
                           }
-                        });
-                        dbg!(&key);
-                        keys_and_vals.into_iter().fold(template_value.clone(), |acc, (k, v)| {
-                          let replacement = format!("{{{k}}}");
-                          acc.replace(&replacement, v.as_str().unwrap_or_default())
-                        })
-                      },
-                      _ => return None,
-                    };
-                    obj.insert(key.clone(), Value::String(value));
-                  }
-                  Some(Value::Object(obj))
-                })
-                .collect();
-              Ok(Value::Array(objects))
-            },
-
-            _ => Err(LearnerError::ApiError(
-              "ArrayOfObjects transform requires string or array input".to_string(),
-            )),
-          }
+                        }
+                      }
+                      keys_and_vals.into_iter().fold(template_value.clone(), |acc, (k, v)| {
+                        let replacement = format!("{{{k}}}");
+                        acc.replace(&replacement, v.as_str().unwrap_or_default())
+                      })
+                    },
+                    _ => return None,
+                  };
+                  obj.insert(key.clone(), Value::String(value));
+                }
+                Some(Value::Object(obj))
+              })
+              .collect();
+            Ok(Value::Array(objects))
+          },
+          _ => Err(LearnerError::ApiError(
+            "ArrayOfObjects transform requires string or array input".to_string(),
+          )),
         },
       }
     },
