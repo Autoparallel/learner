@@ -100,7 +100,7 @@ async fn test_iacr_pdf_from_paper() -> TestResult<()> {
 #[traced_test]
 async fn test_doi_retriever_integration() -> TestResult<()> {
   let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
-  let retriever: Retriever = manager.load_config("config_new/doi.toml")?;
+  let retriever: Retriever = dbg!(manager.load_config("config_new/doi.toml")?);
 
   // Test with a real DOI paper
   let paper = retriever.retrieve_resource("10.1145/1327452.1327492").await?;

@@ -1,5 +1,3 @@
-use std::os::macos::raw;
-
 use record::{Record, State, StorageData};
 use serde_json::json;
 
@@ -115,20 +113,19 @@ fn process_template_fields(
   let mut result = BTreeMap::new();
 
   for field_def in &template.fields {
-    if let Some(field_map) = mappings.get(dbg!(&field_def.name)) {
+    // If we have a mapping for this field, try to extract its value
+    if let Some(field_map) = mappings.get(&field_def.name) {
       if let Some(value) = extract_mapped_value(json, field_map, field_def)? {
         result.insert(field_def.name.clone(), value);
       } else if field_def.required {
+        // Only error if the field was required and we couldn't find it
         return Err(LearnerError::ApiError(format!(
           "Required field '{}' not found in response",
           field_def.name
         )));
-      } else if let Some(default) = &field_def.default {
-        result.insert(field_def.name.clone(), default.clone());
       }
     }
   }
-
   Ok(result)
 }
 
@@ -151,8 +148,9 @@ fn extract_mapped_value(
   // First apply any explicit transforms
   let mut value = raw_value;
   for transform in &field_map.transforms {
-    value = apply_transform(&value, dbg!(transform))?;
+    value = apply_transform(&value, transform)?;
   }
+
   value = if let Some(structure) = &field_map.structure {
     let mut object = BTreeMap::new();
     for (key, to_replace) in structure {
@@ -165,8 +163,8 @@ fn extract_mapped_value(
   };
 
   // Coerce a single value into an array if needed
-  if field_def.field_type.as_str() == "array" {
-    value = dbg!(into_array(value));
+  if field_def.base_type == "array" {
+    value = into_array(value);
   }
 
   Ok(Some(value))

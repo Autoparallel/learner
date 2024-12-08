@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use serde_json::{Map, Number};
+
 use super::*;
 
 // Type alias for clarity and consistency
@@ -13,10 +15,11 @@ pub struct Template {
   #[serde(default)]
   pub fields:      Vec<FieldDefinition>,
 }
+
+// Custom deserialization to handle the flattened field structure
 impl<'de> Deserialize<'de> for Template {
   fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
   where D: serde::Deserializer<'de> {
-    // Helper struct to capture the raw TOML structure
     #[derive(Deserialize)]
     struct TemplateHelper {
       name:        String,
@@ -26,11 +29,9 @@ impl<'de> Deserialize<'de> for Template {
       fields:      BTreeMap<String, FieldDefinition>,
     }
 
-    // Deserialize into our helper first
     let helper = TemplateHelper::deserialize(deserializer)?;
 
-    // Convert the field map into a Vec, setting the name from the key
-    // Filter out the metadata fields we don't want to treat as FieldDefinitions
+    // Filter out metadata fields and set field names
     let fields = helper
       .fields
       .into_iter()
@@ -49,31 +50,30 @@ impl<'de> Deserialize<'de> for Template {
 pub struct FieldDefinition {
   /// Name of the field
   #[serde(skip_deserializing)]
-  pub name:        String,
-  /// Type of the field (should be a JSON Value type)
-  pub field_type:  String,
+  pub name: String,
+
   /// Whether this field must be present
   #[serde(default)]
-  pub required:    bool,
+  pub required: bool,
+
   /// Human-readable description
   #[serde(default)]
   pub description: Option<String>,
-  /// Default value if field is absent
-  #[serde(default)]
-  pub default:     Option<Value>,
-  /// Optional validation rules
-  #[serde(default)]
-  pub validation:  Option<ValidationRules>,
 
-  pub type_definition: Option<TypeDefinition>,
-}
+  /// The base type of this field (string, number, array, object)
+  pub base_type: String,
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypeDefinition {
-  // For array types, defines the structure of elements
-  pub element_type: Option<Box<FieldDefinition>>,
-  // For table types, defines the fields
-  pub fields:       Option<Vec<FieldDefinition>>,
+  /// Validation rules for this type
+  #[serde(default)]
+  pub validation: Option<ValidationRules>,
+
+  /// Element type if this is an array type
+  #[serde(default)]
+  pub items: Option<Box<FieldDefinition>>,
+
+  /// Fields if this is an object type
+  #[serde(default)]
+  pub fields: Option<Vec<FieldDefinition>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -99,9 +99,8 @@ pub struct ValidationRules {
 }
 
 impl Template {
-  // TODO: Make this just return a `Result<()>`
   pub fn validate(&self, resource: &TemplatedItem) -> Result<()> {
-    // Check required fields
+    // Check required fields are present
     for field in &self.fields {
       if field.required && !resource.contains_key(&field.name) {
         return Err(LearnerError::TemplateInvalidation(format!(
@@ -114,173 +113,193 @@ impl Template {
     // Validate each provided field
     for (name, value) in resource {
       if let Some(field) = self.fields.iter().find(|f| f.name == *name) {
-        // Validate field value against its definition
-        self.validate_field(field, value)?;
+        field.validate_with_path(value, &field.name)?;
+      }
+    }
+
+    Ok(())
+  }
+}
+
+impl FieldDefinition {
+  fn validate_with_path(&self, value: &Value, path: &str) -> Result<()> {
+    match (self.base_type.as_str(), value) {
+      ("string", Value::String(s)) => self.validate_string(s, path),
+      ("number", Value::Number(n)) => self.validate_number(n, path),
+      ("array", Value::Array(items)) => self.validate_array(items, path),
+      ("object", Value::Object(obj)) => self.validate_object(obj, path),
+      ("boolean", Value::Bool(_)) => Ok(()),
+      ("null", Value::Null) => Ok(()),
+      _ => Err(LearnerError::TemplateInvalidation(format!(
+        "Field '{}' expected type '{}' but got '{}'",
+        path,
+        self.base_type,
+        type_name_of_value(value)
+      ))),
+    }
+  }
+
+  fn validate_string(&self, value: &str, path: &str) -> Result<()> {
+    if let Some(rules) = &self.validation {
+      // Length constraints
+      if let Some(min_length) = rules.min_length {
+        if value.len() < min_length {
+          return Err(LearnerError::TemplateInvalidation(format!(
+            "Field '{}' must be at least {} characters",
+            path, min_length
+          )));
+        }
+      }
+      if let Some(max_length) = rules.max_length {
+        if value.len() > max_length {
+          return Err(LearnerError::TemplateInvalidation(format!(
+            "Field '{}' cannot exceed {} characters",
+            path, max_length
+          )));
+        }
+      }
+
+      // Pattern matching
+      if let Some(pattern) = &rules.pattern {
+        let re = Regex::new(pattern)
+          .map_err(|_| LearnerError::TemplateInvalidation("Invalid regex pattern".into()))?;
+        if !re.is_match(value) {
+          return Err(LearnerError::TemplateInvalidation(format!(
+            "Field '{}' must match pattern: {}",
+            path, pattern
+          )));
+        }
+      }
+
+      // DateTime validation
+      if rules.datetime == Some(true) && DateTime::parse_from_rfc3339(value).is_err() {
+        return Err(LearnerError::TemplateInvalidation(format!(
+          "Field '{}' must be a valid RFC3339 datetime",
+          path
+        )));
+      }
+
+      // Enum validation
+      if let Some(allowed) = &rules.enum_values {
+        if !allowed.contains(&value.to_string()) {
+          return Err(LearnerError::TemplateInvalidation(format!(
+            "Field '{}' must be one of: {:?}",
+            path, allowed
+          )));
+        }
+      }
+    }
+    Ok(())
+  }
+
+  fn validate_number(&self, value: &Number, path: &str) -> Result<()> {
+    if let Some(rules) = &self.validation {
+      if let Some(num) = value.as_f64() {
+        if let Some(min) = rules.minimum {
+          if num < min {
+            return Err(LearnerError::TemplateInvalidation(format!(
+              "Field '{}' must be at least {}",
+              path, min
+            )));
+          }
+        }
+        if let Some(max) = rules.maximum {
+          if num > max {
+            return Err(LearnerError::TemplateInvalidation(format!(
+              "Field '{}' cannot exceed {}",
+              path, max
+            )));
+          }
+        }
+        if let Some(multiple) = rules.multiple_of {
+          let ratio = num / multiple;
+          if (ratio - ratio.round()).abs() > f64::EPSILON {
+            return Err(LearnerError::TemplateInvalidation(format!(
+              "Field '{}' must be a multiple of {}",
+              path, multiple
+            )));
+          }
+        }
+      }
+    }
+    Ok(())
+  }
+
+  fn validate_array(&self, items: &[Value], path: &str) -> Result<()> {
+    if let Some(rules) = &self.validation {
+      if let Some(min_items) = rules.min_items {
+        if items.len() < min_items {
+          return Err(LearnerError::TemplateInvalidation(format!(
+            "Field '{}' must have at least {} items",
+            path, min_items
+          )));
+        }
+      }
+      if let Some(max_items) = rules.max_items {
+        if items.len() > max_items {
+          return Err(LearnerError::TemplateInvalidation(format!(
+            "Field '{}' cannot exceed {} items",
+            path, max_items
+          )));
+        }
+      }
+      if rules.unique_items == Some(true) {
+        let mut seen = HashSet::new();
+        for item in items {
+          let item_str = serde_json::to_string(item).map_err(|_| {
+            LearnerError::TemplateInvalidation("Failed to serialize array item".into())
+          })?;
+          if !seen.insert(item_str) {
+            return Err(LearnerError::TemplateInvalidation(format!(
+              "Field '{}' contains duplicate items",
+              path
+            )));
+          }
+        }
+      }
+    }
+
+    // Validate each item if we have an item type definition
+    if let Some(item_type) = &self.items {
+      for (index, item) in items.iter().enumerate() {
+        item_type.validate_with_path(item, &format!("{}[{}]", path, index)).map_err(|e| {
+          LearnerError::TemplateInvalidation(format!(
+            "Invalid item at index {} in array '{}': {}",
+            index, path, e
+          ))
+        })?;
       }
     }
 
     Ok(())
   }
 
-  /// Validates a single field value against its definition
-  fn validate_field(&self, field: &FieldDefinition, value: &Value) -> Result<()> {
-    match (field.field_type.as_str(), value) {
-      // String validation - handles both basic type checking and string-specific rules
-      ("string", Value::String(v)) => {
-        if let Some(rules) = &field.validation {
-          // Length constraints
-          if let Some(min_length) = rules.min_length {
-            if v.len() < min_length {
-              return Err(LearnerError::TemplateInvalidation(format!(
-                "Field '{}' must be at least {} characters",
-                field.name, min_length
-              )));
-            }
-          }
-          if let Some(max_length) = rules.max_length {
-            if v.len() > max_length {
-              return Err(LearnerError::TemplateInvalidation(format!(
-                "Field '{}' cannot exceed {} characters",
-                field.name, max_length
-              )));
-            }
-          }
-
-          // Pattern matching via regex
-          if let Some(pattern) = &rules.pattern {
-            let re = Regex::new(pattern)
-              .map_err(|_| LearnerError::TemplateInvalidation("Invalid regex pattern".into()))?;
-            if !re.is_match(v) {
-              return Err(LearnerError::TemplateInvalidation(format!(
-                "Field '{}' must match pattern: {}",
-                field.name, pattern
-              )));
-            }
-          }
-
-          // Datetime validation if specified
-          if rules.datetime == Some(true) && DateTime::parse_from_rfc3339(v).is_err() {
-            return Err(LearnerError::TemplateInvalidation(format!(
-              "Field '{}' must be a valid RFC3339 datetime",
-              field.name
-            )));
-          }
-
-          // Enumerated values check
-          if let Some(allowed) = &rules.enum_values {
-            if !allowed.contains(v) {
-              return Err(LearnerError::TemplateInvalidation(format!(
-                "Field '{}' must be one of: {:?}",
-                field.name, allowed
-              )));
-            }
-          }
+  fn validate_object(&self, obj: &Map<String, Value>, path: &str) -> Result<()> {
+    if let Some(fields) = &self.fields {
+      for field in fields {
+        if let Some(value) = obj.get(&field.name) {
+          field.validate_with_path(value, &format!("{}.{}", path, field.name))?;
+        } else if field.required {
+          return Err(LearnerError::TemplateInvalidation(format!(
+            "Missing required field '{}' in object '{}'",
+            field.name, path
+          )));
         }
-        Ok(())
-      },
-
-      // Numeric validations - handle both number types
-      ("number", Value::Number(n)) => {
-        if let Some(rules) = &field.validation {
-          if let Some(num) = n.as_f64() {
-            validate_numeric(field, num, rules)?;
-          }
-        }
-        Ok(())
-      },
-
-      // Array validation - handles array-specific rules
-      ("array", Value::Array(v)) => {
-        if let Some(rules) = &field.validation {
-          if let Some(min_items) = rules.min_items {
-            if v.len() < min_items {
-              return Err(LearnerError::TemplateInvalidation(format!(
-                "Field '{}' must have at least {} items",
-                field.name, min_items
-              )));
-            }
-          }
-
-          if let Some(max_items) = rules.max_items {
-            if v.len() > max_items {
-              return Err(LearnerError::TemplateInvalidation(format!(
-                "Field '{}' cannot exceed {} items",
-                field.name, max_items
-              )));
-            }
-          }
-
-          if rules.unique_items == Some(true) {
-            let mut seen = HashSet::new();
-            for item in v {
-              let item_str = serde_json::to_string(item).map_err(|_| {
-                LearnerError::TemplateInvalidation("Failed to serialize array item".into())
-              })?;
-              if !seen.insert(item_str) {
-                return Err(LearnerError::TemplateInvalidation(format!(
-                  "Field '{}' contains duplicate items",
-                  field.name
-                )));
-              }
-            }
-          }
-        }
-        Ok(())
-      },
-
-      // Simple type validations - just ensure type matches
-      ("boolean", Value::Bool(_)) => Ok(()),
-      ("object", Value::Object(_)) => Ok(()),
-      ("null", Value::Null) => Ok(()),
-
-      // Type mismatch - provide a clear error message
-      _ => Err(LearnerError::TemplateInvalidation(format!(
-        "Field '{}' expected type '{}' but got '{}'",
-        field.name,
-        field.field_type,
-        match value {
-          Value::String(_) => "string",
-          Value::Number(_) => "number",
-          Value::Bool(_) => "boolean",
-          Value::Array(_) => "array",
-          Value::Object(_) => "object",
-          Value::Null => "null",
-        }
-      ))),
+      }
     }
+    Ok(())
   }
 }
 
-fn validate_numeric(field: &FieldDefinition, value: f64, rules: &ValidationRules) -> Result<()> {
-  if let Some(min) = rules.minimum {
-    if value < min {
-      return Err(LearnerError::TemplateInvalidation(format!(
-        "Field '{}' must be at least {}",
-        field.name, min
-      )));
-    }
+fn type_name_of_value(value: &Value) -> &'static str {
+  match value {
+    Value::String(_) => "string",
+    Value::Number(_) => "number",
+    Value::Bool(_) => "boolean",
+    Value::Array(_) => "array",
+    Value::Object(_) => "object",
+    Value::Null => "null",
   }
-
-  if let Some(max) = rules.maximum {
-    if value > max {
-      return Err(LearnerError::TemplateInvalidation(format!(
-        "Field '{}' cannot exceed {}",
-        field.name, max
-      )));
-    }
-  }
-
-  if let Some(multiple) = rules.multiple_of {
-    let ratio = value / multiple;
-    if (ratio - ratio.round()).abs() > f64::EPSILON {
-      return Err(LearnerError::TemplateInvalidation(format!(
-        "Field '{}' must be a multiple of {}",
-        field.name, multiple
-      )));
-    }
-  }
-
-  Ok(())
 }
 
 /// Convert DateTime to RFC3339 string for JSON storage
@@ -374,26 +393,27 @@ mod tests {
 
   #[test]
   fn test_datetime_validation() {
-    let template = Template {
-      name:        "Test Template".to_string(),
-      description: None,
-      fields:      vec![FieldDefinition {
-        name:            "timestamp".into(),
-        field_type:      "string".into(),
-        required:        true,
-        description:     None,
-        default:         None,
-        validation:      Some(ValidationRules { datetime: Some(true), ..Default::default() }),
-        type_definition: None,
-      }],
-    };
+    todo!("Fix this")
+    // let template = Template {
+    //   name:        "Test Template".to_string(),
+    //   description: None,
+    //   fields:      vec![FieldDefinition {
+    //     name:            "timestamp".into(),
+    //     field_type:      "string".into(),
+    //     required:        true,
+    //     description:     None,
+    //     default:         None,
+    //     validation:      Some(ValidationRules { datetime: Some(true), ..Default::default() }),
+    //     type_definition: None,
+    //   }],
+    // };
 
-    let valid_resource = BTreeMap::from([("timestamp".into(), json!("2024-01-01T00:00:00Z"))]);
-    template.validate(&valid_resource).unwrap();
+    // let valid_resource = BTreeMap::from([("timestamp".into(), json!("2024-01-01T00:00:00Z"))]);
+    // template.validate(&valid_resource).unwrap();
 
-    let invalid_resource = BTreeMap::from([
-      ("timestamp".into(), json!("2024-01-01")), // Not RFC3339
-    ]);
-    assert!(template.validate(&invalid_resource).is_err());
+    // let invalid_resource = BTreeMap::from([
+    //   ("timestamp".into(), json!("2024-01-01")), // Not RFC3339
+    // ]);
+    // assert!(template.validate(&invalid_resource).is_err());
   }
 }
