@@ -21,20 +21,25 @@ impl ConfigurationManager {
   pub fn load_config<T>(&mut self, path: impl AsRef<Path>) -> Result<T>
   where T: DeserializeOwned + std::fmt::Debug {
     let path = path.as_ref();
-    let content = std::fs::read_to_string(path)?;
-    let mut raw_config: toml::Value = toml::from_str(&content)?;
+    let content = dbg!(std::fs::read_to_string(path)?);
+    let mut raw_config: toml::Value = dbg!(toml::from_str(&content)?);
 
     // If this is a Retriever config, handle resource reference
     if std::any::type_name::<T>() == std::any::type_name::<Retriever>() {
-      if let Some(toml::Value::String(resource_name)) = raw_config.get("resource") {
-        // Load the referenced resource
-        let resource_path = self.config_paths.join(format!("{resource_name}.toml"));
-        let resource_content = std::fs::read_to_string(resource_path)?;
-        let resource_config: toml::Value = toml::from_str(&resource_content)?;
+      // Handle both resource and retrieval templates
+      let template_fields = ["resource_template", "retrieval_template"];
 
-        // Replace the string reference with the resource config
-        if let Some(table) = raw_config.as_table_mut() {
-          table.insert("resource".into(), resource_config);
+      for field in &template_fields {
+        if let Some(toml::Value::String(template_name)) = raw_config.get(field) {
+          // Load the referenced template
+          let template_path = self.config_paths.join(format!("{template_name}.toml"));
+          let template_content = std::fs::read_to_string(template_path)?;
+          let template_config: toml::Value = toml::from_str(&template_content)?;
+
+          // Replace the string reference with the template config
+          if let Some(table) = raw_config.as_table_mut() {
+            table.insert((*field).to_string(), template_config);
+          }
         }
       }
     }
@@ -57,6 +62,8 @@ mod tests {
 
     // Load configurations in order
     let paper: Template = dbg!(manager.load_config("config_new/paper.toml").unwrap());
+
+    let retreival: Template = dbg!(manager.load_config("config_new/retrieval.toml")).unwrap();
 
     let arxiv_retriever: Retriever = dbg!(manager.load_config("config_new/arxiv.toml").unwrap());
 

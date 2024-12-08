@@ -1,0 +1,40 @@
+name = "retrieval"
+
+description = "Standard retrieval data template"
+
+[source]
+field_type = "string"
+required   = false
+
+[source_identifier]
+field_type = "string"
+required   = false
+
+[urls]
+field_type = "object"
+required   = true
+
+[urls.type_definition]
+fields = [
+    { name = "pdf", field_type = "string", required = false },
+    { name = "html", field_type = "string", required = false },
+]
+
+[doi]
+field_type = "string"
+required   = false
+
+[last_checked]
+field_type = "string"
+required   = false
+validation = { datetime = true }
+
+[access_type]
+field_type = "string"
+required   = false
+validation = { enum_values = ["open", "subscription", "institutional"] }
+
+[verified]
+default    = true
+field_type = "boolean"
+required   = true

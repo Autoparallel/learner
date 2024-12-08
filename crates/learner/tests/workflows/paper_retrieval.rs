@@ -1,28 +1,15 @@
 use std::fs;
 
-use learner::{configuration::ConfigurationManager, template::Template};
+use learner::configuration::ConfigurationManager;
 
 use super::*;
 
 #[traced_test]
 #[tokio::test]
 async fn test_arxiv_retriever_integration() -> TestResult<()> {
-  // let ret_config_str = fs::read_to_string("config/retrievers/arxiv.toml").expect(
-  //   "Failed to read config
-  //   file",
-  // );
-  // let res_config_str = fs::read_to_string("config/resources/paper.toml").expect(
-  //   "Failed to read config
-  //   file",
-  // );
   let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
   let retriever: Retriever = manager.load_config("config_new/arxiv.toml")?;
 
-  // let retriever: Retriever = toml::from_str(&ret_config_str).expect("Failed to parse config");
-  // let resource: ResourceTemplate = toml::from_str(&res_config_str).expect("Failed to parse
-  // config");
-
-  // Test with a real arXiv paper
   let paper = retriever.retrieve_resource("2301.07041").await?;
 
   dbg!(&paper);
@@ -70,10 +57,7 @@ async fn test_arxiv_pdf_from_paper() -> TestResult<()> {
 async fn test_iacr_retriever_integration() -> TestResult<()> {
   let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
   let retriever: Retriever = manager.load_config("config_new/iacr.toml")?;
-  // let resource: ResourceTemplate = toml::from_str(&res_config_str).expect("Failed to parse
-  // config");
 
-  // // Test with a real IACR paper
   let paper = retriever.retrieve_resource("2016/260").await.unwrap();
   // assert!(resource.validate(&paper)?); // TODO: validation already happens internally, to be fair
   // that validation may not be working totally right
@@ -121,6 +105,7 @@ async fn test_doi_retriever_integration() -> TestResult<()> {
   let paper = retriever.retrieve_resource("10.1145/1327452.1327492").await?;
   // assert!(resource.validate(&paper)?);
   dbg!(&paper);
+  todo!("Clean this up");
   // assert!(!paper.title.is_empty());
   // assert!(!paper.authors.is_empty());
   // assert!(!paper.abstract_text.is_empty());

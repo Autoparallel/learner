@@ -20,11 +20,11 @@ pub struct Retriever {
   #[serde(default)]
   pub headers:         BTreeMap<String, String>,
 
-  #[serde(rename = "resource")]
   pub resource_template: Template,
   #[serde(default)]
   pub resource_mappings: BTreeMap<String, FieldMap>,
 
+  pub retrieval_template: Template,
   #[serde(default)]
   pub retrieval_mappings: BTreeMap<String, FieldMap>,
 }
@@ -79,8 +79,6 @@ impl Retriever {
       ResponseFormat::Json => serde_json::from_slice(&data)?,
     };
 
-    // Process response and get resource
-    // TODO: this should probably be a method
     let mut resource = self.process_json_value(&json)?;
 
     // Add source metadata
@@ -112,6 +110,31 @@ impl Retriever {
 
     Ok(resource)
   }
+}
+
+fn process_template_fields(
+  json: &Value,
+  template: &Template,
+  mappings: &BTreeMap<String, FieldMap>,
+) -> Result<BTreeMap<String, Value>> {
+  let mut result = BTreeMap::new();
+
+  for field_def in &template.fields {
+    if let Some(field_map) = mappings.get(&field_def.name) {
+      if let Some(value) = extract_mapped_value(json, field_map, field_def)? {
+        result.insert(field_def.name.clone(), value);
+      } else if field_def.required {
+        return Err(LearnerError::ApiError(format!(
+          "Required field '{}' not found in response",
+          field_def.name
+        )));
+      } else if let Some(default) = &field_def.default {
+        result.insert(field_def.name.clone(), default.clone());
+      }
+    }
+  }
+
+  Ok(result)
 }
 
 /// Extract and transform a value from JSON using a field mapping

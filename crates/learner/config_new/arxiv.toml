@@ -2,31 +2,25 @@ name = "arxiv"
 
 description = "Retriever template for getting a paper from arXiv"
 
+resource_template  = "paper"
+retrieval_template = "retrieval"
+
 base_url          = "http://export.arxiv.org"
 endpoint_template = "http://export.arxiv.org/api/query?id_list={identifier}&max_results=1"
 pattern           = "(?:^|https?://arxiv\\.org/(?:abs|pdf)/)(\\d{4}\\.\\d{4,5}|[a-zA-Z-]+(?:\\.[A-Z]{2})?/\\d{7})(?:\\.pdf)?$"
-resource          = "paper"
 source            = "arxiv"
 
 response_format = { type = "xml", strip_namespaces = true }
 
+[resource_mappings]
+abstract          = { path = "feed/entry/summary" }
+authors           = { path = "feed/entry/author" }
+publication_dates = { path = "feed/entry/published" }
+title             = { path = "feed/entry/title" }
 
-[resource_mappings.title]
-path = "feed/entry/title"
-
-[resource_mappings.abstract]
-path = "feed/entry/summary"
-
-[resource_mappings.authors]
-path = "feed/entry/author"
-
-[resource_mappings.publication_dates]
-path = "feed/entry/published"
-
-[retrieval_data.urls]
-path = "feed/entry/id"
-
-[retrieval_data.urls.transform]
+[retrieval_mappings]
+urls = { path = "feed/entry/id" }
+[urls.transform]
 pattern     = "/abs/"
 replacement = "/pdf/"
 type        = "Replace"

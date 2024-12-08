@@ -2,31 +2,6 @@ use quick_xml::{events::Event, Reader};
 
 use super::*;
 
-/// Available response format handlers.
-///
-/// Specifies how to parse and extract paper metadata from API responses
-/// in different formats.
-///
-/// # Examples
-///
-/// XML configuration:
-/// ```toml
-/// [response_format]
-/// type = "xml"
-/// strip_namespaces = true
-///
-/// [response_format.field_maps]
-/// title = { path = "entry/title" }
-/// ```
-///
-/// JSON configuration:
-/// ```toml
-/// [response_format]
-/// type = "json"
-///
-/// [response_format.field_maps]
-/// title = { path = "message/title/0" }
-/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ResponseFormat {
@@ -41,17 +16,6 @@ pub enum ResponseFormat {
   Json,
 }
 
-/// Field mapping configuration.
-///
-/// Defines how to extract and transform specific fields from API responses.
-///
-/// # Examples
-///
-/// ```toml
-/// [field_maps.title]
-/// path = "entry/title"
-/// transform = { type = "replace", pattern = "\\s+", replacement = " " }
-/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldMap {
   /// Path to field in response (e.g., JSON path or XPath)
@@ -61,23 +25,6 @@ pub struct FieldMap {
   pub transform: Option<Transform>,
 }
 
-/// Available field value transformations.
-///
-/// Transformations that can be applied to extracted field values
-/// before constructing the final Paper object.
-///
-/// # Examples
-///
-/// ```toml
-/// # Clean up whitespace
-/// transform = { type = "replace", pattern = "\\s+", replacement = " " }
-///
-/// # Convert date format
-/// transform = { type = "date", from_format = "%Y-%m-%d", to_format = "%Y-%m-%dT00:00:00Z" }
-///
-/// # Construct full URL
-/// transform = { type = "url", base = "https://example.com/", suffix = ".pdf" }
-/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Transform {
