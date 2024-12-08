@@ -9,7 +9,7 @@ use learner::{
   llm::{LlamaRequest, Model},
   pdf::PDFContentBuilder,
   prelude::*,
-  resource::{Author, Paper},
+  resource::{paper::Paper, shared::Author},
   Config, Learner,
 };
 use tempfile::{tempdir, TempDir};
@@ -20,7 +20,6 @@ mod workflows;
 
 pub type TestResult<T> = Result<T, Box<dyn Error>>;
 
-// #[tokio::test]
 pub async fn create_test_learner() -> (Learner, TempDir, TempDir, TempDir) {
   let config_dir = tempdir().unwrap();
   let database_dir = tempdir().unwrap();
@@ -28,6 +27,7 @@ pub async fn create_test_learner() -> (Learner, TempDir, TempDir, TempDir) {
   let config = Config::default()
     .with_database_path(&database_dir.path().join("learner.db"))
     .with_retrievers_path(Path::new("config/retrievers/"))
+    .with_resources_path(Path::new("config/resources/"))
     .with_storage_path(storage_dir.path());
   let learner =
     Learner::builder().with_path(config_dir.path()).with_config(config).build().await.unwrap();

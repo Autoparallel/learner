@@ -2,13 +2,25 @@ base_url          = "https://api.crossref.org/works"
 endpoint_template = "https://api.crossref.org/works/{identifier}"
 name              = "doi"
 pattern           = "(?:^|https?://doi\\.org/)(10\\.\\d{4,9}/[-._;()/:\\w]+)$"
+resource          = "paper"
 source            = "doi"
 
 [response_format]
 type = "json"
 
 [response_format.field_maps.title]
-path = "message/title"
+path = "message"
+[response_format.field_maps.title.transform]
+sources = [
+    { type = "path", value = "title/0" },
+    { type = "path", value = "subtitle/0" },
+]
+type = "Compose"
+
+[response_format.field_maps.title.transform.format]
+delimiter = ": "
+type      = "Join"
+
 
 [response_format.field_maps.abstract]
 path = "message/abstract"
@@ -20,8 +32,18 @@ type        = "Replace"
 
 [response_format.field_maps.authors]
 path = "message/author"
+[response_format.field_maps.authors.transform]
+sources = [
+    { type = "key_value", value = { key = "family", path = "family" } },
+    { type = "key_value", value = { key = "given", path = "given" } },
+]
+type = "Compose"
 
-[response_format.field_maps.publication_date]
+[response_format.field_maps.authors.transform.format]
+template = { name = "{given} {family}" }
+type     = "ArrayOfObjects"
+
+[response_format.field_maps.publication_dates]
 path = "message/created/date-time"
 
 [response_format.field_maps.pdf_url]

@@ -1,0 +1,45 @@
+name = "doi"
+
+description = "Retriever template for getting a paper from DOI/Crossref"
+
+resource_template  = "paper"
+retrieval_template = "retrieval"
+
+base_url          = "https://api.crossref.org/works"
+endpoint_template = "https://api.crossref.org/works/{identifier}"
+
+pattern  = "(?:^|https?://doi\\.org/)(10\\.\\d{4,9}/[-._;()/:\\w]+)$"
+resource = "paper"
+source   = "doi"
+
+[response_format]
+type = "json"
+
+[resource_mappings]
+abstract          = { path = "message/abstract" }
+publication_dates = { path = "message/created/date-time" }
+
+[resource_mappings.title]
+path = "message"
+transforms = [
+    { type = "Combine", subpaths = [
+        "title/0",
+        "subtitle/0",
+    ], delimiter = ": " },
+]
+
+[resource_mappings.authors]
+path = "message/author"
+transforms = [
+    { type = "Combine", subpaths = [
+        "given",
+        "family",
+    ], delimiter = " " },
+]
+
+[retrieval_mappings.urls]
+path      = "message/link/0/URL"
+structure = { "pdf" = "{value}" }
+
+[headers]
+Accept = "application/json"

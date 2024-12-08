@@ -1,0 +1,29 @@
+name = "arxiv"
+
+description = "Retriever template for getting a paper from arXiv"
+
+resource_template  = "paper"
+retrieval_template = "retrieval"
+
+base_url          = "http://export.arxiv.org"
+endpoint_template = "http://export.arxiv.org/api/query?id_list={identifier}&max_results=1"
+pattern           = "(?:^|https?://arxiv\\.org/(?:abs|pdf)/)(\\d{4}\\.\\d{4,5}|[a-zA-Z-]+(?:\\.[A-Z]{2})?/\\d{7})(?:\\.pdf)?$"
+source            = "arxiv"
+
+response_format = { type = "xml", strip_namespaces = true }
+
+[resource_mappings]
+abstract          = { path = "feed/entry/summary" }
+authors           = { path = "feed/entry/author" }
+publication_dates = { path = "feed/entry/published" }
+title             = { path = "feed/entry/title" }
+
+[retrieval_mappings.urls]
+path = "feed/entry/id"
+structure = { "pdf" = "http://arxiv.org/pdf/{value}.pdf", "html" = "http://arxiv.org/abs/{value}" }
+transforms = [
+    { type = "Replace", pattern = ".*/(?:abs|pdf)/(.+?)(?:v\\d+)?$", replacement = "$1" },
+]
+
+[headers]
+Accept = "application/xml"

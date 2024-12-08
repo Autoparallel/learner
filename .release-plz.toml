@@ -13,4 +13,4 @@ publish = true
 
 [[package]]
 name    = "learner-sdk"
-publish = false
+publish = true
