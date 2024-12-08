@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use super::*;
 
 // Type alias for clarity and consistency
-pub type Resource = BTreeMap<String, Value>;
+pub type TemplatedItem = BTreeMap<String, Value>;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Template {
@@ -99,12 +99,12 @@ pub struct ValidationRules {
 }
 
 impl Template {
-  /// Validates a set of values against this resource configuration
-  pub fn validate(&self, resource: &Resource) -> Result<bool> {
+  // TODO: Make this just return a `Result<()>`
+  pub fn validate(&self, resource: &TemplatedItem) -> Result<()> {
     // Check required fields
     for field in &self.fields {
       if field.required && !resource.contains_key(&field.name) {
-        return Err(LearnerError::InvalidResource(format!(
+        return Err(LearnerError::TemplateInvalidation(format!(
           "Missing required field: {}",
           field.name
         )));
@@ -119,7 +119,7 @@ impl Template {
       }
     }
 
-    Ok(true)
+    Ok(())
   }
 
   /// Validates a single field value against its definition
@@ -131,7 +131,7 @@ impl Template {
           // Length constraints
           if let Some(min_length) = rules.min_length {
             if v.len() < min_length {
-              return Err(LearnerError::InvalidResource(format!(
+              return Err(LearnerError::TemplateInvalidation(format!(
                 "Field '{}' must be at least {} characters",
                 field.name, min_length
               )));
@@ -139,7 +139,7 @@ impl Template {
           }
           if let Some(max_length) = rules.max_length {
             if v.len() > max_length {
-              return Err(LearnerError::InvalidResource(format!(
+              return Err(LearnerError::TemplateInvalidation(format!(
                 "Field '{}' cannot exceed {} characters",
                 field.name, max_length
               )));
@@ -149,9 +149,9 @@ impl Template {
           // Pattern matching via regex
           if let Some(pattern) = &rules.pattern {
             let re = Regex::new(pattern)
-              .map_err(|_| LearnerError::InvalidResource("Invalid regex pattern".into()))?;
+              .map_err(|_| LearnerError::TemplateInvalidation("Invalid regex pattern".into()))?;
             if !re.is_match(v) {
-              return Err(LearnerError::InvalidResource(format!(
+              return Err(LearnerError::TemplateInvalidation(format!(
                 "Field '{}' must match pattern: {}",
                 field.name, pattern
               )));
@@ -160,7 +160,7 @@ impl Template {
 
           // Datetime validation if specified
           if rules.datetime == Some(true) && DateTime::parse_from_rfc3339(v).is_err() {
-            return Err(LearnerError::InvalidResource(format!(
+            return Err(LearnerError::TemplateInvalidation(format!(
               "Field '{}' must be a valid RFC3339 datetime",
               field.name
             )));
@@ -169,7 +169,7 @@ impl Template {
           // Enumerated values check
           if let Some(allowed) = &rules.enum_values {
             if !allowed.contains(v) {
-              return Err(LearnerError::InvalidResource(format!(
+              return Err(LearnerError::TemplateInvalidation(format!(
                 "Field '{}' must be one of: {:?}",
                 field.name, allowed
               )));
@@ -194,7 +194,7 @@ impl Template {
         if let Some(rules) = &field.validation {
           if let Some(min_items) = rules.min_items {
             if v.len() < min_items {
-              return Err(LearnerError::InvalidResource(format!(
+              return Err(LearnerError::TemplateInvalidation(format!(
                 "Field '{}' must have at least {} items",
                 field.name, min_items
               )));
@@ -203,7 +203,7 @@ impl Template {
 
           if let Some(max_items) = rules.max_items {
             if v.len() > max_items {
-              return Err(LearnerError::InvalidResource(format!(
+              return Err(LearnerError::TemplateInvalidation(format!(
                 "Field '{}' cannot exceed {} items",
                 field.name, max_items
               )));
@@ -214,10 +214,10 @@ impl Template {
             let mut seen = HashSet::new();
             for item in v {
               let item_str = serde_json::to_string(item).map_err(|_| {
-                LearnerError::InvalidResource("Failed to serialize array item".into())
+                LearnerError::TemplateInvalidation("Failed to serialize array item".into())
               })?;
               if !seen.insert(item_str) {
-                return Err(LearnerError::InvalidResource(format!(
+                return Err(LearnerError::TemplateInvalidation(format!(
                   "Field '{}' contains duplicate items",
                   field.name
                 )));
@@ -234,7 +234,7 @@ impl Template {
       ("null", Value::Null) => Ok(()),
 
       // Type mismatch - provide a clear error message
-      _ => Err(LearnerError::InvalidResource(format!(
+      _ => Err(LearnerError::TemplateInvalidation(format!(
         "Field '{}' expected type '{}' but got '{}'",
         field.name,
         field.field_type,
@@ -254,7 +254,7 @@ impl Template {
 fn validate_numeric(field: &FieldDefinition, value: f64, rules: &ValidationRules) -> Result<()> {
   if let Some(min) = rules.minimum {
     if value < min {
-      return Err(LearnerError::InvalidResource(format!(
+      return Err(LearnerError::TemplateInvalidation(format!(
         "Field '{}' must be at least {}",
         field.name, min
       )));
@@ -263,7 +263,7 @@ fn validate_numeric(field: &FieldDefinition, value: f64, rules: &ValidationRules
 
   if let Some(max) = rules.maximum {
     if value > max {
-      return Err(LearnerError::InvalidResource(format!(
+      return Err(LearnerError::TemplateInvalidation(format!(
         "Field '{}' cannot exceed {}",
         field.name, max
       )));
@@ -273,7 +273,7 @@ fn validate_numeric(field: &FieldDefinition, value: f64, rules: &ValidationRules
   if let Some(multiple) = rules.multiple_of {
     let ratio = value / multiple;
     if (ratio - ratio.round()).abs() > f64::EPSILON {
-      return Err(LearnerError::InvalidResource(format!(
+      return Err(LearnerError::TemplateInvalidation(format!(
         "Field '{}' must be a multiple of {}",
         field.name, multiple
       )));
@@ -290,7 +290,7 @@ pub fn datetime_to_json(dt: DateTime<Utc>) -> String { dt.to_rfc3339() }
 pub fn datetime_from_json(s: &str) -> Result<DateTime<Utc>> {
   DateTime::parse_from_rfc3339(s)
     .map(|dt| dt.with_timezone(&Utc))
-    .map_err(|e| LearnerError::InvalidResource(format!("Invalid datetime format: {}", e)))
+    .map_err(|e| LearnerError::TemplateInvalidation(format!("Invalid datetime format: {}", e)))
 }
 #[cfg(test)]
 mod tests {
@@ -321,7 +321,7 @@ mod tests {
     ]);
 
     // Validate the paper
-    assert!(template.validate(&paper_resource).unwrap());
+    template.validate(&paper_resource).unwrap();
 
     // Test required field validation
     let invalid_paper = BTreeMap::from([
@@ -345,7 +345,7 @@ mod tests {
       ("publication_date".into(), json!(date)),
     ]);
 
-    assert!(template.validate(&book_resource).unwrap());
+    template.validate(&book_resource).unwrap();
   }
 
   #[test]
@@ -364,7 +364,7 @@ mod tests {
       ("advisors".into(), json!(["Prof. Bob Supervisor"])),
     ]);
 
-    assert!(template.validate(&thesis_resource).unwrap());
+    template.validate(&thesis_resource).unwrap();
 
     // Test degree enum validation
     let mut invalid_thesis = thesis_resource.clone();
@@ -389,7 +389,7 @@ mod tests {
     };
 
     let valid_resource = BTreeMap::from([("timestamp".into(), json!("2024-01-01T00:00:00Z"))]);
-    assert!(template.validate(&valid_resource).unwrap());
+    template.validate(&valid_resource).unwrap();
 
     let invalid_resource = BTreeMap::from([
       ("timestamp".into(), json!("2024-01-01")), // Not RFC3339

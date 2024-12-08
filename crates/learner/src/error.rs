@@ -251,6 +251,6 @@ pub enum LearnerError {
   #[error(transparent)]
   SerdeJson(#[from] serde_json::Error),
 
-  #[error("Failed to be a valid resource due to: {0}")]
-  InvalidResource(String),
+  #[error("Failed to be a valid item due to: {0}")]
+  TemplateInvalidation(String),
 }

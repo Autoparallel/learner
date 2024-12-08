@@ -12,7 +12,7 @@ required   = false
 
 [urls]
 field_type = "object"
-required   = true
+required   = false    # Consider changing
 
 [urls.type_definition]
 fields = [
@@ -33,8 +33,3 @@ validation = { datetime = true }
 field_type = "string"
 required   = false
 validation = { enum_values = ["open", "subscription", "institutional"] }
-
-[verified]
-default    = true
-field_type = "boolean"
-required   = true

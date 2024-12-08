@@ -2,10 +2,12 @@ name = "iacr"
 
 description = "Retriever template for getting a paper from IACR"
 
+resource_template  = "paper"
+retrieval_template = "retrieval"
+
 base_url          = "https://eprint.iacr.org"
 endpoint_template = "https://eprint.iacr.org/oai?verb=GetRecord&identifier=oai:eprint.iacr.org:{identifier}&metadataPrefix=oai_dc"
 pattern           = "(?:^|https?://eprint\\.iacr\\.org/)(\\d{4}/\\d+)(?:\\.pdf)?$"
-resource          = "paper"
 source            = "iacr"
 
 response_format = { type = "xml", strip_namespaces = true }

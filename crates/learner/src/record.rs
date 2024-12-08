@@ -1,4 +1,4 @@
-use template::Resource;
+use template::TemplatedItem;
 
 use super::*;
 
@@ -8,7 +8,7 @@ use super::*;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
   /// The resource type this record manages
-  pub resource: Resource,
+  pub resource: TemplatedItem,
 
   /// State tracking configuration
   pub state: State,
@@ -17,7 +17,7 @@ pub struct Record {
   pub storage: StorageData,
 
   /// Retrieval configuration
-  pub retrieval: RetrievalData,
+  pub retrieval: TemplatedItem,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -59,12 +59,12 @@ pub struct RetrievalData {
   pub verified:          bool,                  // Whether we've confirmed this data
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StorageData {
   pub files:              BTreeMap<String, PathBuf>,
   pub original_filenames: BTreeMap<String, String>,
   pub added_at:           BTreeMap<String, DateTime<Utc>>,
   pub file_sizes:         BTreeMap<String, u64>, // Track file sizes
   pub checksums:          BTreeMap<String, String>, // For integrity checking
-  pub last_verified:      DateTime<Utc>,         // When we last checked files exist
+  pub last_verified:      Option<DateTime<Utc>>, // When we last checked files exist
 }

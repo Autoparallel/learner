@@ -18,12 +18,13 @@ authors           = { path = "feed/entry/author" }
 publication_dates = { path = "feed/entry/published" }
 title             = { path = "feed/entry/title" }
 
-[retrieval_mappings]
-urls = { path = "feed/entry/id" }
-[urls.transform]
-pattern     = "/abs/"
-replacement = "/pdf/"
-type        = "Replace"
+[retrieval_mappings.urls]
+path = "feed/entry/id"
+[retrieval_mappings.urls.transform]
+format  = { type = "Object", template = { "pdf" = "{value}" } }
+sources = [{ type = "path", value = "feed/entry/id" }]
+type    = "Compose"
+
 
 [headers]
 Accept = "application/xml"

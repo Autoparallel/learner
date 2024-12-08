@@ -7,7 +7,7 @@ pub use config::*;
 pub use response::*;
 use serde_json::Map;
 
-use crate::template::Resource;
+use crate::template::TemplatedItem;
 
 // TODO: This should be `BTreeMap<String, Config<Retriever>>`
 #[derive(Default, Debug, Clone)]
@@ -58,7 +58,7 @@ impl Retrievers {
   /// ```
   pub fn new() -> Self { Self::default() }
 
-  pub async fn get_resource_file(&self, input: &str) -> Result<Resource> {
+  pub async fn get_resource_file(&self, input: &str) -> Result<TemplatedItem> {
     todo!(
       "Arguably, we don't even need this. We could instead just have this handled by `Learner` so \
        the API is simpler"

@@ -1,5 +1,7 @@
+use record::{Record, State, StorageData};
+
 use super::*;
-use crate::template::{FieldDefinition, Resource, Template};
+use crate::template::{FieldDefinition, Template, TemplatedItem};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Retriever {
@@ -53,7 +55,7 @@ impl Retriever {
       .ok_or(LearnerError::InvalidIdentifier)
   }
 
-  pub async fn retrieve_resource(&self, input: &str) -> Result<Resource> {
+  pub async fn retrieve_resource(&self, input: &str) -> Result<Record> {
     let identifier = self.extract_identifier(input)?;
 
     // Send request and get response
@@ -79,7 +81,7 @@ impl Retriever {
       ResponseFormat::Json => serde_json::from_slice(&data)?,
     };
 
-    let mut resource = self.process_json_value(&json)?;
+    let (mut resource, retrieval) = self.process_json_value(&json)?;
 
     // Add source metadata
     resource.insert("source".into(), Value::String(self.source.clone()));
@@ -87,28 +89,17 @@ impl Retriever {
 
     // Validate full resource against config
     self.resource_template.validate(&resource)?;
-    Ok(resource)
+    self.retrieval_template.validate(&retrieval)?;
+
+    Ok(Record { resource, state: State::default(), storage: StorageData::default(), retrieval })
   }
 
-  pub fn process_json_value(&self, json: &Value) -> Result<Resource> {
-    let mut resource = Resource::new();
+  pub fn process_json_value(&self, json: &Value) -> Result<(TemplatedItem, TemplatedItem)> {
+    let resource = process_template_fields(json, &self.resource_template, &self.resource_mappings)?;
+    let retrieval =
+      process_template_fields(json, &self.retrieval_template, &self.retrieval_mappings)?;
 
-    for field_def in &self.resource_template.fields {
-      if let Some(field_map) = self.resource_mappings.get(&field_def.name) {
-        if let Some(value) = extract_mapped_value(json, field_map, field_def)? {
-          resource.insert(field_def.name.clone(), value);
-        } else if field_def.required {
-          return Err(LearnerError::ApiError(format!(
-            "Required field '{}' not found in response",
-            field_def.name
-          )));
-        } else if let Some(default) = &field_def.default {
-          resource.insert(field_def.name.clone(), default.clone());
-        }
-      }
-    }
-
-    Ok(resource)
+    Ok((resource, retrieval))
   }
 }
 
@@ -120,7 +111,7 @@ fn process_template_fields(
   let mut result = BTreeMap::new();
 
   for field_def in &template.fields {
-    if let Some(field_map) = mappings.get(&field_def.name) {
+    if let Some(field_map) = mappings.get(dbg!(&field_def.name)) {
       if let Some(value) = extract_mapped_value(json, field_map, field_def)? {
         result.insert(field_def.name.clone(), value);
       } else if field_def.required {
@@ -263,7 +254,7 @@ fn get_path_value(json: &Value, path: &[&str]) -> Option<Value> {
           }
         }
       },
-      _ => return None,
+      _ => return Some(json.clone()),
     }
   }
 
@@ -300,7 +291,7 @@ fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
       )))
     },
     Transform::Compose { sources, format } => {
-      let values: Vec<Value> = sources
+      let values: Vec<Value> = dbg!(sources
         .iter()
         .filter_map(|source| match source {
           Source::Path(path) | Source::KeyValue { key: _, path } => {
@@ -309,7 +300,7 @@ fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
           },
           Source::Literal(text) => Some(Value::String(text.clone())),
         })
-        .collect();
+        .collect());
       match format {
         ComposeFormat::Join { delimiter } => {
           let strings: Vec<String> = values
@@ -325,8 +316,9 @@ fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
         },
         ComposeFormat::Object => {
           let mut obj = Map::new();
+          dbg!(&sources);
           for (source, value) in sources.iter().zip(values.iter()) {
-            if let Source::KeyValue { key, .. } = source {
+            if let Source::KeyValue { key, .. } = dbg!(source) {
               obj.insert(key.clone(), value.clone());
             }
           }
