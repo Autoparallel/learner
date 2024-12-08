@@ -1,0 +1,59 @@
+name = "doi"
+
+description = "Retriever template for getting a paper from DOI/Crossref"
+
+base_url          = "https://api.crossref.org/works"
+endpoint_template = "https://api.crossref.org/works/{identifier}"
+
+pattern  = "(?:^|https?://doi\\.org/)(10\\.\\d{4,9}/[-._;()/:\\w]+)$"
+resource = "paper"
+source   = "doi"
+
+response_format = { type = "json" }
+
+[resource_mappings.title]
+path = "message"
+[resource_mappings.title.transform]
+sources = [
+    { type = "path", value = "title/0" },
+    { type = "path", value = "subtitle/0" },
+]
+type = "Compose"
+
+[resource_mappings.title.transform.format]
+delimiter = ": "
+type      = "Join"
+
+
+[resource_mappings.abstract]
+path = "message/abstract"
+
+[resource_mappings.abstract.transform]
+pattern     = "<[^>]+>"
+replacement = ""
+type        = "Replace"
+
+[resource_mappings.authors]
+path = "message/author"
+[resource_mappings.authors.transform]
+sources = [
+    { type = "key_value", value = { key = "family", path = "family" } },
+    { type = "key_value", value = { key = "given", path = "given" } },
+]
+type = "Compose"
+
+[resource_mappings.authors.transform.format]
+template = { name = "{given} {family}" }
+type     = "ArrayOfObjects"
+
+[resource_mappings.publication_dates]
+path = "message/created/date-time"
+
+[resource_mappings.pdf_url]
+path = "message/link/0/URL"
+
+[resource_mappings.doi]
+path = "message/DOI"
+
+[headers]
+Accept = "application/json"

@@ -1,0 +1,39 @@
+name = "iacr"
+
+description = "Retriever template for getting a paper from IACR"
+
+base_url          = "https://eprint.iacr.org"
+endpoint_template = "https://eprint.iacr.org/oai?verb=GetRecord&identifier=oai:eprint.iacr.org:{identifier}&metadataPrefix=oai_dc"
+pattern           = "(?:^|https?://eprint\\.iacr\\.org/)(\\d{4}/\\d+)(?:\\.pdf)?$"
+resource          = "paper"
+source            = "iacr"
+
+response_format = { type = "xml", strip_namespaces = true }
+
+[resource_mappings.title]
+path = "OAI-PMH/GetRecord/record/metadata/dc/title"
+
+[resource_mappings.abstract]
+path = "OAI-PMH/GetRecord/record/metadata/dc/description"
+
+[resource_mappings.authors]
+path = "OAI-PMH/GetRecord/record/metadata/dc"
+[resource_mappings.authors.transform]
+sources = [{ type = "key_value", value = { key = "name", path = "creator" } }]
+type    = "Compose"
+[resource_mappings.authors.transform.format]
+type = "Object"
+
+[resource_mappings.publication_dates]
+path = "OAI-PMH/GetRecord/record/metadata/dc/date"
+
+[resource_mappings.pdf_url]
+path = "OAI-PMH/GetRecord/record/metadata/dc/identifier"
+
+[resource_mappings.pdf_url.transform]
+pattern     = "^(https://eprint\\.iacr\\.org/\\d{4}/\\d+)$"
+replacement = "$1.pdf"
+type        = "Replace"
+
+[headers]
+Accept = "application/xml"
