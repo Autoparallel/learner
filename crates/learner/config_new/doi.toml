@@ -36,23 +36,10 @@ transforms = [
         "family",
     ], delimiter = " " },
 ]
-# [response_format.field_maps.authors.transform]
-# sources = [
-#     { type = "key_value", value = { key = "family", path = "family" } },
-#     { type = "key_value", value = { key = "given", path = "given" } },
-# ]
-# type = "Compose"
 
-# [response_format.field_maps.authors.transform.format]
-# template = { name = "{given} {family}" }
-# type     = "ArrayOfObjects"
-
-
-# [response_format.field_maps.pdf_url]
-# path = "message/link/0/URL"
-
-# [response_format.field_maps.doi]
-# path = "message/DOI"
+[retrieval_mappings.urls]
+path      = "message/link/0/URL"
+structure = { "pdf" = "{value}" }
 
 [headers]
 Accept = "application/json"
