@@ -42,6 +42,8 @@
 //! # }
 //! ```
 
+use shared::Author;
+
 use super::*;
 
 /// Complete representation of an academic paper with metadata.

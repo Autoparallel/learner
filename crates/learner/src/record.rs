@@ -1,3 +1,5 @@
+use template::Resource;
+
 use super::*;
 
 // TODO: We probably want a `RecordTemplate` just like we have for `Resource`. Perhaps we can just

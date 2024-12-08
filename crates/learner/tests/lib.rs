@@ -9,7 +9,7 @@ use learner::{
   llm::{LlamaRequest, Model},
   pdf::PDFContentBuilder,
   prelude::*,
-  resource::{Author, Paper},
+  resource::{paper::Paper, shared::Author},
   Config, Learner,
 };
 use tempfile::{tempdir, TempDir};

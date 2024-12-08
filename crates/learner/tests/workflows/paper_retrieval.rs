@@ -1,9 +1,6 @@
 use std::fs;
 
-use learner::{
-  configuration::{Config, ConfigurationManager},
-  resource::ResourceTemplate,
-};
+use learner::{configuration::ConfigurationManager, template::Template};
 
 use super::*;
 
@@ -19,14 +16,14 @@ async fn test_arxiv_retriever_integration() -> TestResult<()> {
   //   file",
   // );
   let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
-  let retriever: Config<Retriever> = manager.load_config("config_new/arxiv.toml")?;
+  let retriever: Retriever = manager.load_config("config_new/arxiv.toml")?;
 
   // let retriever: Retriever = toml::from_str(&ret_config_str).expect("Failed to parse config");
   // let resource: ResourceTemplate = toml::from_str(&res_config_str).expect("Failed to parse
   // config");
 
   // Test with a real arXiv paper
-  let paper = retriever.inner().retrieve_resource("2301.07041").await?;
+  let paper = retriever.retrieve_resource("2301.07041").await?;
 
   dbg!(&paper);
   // assert!(resource.validate(&paper)?);
@@ -72,12 +69,12 @@ async fn test_arxiv_pdf_from_paper() -> TestResult<()> {
 #[tokio::test]
 async fn test_iacr_retriever_integration() -> TestResult<()> {
   let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
-  let retriever: Config<Retriever> = manager.load_config("config_new/iacr.toml")?;
+  let retriever: Retriever = manager.load_config("config_new/iacr.toml")?;
   // let resource: ResourceTemplate = toml::from_str(&res_config_str).expect("Failed to parse
   // config");
 
   // // Test with a real IACR paper
-  let paper = retriever.inner().retrieve_resource("2016/260").await.unwrap();
+  let paper = retriever.retrieve_resource("2016/260").await.unwrap();
   // assert!(resource.validate(&paper)?); // TODO: validation already happens internally, to be fair
   // that validation may not be working totally right
   dbg!(&paper);
@@ -118,10 +115,10 @@ async fn test_iacr_pdf_from_paper() -> TestResult<()> {
 #[traced_test]
 async fn test_doi_retriever_integration() -> TestResult<()> {
   let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
-  let retriever: Config<Retriever> = manager.load_config("config_new/doi.toml")?;
+  let retriever: Retriever = manager.load_config("config_new/doi.toml")?;
 
   // Test with a real DOI paper
-  let paper = retriever.inner().retrieve_resource("10.1145/1327452.1327492").await?;
+  let paper = retriever.retrieve_resource("10.1145/1327452.1327492").await?;
   // assert!(resource.validate(&paper)?);
   dbg!(&paper);
   // assert!(!paper.title.is_empty());

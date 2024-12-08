@@ -153,7 +153,6 @@ use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::Url;
-use resource::{Resource, ResourceTemplate, Resources};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, trace, warn};
@@ -171,14 +170,9 @@ pub mod llm;
 pub mod pdf;
 pub mod record;
 pub mod resource;
+pub mod template;
 
-use crate::{
-  database::*,
-  error::*,
-  prelude::*,
-  resource::{Author, Paper},
-  retriever::*,
-};
+use crate::{database::*, error::*, prelude::*, retriever::*};
 
 /// ArXiv default configuration
 pub const ARXIV_CONFIG: &str = include_str!("../config/retrievers/arxiv.toml");
@@ -223,11 +217,7 @@ pub const THESIS_CONFIG: &str = include_str!("../config/resources/thesis.toml");
 /// }
 /// ```
 pub mod prelude {
-  pub use crate::{
-    configuration::{Configurable, Identifiable},
-    database::DatabaseInstruction,
-    error::LearnerError,
-  };
+  pub use crate::{database::DatabaseInstruction, error::LearnerError};
 }
 
 /// Core configuration for the library.
@@ -298,8 +288,8 @@ pub struct Learner {
   pub database:   Database,
   /// Paper retrieval system
   pub retrievers: Retrievers,
-  /// Resources to use
-  pub resources:  Resources,
+  // / Resources to use
+  // pub resources:  Resources,
 }
 
 /// Builder for creating configured Learner instances.
@@ -593,7 +583,7 @@ impl LearnerBuilder {
     // let retriever = Retrievers::new().with_config_dir(&config.retrievers_path)?;
     // let resources = Resources::new().with_config_dir(&config.resources_path)?;
 
-    Ok(Learner { config, database, retrievers: Retrievers::new(), resources: Resources::new() })
+    Ok(Learner { config, database, retrievers: Retrievers::new() })
   }
 }
 
@@ -745,33 +735,6 @@ impl Learner {
   /// # }
   /// ```
   pub async fn init() -> Result<Self> { Self::with_config(Config::init()?).await }
-
-  pub async fn retreive(&mut self, input: &str) -> Result<Resource> {
-    // let mut matches = Vec::new();
-
-    // // Find all configs that match the input
-    // for (name, config) in self.retrievers.as_map().iter() {
-    //   if config.pattern.is_match(input) {
-    //     matches.push((name, config));
-    //   }
-    // }
-
-    todo!("Finish this")
-    // match matches.len() {
-    //   0 => Err(LearnerError::InvalidIdentifier),
-    //   1 => {
-    //     let resource_config = self.resources.as_map().get(matches[0].0);
-    //     if let Some(resource_config) = resource_config {
-    //       Ok(matches[0].1.retrieve_resource(input, resource_config).await?)
-    //     } else {
-    //       todo!("Error because that resource wasn't available.")
-    //     }
-    //   },
-    //   _ => Err(LearnerError::AmbiguousIdentifier(
-    //     matches.into_iter().map(|(n, c)| n.to_string()).collect(),
-    //   )),
-    // }
-  }
 }
 
 #[cfg(test)]

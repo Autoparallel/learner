@@ -1,7 +1,7 @@
 // use resource::Resource;
 
 use record::RetrievalData;
-use resource::ResourceTemplate;
+use template::{Resource, Template};
 
 use super::*;
 
@@ -9,7 +9,9 @@ use super::*;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Retriever {
-  pub resource:       ResourceTemplate,
+  pub name:           String,
+  pub description:    Option<String>,
+  pub resource:       Template,
   #[serde(skip_deserializing)]
   #[serde(default)]
   pub retrieval_data: RetrievalData,

@@ -5,6 +5,7 @@ mod response;
 
 pub use config::*;
 pub use response::*;
+use template::Resource;
 
 // TODO: This should be `BTreeMap<String, Config<Retriever>>`
 #[derive(Default, Debug, Clone)]
@@ -55,28 +56,7 @@ impl Retrievers {
   /// ```
   pub fn new() -> Self { Self::default() }
 
-  #[deprecated]
-  pub async fn get_paper(&self, input: &str) -> Result<Paper> {
-    let mut matches = Vec::new();
-
-    // Find all configs that match the input
-    for config in self.configs.values() {
-      if config.pattern.is_match(input) {
-        matches.push(config);
-      }
-    }
-
-    todo!("Fix this")
-    // match matches.len() {
-    //   0 => Err(LearnerError::InvalidIdentifier),
-    //   1 => matches[0].retrieve_paper(input).await,
-    //   _ => Err(LearnerError::AmbiguousIdentifier(
-    //     matches.into_iter().map(|c| c.name.clone()).collect(),
-    //   )),
-    // }
-  }
-
-  pub async fn get_resource(&self, input: &str) -> Result<Paper> {
+  pub async fn get_resource(&self, input: &str) -> Result<Resource> {
     todo!(
       "Arguably, we don't even need this. We could instead just have this handled by `Learner` so \
        the API is simpler"
