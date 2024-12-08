@@ -139,7 +139,7 @@
 //! # }
 //! ```
 
-#![warn(missing_docs, clippy::missing_docs_in_private_items)]
+// #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 #![feature(str_from_utf16_endian)]
 
 use std::{

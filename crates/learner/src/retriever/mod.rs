@@ -56,7 +56,7 @@ impl Retrievers {
   /// ```
   pub fn new() -> Self { Self::default() }
 
-  pub async fn get_resource(&self, input: &str) -> Result<Resource> {
+  pub async fn get_resource_file(&self, input: &str) -> Result<Resource> {
     todo!(
       "Arguably, we don't even need this. We could instead just have this handled by `Learner` so \
        the API is simpler"

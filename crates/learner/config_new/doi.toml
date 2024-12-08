@@ -49,11 +49,11 @@ type     = "ArrayOfObjects"
 [resource_mappings.publication_dates]
 path = "message/created/date-time"
 
-[resource_mappings.pdf_url]
-path = "message/link/0/URL"
-
 [resource_mappings.doi]
 path = "message/DOI"
+
+[resource_mappings.pdf_url]
+path = "message/link/0/URL"
 
 [headers]
 Accept = "application/json"
