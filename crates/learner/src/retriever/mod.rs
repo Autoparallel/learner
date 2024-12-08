@@ -208,17 +208,18 @@ mod tests {
       assert!(field_maps.contains_key("pdf_url"));
 
       // Verify PDF transform
-      if let Some(map) = field_maps.get("pdf_url") {
-        match &map.transform {
-          Some(Transform::Replace { pattern, replacement }) => {
-            assert_eq!(pattern, "/abs/");
-            assert_eq!(replacement, "/pdf/");
-          },
-          _ => panic!("Expected Replace transform for pdf_url"),
-        }
-      } else {
-        panic!("Missing pdf_url field map");
-      }
+      todo!("Fix this");
+    //   if let Some(map) = field_maps.get("pdf_url") {
+    //     match &map.transform {
+    //       Some(Transform::Replace { pattern, replacement }) => {
+    //         assert_eq!(pattern, "/abs/");
+    //         assert_eq!(replacement, "/pdf/");
+    //       },
+    //       _ => panic!("Expected Replace transform for pdf_url"),
+    //     }
+    //   } else {
+    //     panic!("Missing pdf_url field map");
+    //   }
     } else {
       panic!("Expected an XML configuration, but did not get one.")
     }

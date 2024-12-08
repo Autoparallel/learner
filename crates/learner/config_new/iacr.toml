@@ -14,25 +14,16 @@ response_format = { type = "xml", strip_namespaces = true }
 
 [resource_mappings]
 abstract          = { path = "OAI-PMH/GetRecord/record/metadata/dc/description" }
+authors           = { path = "OAI-PMH/GetRecord/record/metadata/dc/creator" }
 publication_dates = { path = "OAI-PMH/GetRecord/record/metadata/dc/date" }
 title             = { path = "OAI-PMH/GetRecord/record/metadata/dc/title" }
 
-[resource_mappings.authors]
-path = "OAI-PMH/GetRecord/record/metadata/dc"
-[resource_mappings.authors.transform]
-sources = [{ type = "key_value", value = { key = "name", path = "creator" } }]
-type    = "Compose"
-[resource_mappings.authors.transform.format]
-type = "Object"
-
-
-# [resource_mappings.pdf_url]
-# path = "OAI-PMH/GetRecord/record/metadata/dc/identifier"
-
-# [resource_mappings.pdf_url.transform]
-# pattern     = "^(https://eprint\\.iacr\\.org/\\d{4}/\\d+)$"
-# replacement = "$1.pdf"
-# type        = "Replace"
+[retrieval_mappings.urls]
+path = "OAI-PMH/GetRecord/record/metadata/dc/identifier"
+structure = { "pdf" = "https://eprint.iacr.org/{value}.pdf", "html" = "https://eprint.iacr.org/{value}" }
+transforms = [
+    { type = "Replace", pattern = ".*/(\\d{4}/\\d+)$", replacement = "$1" },
+]
 
 [headers]
 Accept = "application/xml"

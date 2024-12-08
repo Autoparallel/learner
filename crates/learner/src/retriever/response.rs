@@ -15,14 +15,16 @@ pub enum ResponseFormat {
   #[serde(rename = "json")]
   Json,
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldMap {
-  /// Path to field in response (e.g., JSON path or XPath)
-  pub path:      String,
-  /// Optional transformation to apply to extracted value
+  /// Path to field in response
+  pub path:       String,
+  /// Transformations to apply in order
   #[serde(default)]
-  pub transform: Option<Transform>,
+  pub transforms: Vec<Transform>,
+  /// Optional structured output
+  #[serde(default)]
+  pub structure:  Option<BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,53 +37,9 @@ pub enum Transform {
     /// Text to replace matched patterns with
     replacement: String,
   },
-  /// Convert between date formats
-  Date {
-    /// Source date format string using chrono syntax (e.g., "%Y-%m-%d")
-    from_format: String,
-    /// Target date format string using chrono syntax (e.g., "%Y-%m-%dT%H:%M:%SZ")
-    to_format:   String,
-  },
-  /// Construct URL from parts
-  Url {
-    /// Base URL template, may contain {value} placeholder
-    base:   String,
-    /// Optional suffix to append to the URL (e.g., ".pdf")
-    suffix: Option<String>,
-  },
-  Compose {
-    /// List of field paths or direct values to combine
-    sources: Vec<Source>,
-    /// How to format the combined result
-    format:  ComposeFormat,
-  },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "value")]
-pub enum Source {
-  /// Path to a field to extract
-  #[serde(rename = "path")]
-  Path(String),
-  /// A literal string value
-  #[serde(rename = "literal")]
-  Literal(String),
-  /// A field mapping with a new key name
-  #[serde(rename = "key_value")]
-  KeyValue { key: String, path: String },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum ComposeFormat {
-  /// Join fields with a delimiter
-  Join { delimiter: String },
-  /// Create an object with key-value pairs
-  Object { template: BTreeMap<String, String> },
-  /// Create an array of objects with specified structure
-  ArrayOfObjects {
-    /// How to structure each object
-    template: BTreeMap<String, String>,
+  Combine {
+    subpaths:  Vec<String>,
+    delimiter: String,
   },
 }
 

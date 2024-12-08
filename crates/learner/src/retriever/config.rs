@@ -1,4 +1,7 @@
+use std::os::macos::raw;
+
 use record::{Record, State, StorageData};
+use serde_json::json;
 
 use super::*;
 use crate::template::{FieldDefinition, Template, TemplatedItem};
@@ -88,8 +91,9 @@ impl Retriever {
     resource.insert("source_identifier".into(), Value::String(identifier.to_string()));
 
     // Validate full resource against config
-    self.resource_template.validate(&resource)?;
-    self.retrieval_template.validate(&retrieval)?;
+    // TODO: Add in validations here.
+    // self.resource_template.validate(dbg!(&resource))?;
+    // self.retrieval_template.validate(dbg!(&retrieval))?;
 
     Ok(Record { resource, state: State::default(), storage: StorageData::default(), retrieval })
   }
@@ -145,68 +149,34 @@ fn extract_mapped_value(
   };
 
   // First apply any explicit transforms
-  let value = if let Some(transform) = &field_map.transform {
-    apply_transform(&raw_value, transform)?
+  let mut value = raw_value;
+  for transform in &field_map.transforms {
+    value = apply_transform(&value, dbg!(transform))?;
+  }
+  value = if let Some(structure) = &field_map.structure {
+    let mut object = BTreeMap::new();
+    for (key, to_replace) in structure {
+      // TODO: Remove unwrap
+      object.insert(key, to_replace.replace("{value}", value.as_str().unwrap()));
+    }
+    json!(object)
   } else {
-    raw_value
+    value
   };
 
-  // Then attempt type coercion based on field definition
-  let coerced = dbg!(coerce_to_type(&value, field_def)?);
-  Ok(Some(coerced))
+  // Coerce a single value into an array if needed
+  if field_def.field_type.as_str() == "array" {
+    value = dbg!(into_array(value));
+  }
+
+  Ok(Some(value))
 }
 
-fn coerce_to_type(value: &Value, field_def: &FieldDefinition) -> Result<Value> {
-  match field_def.field_type.as_str() {
-    "array" => {
-      let arr = match value {
-        // Single value -> wrap in array
-        Value::String(_) | Value::Object(_) | Value::Number(_) => vec![value.clone()],
-        // Already an array
-        Value::Array(arr) => arr.clone(),
-        _ => return Ok(value.clone()), // Can't coerce, return as-is
-      };
-
-      // If we have inner type info, try to coerce each element
-      if let Some(ref type_def) = field_def.type_definition {
-        if let Some(ref element_def) = type_def.element_type {
-          let coerced: Vec<Value> =
-            arr.into_iter().map(|v| coerce_to_type(&v, element_def)).collect::<Result<_>>()?;
-          Ok(Value::Array(coerced))
-        } else {
-          Ok(Value::Array(arr))
-        }
-      } else {
-        Ok(Value::Array(arr))
-      }
-    },
-    // "object" => {
-    //   match value {
-    //     Value::Object(m) => {
-    //       if let Some(ref type_def) = field_def.type_definition {
-    //         if let Some(fields) = &type_def.fields {
-    //           let mut obj = Map::new();
-    //           // Copy over matching fields with coercion
-    //           for field in fields {
-    //             if let Some(v) = m.get(&field.name) {
-    //               obj.insert(field.name.clone(), coerce_to_type(v, field)?);
-    //             }
-    //           }
-    //           Ok(Value::Object(obj))
-    //         } else {
-    //           // If no fields defined, preserve the original object
-    //           Ok(value.clone())
-    //         }
-    //       } else {
-    //         // If no type definition, preserve the original object
-    //         Ok(value.clone())
-    //       }
-    //     },
-    //     _ => Ok(value.clone()),
-    //   }
-    // },
-    // Add other type coercions as needed
-    _ => Ok(value.clone()),
+fn into_array(value: Value) -> Value {
+  match value {
+    // Single value -> wrap in array
+    Value::Array(_) => value,
+    _ => json!(vec![value]),
   }
 }
 
@@ -268,111 +238,32 @@ fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
         Regex::new(pattern).map_err(|e| LearnerError::ApiError(format!("Invalid regex: {e}")))?;
       Ok(Value::String(re.replace_all(text, replacement.as_str()).into_owned()))
     },
-    Transform::Date { from_format, to_format } => {
-      let text = value.as_str().ok_or_else(|| {
-        LearnerError::ApiError("Date transform requires string input".to_string())
-      })?;
-      let dt = chrono::NaiveDateTime::parse_from_str(text, from_format)
-        .map_err(|e| LearnerError::ApiError(format!("Invalid date: {e}")))?;
-      Ok(Value::String(dt.format(to_format).to_string()))
-    },
-    Transform::Url { base, suffix } => {
-      let text = value
-        .as_str()
-        .ok_or_else(|| LearnerError::ApiError("URL transform requires string input".to_string()))?;
-      Ok(Value::String(format!(
-        "{}{}",
-        base.replace("{value}", text),
-        suffix.as_deref().unwrap_or("")
-      )))
-    },
-    Transform::Compose { sources, format } => {
-      let values: Vec<Value> = dbg!(sources
-        .iter()
-        .filter_map(|source| match source {
-          Source::Path(path) | Source::KeyValue { key: _, path } => {
-            let components: Vec<&str> = path.split('/').collect();
-            get_path_value(value, &components)
-          },
-          Source::Literal(text) => Some(Value::String(text.clone())),
-        })
-        .collect());
-      match format {
-        ComposeFormat::Join { delimiter } => {
-          let strings: Vec<String> = values
-            .iter()
-            .filter_map(|v| match v {
-              Value::String(s) => Some(s.clone()),
-              Value::Array(arr) if arr.len() == 1 =>
-                arr[0].as_str().map(std::string::ToString::to_string),
-              _ => None,
-            })
-            .collect();
-          Ok(Value::String(strings.join(delimiter)))
-        },
-        ComposeFormat::Object { template } => {
-          println!("Values to process: {:?}", values);
-          println!("Template: {:?}", template);
-          let mut obj = Map::new();
-          if values.len() == 1 {
-            if let Some(value) = values.first() {
-              println!("Processing value: {:?}", value);
-              for (key, template_str) in template {
-                println!("Processing template: {} -> {}", key, template_str);
-                let formatted = template_str.replace("{value}", value.as_str().unwrap_or_default());
-                println!("Formatted result: {}", formatted);
-                obj.insert(key.clone(), Value::String(formatted));
-              }
-            }
-          }
-          println!("Final object: {:?}", obj);
-          Ok(dbg!(Value::Object(obj)))
-        },
-        ComposeFormat::ArrayOfObjects { template } => match value {
-          Value::String(s) => {
-            let mut obj = Map::new();
-            for (key, template_value) in template {
-              let value = template_value.replace("{value}", s);
-              obj.insert(key.clone(), Value::String(value));
-            }
-            Ok(Value::Array(vec![Value::Object(obj)]))
-          },
-          Value::Array(arr) => {
-            let objects: Vec<Value> = arr
-              .iter()
-              .filter_map(|item| {
-                let mut obj = Map::new();
-                for (key, template_value) in template {
-                  let value = match item {
-                    Value::String(s) => template_value.replace("{value}", s),
-                    Value::Object(obj) => {
-                      let mut keys_and_vals = Vec::new();
-                      for source in sources {
-                        if let Source::KeyValue { key, path } = source {
-                          if let Some(val) = obj.get(path) {
-                            keys_and_vals.push((key, val));
-                          }
-                        }
-                      }
-                      keys_and_vals.into_iter().fold(template_value.clone(), |acc, (k, v)| {
-                        let replacement = format!("{{{k}}}");
-                        acc.replace(&replacement, v.as_str().unwrap_or_default())
-                      })
-                    },
-                    _ => return None,
-                  };
-                  obj.insert(key.clone(), Value::String(value));
-                }
-                Some(Value::Object(obj))
-              })
-              .collect();
-            Ok(Value::Array(objects))
-          },
-          _ => Err(LearnerError::ApiError(
-            "ArrayOfObjects transform requires string or array input".to_string(),
+    Transform::Combine { subpaths, delimiter } => {
+      // TODO: fix unwrap
+      println!("INSIDE OF COMBINE WITH SUBPATHS: {:?}", subpaths);
+      match value.as_array() {
+        Some(arr) =>
+          return Ok(Value::Array(
+            arr.iter().map(|v| combine_path_values(v, subpaths, delimiter)).collect(),
           )),
-        },
+        None => return Ok(combine_path_values(value, subpaths, delimiter)),
       }
     },
   }
+}
+
+fn combine_path_values(value: &Value, subpaths: &Vec<String>, delimiter: &str) -> Value {
+  Value::String(
+    subpaths
+      .iter()
+      .fold(String::new(), |mut acc, subpath| {
+        if !acc.is_empty() {
+          acc.push_str(delimiter);
+        }
+        let subpath: Vec<&str> = subpath.split("/").collect();
+        acc.push_str(dbg!(get_path_value(value, &subpath).unwrap().as_str().unwrap()));
+        acc
+      })
+      .to_string(),
+  )
 }

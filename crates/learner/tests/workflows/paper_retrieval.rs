@@ -58,9 +58,10 @@ async fn test_iacr_retriever_integration() -> TestResult<()> {
   let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
   let retriever: Retriever = manager.load_config("config_new/iacr.toml")?;
 
-  let paper = retriever.retrieve_resource("2016/260").await.unwrap();
-  // assert!(resource.validate(&paper)?); // TODO: validation already happens internally, to be fair
-  // that validation may not be working totally right
+  let paper = retriever.retrieve_resource("2019/953").await.unwrap(); // plonk
+                                                                      // let paper = retriever.retrieve_resource("2016/260").await.unwrap(); // groth 16
+                                                                      // assert!(resource.validate(&paper)?); // TODO: validation already happens internally, to be fair
+                                                                      // that validation may not be working totally right
   dbg!(&paper);
 
   todo!("This needs cleaned up.");

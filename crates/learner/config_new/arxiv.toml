@@ -19,21 +19,11 @@ publication_dates = { path = "feed/entry/published" }
 title             = { path = "feed/entry/title" }
 
 [retrieval_mappings.urls]
-path           = "feed/entry/id"
-transform.type = "Compose"
-
-[[retrieval_mappings.urls.transform.sources]]
-transform.pattern     = ".*/(?:abs|pdf)/(.+?)(?:v\\d+)?$"
-transform.replacement = "$1"
-transform.type        = "Replace"
-type                  = "path"
-value                 = "feed/entry/id"
-
-[retrieval_mappings.urls.transform.format]
-template.html = "http://arxiv.org/abs/{value}"
-template.pdf  = "http://arxiv.org/pdf/{value}"
-type          = "Object"
-
+path = "feed/entry/id"
+structure = { "pdf" = "http://arxiv.org/pdf/{value}.pdf", "html" = "http://arxiv.org/abs/{value}" }
+transforms = [
+    { type = "Replace", pattern = ".*/(?:abs|pdf)/(.+?)(?:v\\d+)?$", replacement = "$1" },
+]
 
 [headers]
 Accept = "application/xml"
