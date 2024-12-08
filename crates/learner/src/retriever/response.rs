@@ -77,7 +77,7 @@ pub enum ComposeFormat {
   /// Join fields with a delimiter
   Join { delimiter: String },
   /// Create an object with key-value pairs
-  Object,
+  Object { template: BTreeMap<String, String> },
   /// Create an array of objects with specified structure
   ArrayOfObjects {
     /// How to structure each object

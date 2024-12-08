@@ -152,7 +152,7 @@ fn extract_mapped_value(
   };
 
   // Then attempt type coercion based on field definition
-  let coerced = coerce_to_type(&value, field_def)?;
+  let coerced = dbg!(coerce_to_type(&value, field_def)?);
   Ok(Some(coerced))
 }
 
@@ -180,35 +180,31 @@ fn coerce_to_type(value: &Value, field_def: &FieldDefinition) -> Result<Value> {
         Ok(Value::Array(arr))
       }
     },
-    "object" => {
-      // If we have field definitions, ensure object has required structure
-      if let Some(ref type_def) = field_def.type_definition {
-        if let Some(fields) = &type_def.fields {
-          let mut obj = Map::new();
-          match value {
-            // Convert string to {name: string} if that's the structure we want
-            Value::String(s) if fields.len() == 1 && fields[0].name == "name" => {
-              obj.insert("name".to_string(), Value::String(s.clone()));
-              Ok(Value::Object(obj))
-            },
-            Value::Object(m) => {
-              // Copy over matching fields with coercion
-              for field in fields {
-                if let Some(v) = m.get(&field.name) {
-                  obj.insert(field.name.clone(), coerce_to_type(v, field)?);
-                }
-              }
-              Ok(Value::Object(obj))
-            },
-            _ => Ok(value.clone()),
-          }
-        } else {
-          Ok(value.clone())
-        }
-      } else {
-        Ok(value.clone())
-      }
-    },
+    // "object" => {
+    //   match value {
+    //     Value::Object(m) => {
+    //       if let Some(ref type_def) = field_def.type_definition {
+    //         if let Some(fields) = &type_def.fields {
+    //           let mut obj = Map::new();
+    //           // Copy over matching fields with coercion
+    //           for field in fields {
+    //             if let Some(v) = m.get(&field.name) {
+    //               obj.insert(field.name.clone(), coerce_to_type(v, field)?);
+    //             }
+    //           }
+    //           Ok(Value::Object(obj))
+    //         } else {
+    //           // If no fields defined, preserve the original object
+    //           Ok(value.clone())
+    //         }
+    //       } else {
+    //         // If no type definition, preserve the original object
+    //         Ok(value.clone())
+    //       }
+    //     },
+    //     _ => Ok(value.clone()),
+    //   }
+    // },
     // Add other type coercions as needed
     _ => Ok(value.clone()),
   }
@@ -314,15 +310,23 @@ fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
             .collect();
           Ok(Value::String(strings.join(delimiter)))
         },
-        ComposeFormat::Object => {
+        ComposeFormat::Object { template } => {
+          println!("Values to process: {:?}", values);
+          println!("Template: {:?}", template);
           let mut obj = Map::new();
-          dbg!(&sources);
-          for (source, value) in sources.iter().zip(values.iter()) {
-            if let Source::KeyValue { key, .. } = dbg!(source) {
-              obj.insert(key.clone(), value.clone());
+          if values.len() == 1 {
+            if let Some(value) = values.first() {
+              println!("Processing value: {:?}", value);
+              for (key, template_str) in template {
+                println!("Processing template: {} -> {}", key, template_str);
+                let formatted = template_str.replace("{value}", value.as_str().unwrap_or_default());
+                println!("Formatted result: {}", formatted);
+                obj.insert(key.clone(), Value::String(formatted));
+              }
             }
           }
-          Ok(Value::Object(obj))
+          println!("Final object: {:?}", obj);
+          Ok(dbg!(Value::Object(obj)))
         },
         ComposeFormat::ArrayOfObjects { template } => match value {
           Value::String(s) => {
