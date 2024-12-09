@@ -229,7 +229,24 @@ fn extract_mapped_value(
     },
   };
 
-  Ok(Some(value))
+  dbg!(&field_def);
+  let array_coerced = if field_def.base_type == "array" {
+    println!("{field_def:?} should be array");
+    match value {
+      Value::Array(_) => value,
+      _ => Value::Array(vec![value]),
+    }
+  } else {
+    match (field_def.base_type.as_str(), &value) {
+      ("string", Value::Array(arr)) if arr.len() == 1 => {
+        println!("should be string");
+        arr[0].clone()
+      },
+      _ => value,
+    }
+  };
+
+  Ok(Some(array_coerced))
 }
 
 /// Get a value from JSON using a path

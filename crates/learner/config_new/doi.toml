@@ -33,7 +33,6 @@ published        = "published/date-time"
 published_online = "published-online/date-time"
 published_print  = "published-print/date-time"
 
-
 [resource_mappings.container]
 from = "message"
 [resource_mappings.container.map]
@@ -47,7 +46,7 @@ volume = "volume"
 from = "message/author"
 [resource_mappings.authors.map]
 affiliation = "affiliation/0/name"
-name        = { paths = ["given", "family"] }
+name        = { paths = ["given", "family"], with = " " }
 
 [retrieval_mappings]
 urls = { map = { pdf = "message/link/0/URL" } }

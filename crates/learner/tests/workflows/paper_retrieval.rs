@@ -4,7 +4,7 @@ use learner::configuration::ConfigurationManager;
 
 use super::*;
 
-#[traced_test]
+// #[traced_test]
 #[tokio::test]
 async fn test_arxiv_retriever_integration() -> TestResult<()> {
   let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
