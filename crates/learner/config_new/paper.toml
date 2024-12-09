@@ -1,6 +1,7 @@
 description = "Configuration for a paper"
 name        = "paper"
 
+# Existing fields
 [abstract]
 base_type = "string"
 required  = false
@@ -9,11 +10,6 @@ required  = false
 base_type  = "string"
 required   = true
 validation = { min_length = 1, max_length = 500 }
-
-[publication_dates]
-base_type = "array"
-items     = { base_type = "string", validation = { datetime = true } }
-required  = true
 
 [authors]
 base_type  = "array"
@@ -25,3 +21,57 @@ fields = [
     { name = "name", base_type = "string", required = true, validation = { min_length = 1 } },
     { name = "affiliation", base_type = "string", required = false },
 ]
+
+[publication_dates]
+base_type = "object"
+fields = [
+    { name = "created", base_type = "string", required = true, validation = { datetime = true } },
+    { name = "published", base_type = "string", required = false, validation = { datetime = true } },
+    { name = "published_online", base_type = "string", required = false, validation = { datetime = true } },
+    { name = "published_print", base_type = "string", required = false, validation = { datetime = true } },
+]
+required = true
+
+# New suggested fields
+[publisher]
+base_type = "string"
+required  = false
+
+[container]
+base_type = "object"
+fields = [
+    { name = "title", base_type = "string", required = true },
+    { name = "issn", base_type = "array", required = false },
+    { name = "volume", base_type = "string", required = false },
+    { name = "issue", base_type = "string", required = false },
+    { name = "pages", base_type = "string", required = false },
+]
+required = false
+
+[type]
+base_type = "string"
+required = false
+validation = { enum_values = [
+    "journal-article",
+    "book",
+    "conference-paper",
+    "report",
+    "thesis",
+] }
+
+[references_count]
+base_type = "number"
+required  = false
+
+[language]
+base_type = "string"
+required  = false
+
+[citations_count] # This is "is-referenced-by-count" in the DOI response
+base_type = "number"
+required  = false
+
+[doi]
+base_type  = "string"
+required   = false
+validation = { pattern = "10\\.\\d{4,9}/[-._;()/:\\w]+" }

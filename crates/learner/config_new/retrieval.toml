@@ -17,10 +17,6 @@ fields = [
 ]
 required = false
 
-[doi]
-base_type = "string"
-required  = false
-
 [last_checked]
 base_type  = "string"
 required   = false

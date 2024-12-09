@@ -25,11 +25,11 @@ pub struct Retriever {
 
   pub resource_template: Template,
   #[serde(default)]
-  pub resource_mappings: BTreeMap<String, FieldMap>,
+  pub resource_mappings: BTreeMap<String, Mapping>,
 
   pub retrieval_template: Template,
   #[serde(default)]
-  pub retrieval_mappings: BTreeMap<String, FieldMap>,
+  pub retrieval_mappings: BTreeMap<String, Mapping>,
 }
 
 impl Retriever {
@@ -78,8 +78,33 @@ impl Retriever {
 
     // Process the response using configured processor
     let json = match &self.response_format {
-      ResponseFormat::Xml { strip_namespaces } => xml_to_json(&data, *strip_namespaces),
-      ResponseFormat::Json => serde_json::from_slice(&data)?,
+      ResponseFormat::Xml { strip_namespaces, clean_content } => {
+        let xml = if *strip_namespaces {
+          response::strip_xml_namespaces(&String::from_utf8_lossy(&data))
+        } else {
+          String::from_utf8_lossy(&data).to_string()
+        };
+
+        // Convert to JSON value
+        let mut value = xml_to_json(&xml);
+
+        // Clean content if requested
+        if *clean_content {
+          clean_value(&mut value);
+        }
+
+        value
+      },
+
+      ResponseFormat::Json { clean_content } => {
+        let mut value = serde_json::from_slice(&data)?;
+
+        if *clean_content {
+          clean_value(&mut value);
+        }
+
+        value
+      },
     };
 
     let (mut resource, retrieval) = self.process_json_value(&json)?;
@@ -108,64 +133,101 @@ impl Retriever {
 fn process_template_fields(
   json: &Value,
   template: &Template,
-  mappings: &BTreeMap<String, FieldMap>,
+  mappings: &BTreeMap<String, Mapping>,
 ) -> Result<BTreeMap<String, Value>> {
   let mut result = BTreeMap::new();
 
   for field_def in &template.fields {
-    // If we have a mapping for this field, try to extract its value
-    if let Some(field_map) = mappings.get(&field_def.name) {
-      if let Some(value) = extract_mapped_value(json, field_map, field_def)? {
-        result.insert(field_def.name.clone(), value);
-      } else if field_def.required {
-        // Only error if the field was required and we couldn't find it
-        return Err(LearnerError::ApiError(format!(
-          "Required field '{}' not found in response",
-          field_def.name
-        )));
+    if let Some(mapping) = mappings.get(&field_def.name) {
+      match extract_mapped_value(json, mapping, field_def) {
+        Ok(Some(value)) => {
+          result.insert(field_def.name.clone(), value);
+        },
+        Ok(None) if field_def.required => {
+          return Err(LearnerError::ApiError(format!(
+            "Required field '{}' not found in response",
+            field_def.name
+          )));
+        },
+        Err(e) => return Err(e),
+        _ => continue,
       }
     }
   }
+
   Ok(result)
 }
 
-/// Extract and transform a value from JSON using a field mapping
+// TODO: Fix unwraps in here
 fn extract_mapped_value(
   json: &Value,
-  field_map: &FieldMap,
+  mapping: &Mapping,
   field_def: &FieldDefinition,
 ) -> Result<Option<Value>> {
-  let path_components: Vec<&str> = field_map.path.split('/').collect();
+  let value = match mapping {
+    // Simple path extraction - most common case
+    Mapping::Path(path) => {
+      let components: Vec<&str> = path.split('/').collect();
+      get_path_value(json, &components)
+        .ok_or_else(|| LearnerError::ApiError(format!("Path '{}' not found", path)))?
+    },
 
-  // Extract raw value using path
-  let raw_value = get_path_value(json, &path_components);
+    // Join multiple string values with a delimiter
+    Mapping::Join { paths, with } => {
+      let parts: Result<Vec<String>> = paths
+        .iter()
+        .map(|path| {
+          let components: Vec<&str> = path.split('/').collect();
+          get_path_value(json, &components)
+            .and_then(|v| v.as_str().map(|s| s.to_string()))
+            .ok_or_else(|| LearnerError::ApiError(format!("Path '{}' is not a string", path)))
+        })
+        .collect();
+      Value::String(parts?.join(with))
+    },
 
-  // If no value found, return None
-  let Some(raw_value) = raw_value else {
-    return Ok(None);
+    // Map values into new structures - handles both arrays and objects
+    Mapping::Map { from, map } => {
+      // Get the source to map from, if specified
+      let source = if let Some(path) = from {
+        let components: Vec<&str> = path.split('/').collect();
+        get_path_value(json, &components)
+          .ok_or_else(|| LearnerError::ApiError(format!("Path '{}' not found", path)))?
+      } else {
+        json.clone()
+      };
+
+      // Process based on whether the source is an array or not
+      match source {
+        Value::Array(items) => {
+          // Map each array item
+          let mapped: Result<Vec<Value>> = items
+            .iter()
+            .map(|item| {
+              let mut obj = Map::new();
+              for (key, mapping) in map {
+                if let Ok(Some(value)) = extract_mapped_value(item, mapping, field_def) {
+                  obj.insert(key.clone(), value);
+                }
+              }
+              Ok(Value::Object(obj))
+            })
+            .collect();
+          Value::Array(mapped?)
+        },
+        // Process as a single object
+        _ => {
+          let mut obj = Map::new();
+          for (key, mapping) in map {
+            if let Ok(Some(value)) = extract_mapped_value(&source, mapping, field_def) {
+              obj.insert(key.clone(), value);
+            }
+          }
+          Value::Object(obj)
+        },
+      }
+    },
   };
-
-  // First apply any explicit transforms
-  let mut value = raw_value;
-  for transform in &field_map.transforms {
-    value = apply_transform(&value, transform)?;
-  }
-
-  value = if let Some(structure) = &field_map.structure {
-    let mut object = BTreeMap::new();
-    for (key, to_replace) in structure {
-      // TODO: Remove unwrap
-      object.insert(key, to_replace.replace("{value}", value.as_str().unwrap()));
-    }
-    json!(object)
-  } else {
-    value
-  };
-
-  // Coerce a single value into an array if needed
-  if field_def.base_type == "array" {
-    value = into_array(value);
-  }
 
   Ok(Some(value))
 }
@@ -223,45 +285,4 @@ fn get_path_value(json: &Value, path: &[&str]) -> Option<Value> {
   }
 
   Some(current)
-}
-
-/// Apply a transform to a JSON value
-fn apply_transform(value: &Value, transform: &Transform) -> Result<Value> {
-  match transform {
-    Transform::Replace { pattern, replacement } => {
-      let text = value.as_str().ok_or_else(|| {
-        LearnerError::ApiError("Replace transform requires string input".to_string())
-      })?;
-      let re =
-        Regex::new(pattern).map_err(|e| LearnerError::ApiError(format!("Invalid regex: {e}")))?;
-      Ok(Value::String(re.replace_all(text, replacement.as_str()).into_owned()))
-    },
-    Transform::Combine { subpaths, delimiter } => {
-      // TODO: fix unwrap
-      println!("INSIDE OF COMBINE WITH SUBPATHS: {:?}", subpaths);
-      match value.as_array() {
-        Some(arr) =>
-          return Ok(Value::Array(
-            arr.iter().map(|v| combine_path_values(v, subpaths, delimiter)).collect(),
-          )),
-        None => return Ok(combine_path_values(value, subpaths, delimiter)),
-      }
-    },
-  }
-}
-
-fn combine_path_values(value: &Value, subpaths: &Vec<String>, delimiter: &str) -> Value {
-  Value::String(
-    subpaths
-      .iter()
-      .fold(String::new(), |mut acc, subpath| {
-        if !acc.is_empty() {
-          acc.push_str(delimiter);
-        }
-        let subpath: Vec<&str> = subpath.split("/").collect();
-        acc.push_str(dbg!(get_path_value(value, &subpath).unwrap().as_str().unwrap()));
-        acc
-      })
-      .to_string(),
-  )
 }

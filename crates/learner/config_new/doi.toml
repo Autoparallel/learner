@@ -8,38 +8,49 @@ retrieval_template = "retrieval"
 base_url          = "https://api.crossref.org/works"
 endpoint_template = "https://api.crossref.org/works/{identifier}"
 
-pattern  = "(?:^|https?://doi\\.org/)(10\\.\\d{4,9}/[-._;()/:\\w]+)$"
-resource = "paper"
-source   = "doi"
+pattern = "(?:^|https?://doi\\.org/)(10\\.\\d{4,9}/[-._;()/:\\w]+)$"
+source  = "doi"
 
 [response_format]
-type = "json"
+clean_content = true
+type          = "json"
 
 [resource_mappings]
-abstract          = { path = "message/abstract" }
-publication_dates = { path = "message/created/date-time" }
+abstract         = "message/abstract"
+citations_count  = "message/is-referenced-by-count"
+doi              = "message/DOI"
+language         = "message/language"
+publisher        = "message/publisher"
+references_count = "message/reference-count"
+title            = { paths = ["message/title/0", "message/subtitle/0"], with = ": " }
+type             = "message/type"
 
-[resource_mappings.title]
-path = "message"
-transforms = [
-    { type = "Combine", subpaths = [
-        "title/0",
-        "subtitle/0",
-    ], delimiter = ": " },
-]
+[resource_mappings.publication_dates]
+from = "message"
+[resource_mappings.publication_dates.map]
+created          = "created/date-time"
+published        = "published/date-time"
+published_online = "published-online/date-time"
+published_print  = "published-print/date-time"
+
+
+[resource_mappings.container]
+from = "message"
+[resource_mappings.container.map]
+issn   = "ISSN"
+issue  = "issue"
+pages  = "page"
+title  = "container-title/0"
+volume = "volume"
 
 [resource_mappings.authors]
-path = "message/author"
-transforms = [
-    { type = "Combine", subpaths = [
-        "given",
-        "family",
-    ], delimiter = " " },
-]
+from = "message/author"
+[resource_mappings.authors.map]
+affiliation = "affiliation/0/name"
+name        = { paths = ["given", "family"] }
 
-[retrieval_mappings.urls]
-path      = "message/link/0/URL"
-structure = { "pdf" = "{value}" }
+[retrieval_mappings]
+urls = { map = { pdf = "message/link/0/URL" } }
 
 [headers]
 Accept = "application/json"

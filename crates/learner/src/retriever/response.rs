@@ -5,54 +5,49 @@ use super::*;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ResponseFormat {
-  /// XML response parser configuration
   #[serde(rename = "xml")]
   Xml {
+    /// Whether to strip XML namespace declarations and prefixes
     #[serde(default)]
     strip_namespaces: bool,
+    /// Whether to clean content by removing markup tags and normalizing whitespace
+    #[serde(default)]
+    clean_content:    bool,
   },
-  /// JSON response parser configuration
+
   #[serde(rename = "json")]
-  Json,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FieldMap {
-  /// Path to field in response
-  pub path:       String,
-  /// Transformations to apply in order
-  #[serde(default)]
-  pub transforms: Vec<Transform>,
-  /// Optional structured output
-  #[serde(default)]
-  pub structure:  Option<BTreeMap<String, String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum Transform {
-  /// Replace text using regex pattern
-  Replace {
-    /// Regular expression pattern to match
-    pattern:     String,
-    /// Text to replace matched patterns with
-    replacement: String,
-  },
-  Combine {
-    subpaths:  Vec<String>,
-    delimiter: String,
+  Json {
+    /// Whether to clean string values by removing markup and normalizing content
+    #[serde(default)]
+    clean_content: bool,
   },
 }
 
-pub fn xml_to_json(data: &[u8], strip_namespaces: bool) -> Value {
-  // Handle namespace stripping
-  let xml = if strip_namespaces {
-    strip_xml_namespaces(&String::from_utf8_lossy(data))
-  } else {
-    String::from_utf8_lossy(data).to_string()
-  };
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Mapping {
+  // A single path string - most common case
+  Path(String),
 
-  trace!("Processing XML response: {:#?}", &xml);
-  let mut reader = Reader::from_str(&xml);
+  // Multiple paths to join with optional delimiter
+  Join {
+    paths: Vec<String>,
+    #[serde(default = "default_delimiter")]
+    with:  String,
+  },
+
+  // Map values into new structures
+  Map {
+    from: Option<String>,
+    map:  BTreeMap<String, Mapping>,
+  },
+}
+
+fn default_delimiter() -> String { " ".to_string() }
+
+pub fn xml_to_json(data: &str) -> Value {
+  trace!("Processing XML response: {:#?}", data);
+  let mut reader = Reader::from_str(data);
   let mut stack = Vec::new();
   let mut current = Map::new();
 
@@ -148,9 +143,58 @@ pub fn xml_to_json(data: &[u8], strip_namespaces: bool) -> Value {
 /// # Returns
 ///
 /// XML content with namespaces removed
-fn strip_xml_namespaces(xml: &str) -> String {
+pub fn strip_xml_namespaces(xml: &str) -> String {
   let re = regex::Regex::new(r#"xmlns(?::\w+)?="[^"]*""#).unwrap();
   let mut result = re.replace_all(xml, "").to_string();
   result = result.replace("oai_dc:", "").replace("dc:", "");
+
   result
+}
+
+pub fn clean_value(value: &mut Value) {
+  match value {
+    // Clean string content
+    Value::String(s) =>
+      if s.contains('<') || s.contains('\n') {
+        *s = clean_content(s);
+      },
+    // Recursively clean arrays and objects
+    Value::Array(arr) =>
+      for item in arr {
+        clean_value(item);
+      },
+    Value::Object(obj) =>
+      for (_, val) in obj {
+        clean_value(val);
+      },
+    _ => (), // Other value types don't need cleaning
+  }
+}
+
+pub fn clean_content(s: &str) -> String {
+  let mut cleaned = s.to_string();
+
+  // Remove various markup tags
+  let tag_patterns = [
+    // JATS tags
+    r"<jats:[^>]+>",
+    r"</jats:[^>]+>",
+    // Generic XML tags
+    r"<[^>]+>",
+    // Any remaining XML-like tags
+    r"</?[a-zA-Z][^>]*>",
+  ];
+
+  for pattern in &tag_patterns {
+    if let Ok(re) = Regex::new(pattern) {
+      cleaned = re.replace_all(&cleaned, "").to_string();
+    }
+  }
+
+  // Normalize whitespace
+  if let Ok(re) = Regex::new(r"\s+") {
+    cleaned = re.replace_all(&cleaned.trim(), " ").to_string();
+  }
+
+  cleaned
 }
