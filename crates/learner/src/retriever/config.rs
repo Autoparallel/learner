@@ -115,8 +115,8 @@ impl Retriever {
 
     // Validate full resource against config
     // TODO: Add in validations here.
-    // self.resource_template.validate(dbg!(&resource))?;
-    // self.retrieval_template.validate(dbg!(&retrieval))?;
+    self.resource_template.validate(dbg!(&resource))?;
+    self.retrieval_template.validate(dbg!(&retrieval))?;
 
     Ok(Record { resource, state: State::default(), storage: StorageData::default(), retrieval })
   }
@@ -230,14 +230,6 @@ fn extract_mapped_value(
   };
 
   Ok(Some(value))
-}
-
-fn into_array(value: Value) -> Value {
-  match value {
-    // Single value -> wrap in array
-    Value::Array(_) => value,
-    _ => json!(vec![value]),
-  }
 }
 
 /// Get a value from JSON using a path

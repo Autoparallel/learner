@@ -43,7 +43,7 @@ pub enum Mapping {
   },
 }
 
-fn default_delimiter() -> String { " ".to_string() }
+fn default_delimiter() -> String { "".to_string() }
 
 pub fn xml_to_json(data: &str) -> Value {
   trace!("Processing XML response: {:#?}", data);
@@ -193,7 +193,7 @@ pub fn clean_content(s: &str) -> String {
 
   // Normalize whitespace
   if let Ok(re) = Regex::new(r"\s+") {
-    cleaned = re.replace_all(&cleaned.trim(), " ").to_string();
+    cleaned = re.replace_all(cleaned.trim(), " ").to_string();
   }
 
   cleaned

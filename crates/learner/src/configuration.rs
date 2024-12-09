@@ -65,8 +65,9 @@ mod tests {
 
     let retreival: Template = dbg!(manager.load_config("config_new/retrieval.toml")).unwrap();
 
-    // let arxiv_retriever: Retriever = dbg!(manager.load_config("config_new/arxiv.toml").unwrap());
+    let arxiv_retriever: Retriever = dbg!(manager.load_config("config_new/arxiv.toml").unwrap());
     let doi_retriever: Retriever = dbg!(manager.load_config("config_new/doi.toml").unwrap());
+    let iacr_retriever: Retriever = dbg!(manager.load_config("config_new/iacr.toml").unwrap());
 
     todo!("Clean this up")
     // The paper_record now has all fields from base_resource and paper,

@@ -16,12 +16,6 @@ pub struct Retrievers {
   configs: BTreeMap<String, Retriever>,
 }
 
-// impl Configurable for Retrievers {
-//   type Config = Retriever;
-
-//   fn as_map(&mut self) -> &mut BTreeMap<String, Self::Config> { &mut self.configs }
-// }
-
 impl Retrievers {
   /// Checks whether the retreivers map is empty.
   ///

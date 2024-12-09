@@ -1,6 +1,5 @@
-name = "arxiv"
-
 description = "Retriever template for getting a paper from arXiv"
+name        = "arxiv"
 
 resource_template  = "paper"
 retrieval_template = "retrieval"
@@ -10,20 +9,31 @@ endpoint_template = "http://export.arxiv.org/api/query?id_list={identifier}&max_
 pattern           = "(?:^|https?://arxiv\\.org/(?:abs|pdf)/)(\\d{4}\\.\\d{4,5}|[a-zA-Z-]+(?:\\.[A-Z]{2})?/\\d{7})(?:\\.pdf)?$"
 source            = "arxiv"
 
-response_format = { type = "xml", strip_namespaces = true }
+[response_format]
+clean_content    = true
+strip_namespaces = true
+type             = "xml"
 
 [resource_mappings]
-abstract          = { path = "feed/entry/summary" }
-authors           = { path = "feed/entry/author" }
-publication_dates = { path = "feed/entry/published" }
-title             = { path = "feed/entry/title" }
+abstract = "feed/entry/summary"
+title    = "feed/entry/title"
+
+[resource_mappings.authors]
+from = "feed/entry/author/name"
+[resource_mappings.authors.map]
+name = "."
+
+[resource_mappings.publication_dates.map]
+created = "feed/entry/published"
 
 [retrieval_mappings.urls]
-path = "feed/entry/id"
-structure = { "pdf" = "http://arxiv.org/pdf/{value}.pdf", "html" = "http://arxiv.org/abs/{value}" }
-transforms = [
-    { type = "Replace", pattern = ".*/(?:abs|pdf)/(.+?)(?:v\\d+)?$", replacement = "$1" },
-]
+from = "feed/entry/id"
+[retrieval_mappings.urls.map.pdf]
+paths     = ["."]
+transform = "replace:.*/(?:abs|pdf)/(.+?)(?:v\\d+)?$:http://arxiv.org/pdf/$1.pdf" # No delimiter needed for single value
+[retrieval_mappings.urls.map.html]
+paths     = ["."]
+transform = "replace:.*/(?:abs|pdf)/(.+?)(?:v\\d+)?$:http://arxiv.org/abs/$1"
 
 [headers]
 Accept = "application/xml"

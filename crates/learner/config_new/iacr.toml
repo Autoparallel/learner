@@ -1,6 +1,5 @@
-name = "iacr"
-
 description = "Retriever template for getting a paper from IACR"
+name        = "iacr"
 
 resource_template  = "paper"
 retrieval_template = "retrieval"
@@ -10,20 +9,32 @@ endpoint_template = "https://eprint.iacr.org/oai?verb=GetRecord&identifier=oai:e
 pattern           = "(?:^|https?://eprint\\.iacr\\.org/)(\\d{4}/\\d+)(?:\\.pdf)?$"
 source            = "iacr"
 
-response_format = { type = "xml", strip_namespaces = true }
+[response_format]
+clean_content    = true
+strip_namespaces = true
+type             = "xml"
 
 [resource_mappings]
-abstract          = { path = "OAI-PMH/GetRecord/record/metadata/dc/description" }
-authors           = { path = "OAI-PMH/GetRecord/record/metadata/dc/creator" }
-publication_dates = { path = "OAI-PMH/GetRecord/record/metadata/dc/date" }
-title             = { path = "OAI-PMH/GetRecord/record/metadata/dc/title" }
+abstract = "OAI-PMH/GetRecord/record/metadata/dc/description"
+title    = "OAI-PMH/GetRecord/record/metadata/dc/title"
+
+[resource_mappings.authors]
+from = "OAI-PMH/GetRecord/record/metadata/dc/creator"
+map  = { name = "." }
+
+[resource_mappings.publication_dates]
+map = { created = "OAI-PMH/GetRecord/record/metadata/dc/date" }
 
 [retrieval_mappings.urls]
-path = "OAI-PMH/GetRecord/record/metadata/dc/identifier"
-structure = { "pdf" = "https://eprint.iacr.org/{value}.pdf", "html" = "https://eprint.iacr.org/{value}" }
-transforms = [
-    { type = "Replace", pattern = ".*/(\\d{4}/\\d+)$", replacement = "$1" },
-]
+from = "OAI-PMH/GetRecord/record/metadata/dc/identifier"
+[retrieval_mappings.urls.map]
+html = { paths = [
+    ".",
+], transform = "replace:.*/(\\d{4}/\\d+)$:https://eprint.iacr.org/$1" }
+pdf = { paths = [
+    ".",
+], transform = "replace:.*/(\\d{4}/\\d+)$:https://eprint.iacr.org/$1.pdf" }
+
 
 [headers]
 Accept = "application/xml"
