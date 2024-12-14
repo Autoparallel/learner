@@ -1,5 +1,4 @@
 use record::{Record, State, StorageData};
-use serde_json::json;
 
 use super::*;
 use crate::template::{FieldDefinition, Template, TemplatedItem};
@@ -169,7 +168,7 @@ fn extract_mapped_value(
     Mapping::Path(path) => {
       let components: Vec<&str> = path.split('/').collect();
       get_path_value(json, &components)
-        .ok_or_else(|| LearnerError::ApiError(format!("Path '{}' not found", path)))?
+        .ok_or_else(|| LearnerError::ApiError(format!("Path '{path}' not found")))?
     },
     Mapping::Join { paths, with } => {
       let parts: Result<Vec<String>> = paths
@@ -177,8 +176,8 @@ fn extract_mapped_value(
         .map(|path| {
           let components: Vec<&str> = path.split('/').collect();
           get_path_value(json, &components)
-            .and_then(|v| v.as_str().map(|s| s.to_string()))
-            .ok_or_else(|| LearnerError::ApiError(format!("Path '{}' is not a string", path)))
+            .and_then(|v| v.as_str().map(std::string::ToString::to_string))
+            .ok_or_else(|| LearnerError::ApiError(format!("Path '{path}' is not a string")))
         })
         .collect();
       Value::String(parts?.join(with))
@@ -188,40 +187,37 @@ fn extract_mapped_value(
       let source = if let Some(path) = from {
         let components: Vec<&str> = path.split('/').collect();
         get_path_value(json, &components)
-          .ok_or_else(|| LearnerError::ApiError(format!("Path '{}' not found", path)))?
+          .ok_or_else(|| LearnerError::ApiError(format!("Path '{path}' not found")))?
       } else {
         json.clone()
       };
 
-      match source {
-        Value::Array(items) => {
-          let mapped: Result<Vec<Value>> = items
-            .iter()
-            .map(|item| {
-              let mut obj = Map::new();
-              for (key, mapping) in map {
-                if let Ok(Some(value)) =
-                  extract_mapped_value(item, mapping, &get_field_def(field_def, key))
-                {
-                  obj.insert(key.clone(), value);
-                }
+      if let Value::Array(items) = source {
+        let mapped: Result<Vec<Value>> = items
+          .iter()
+          .map(|item| {
+            let mut obj = Map::new();
+            for (key, mapping) in map {
+              if let Ok(Some(value)) =
+                extract_mapped_value(item, mapping, &get_field_def(field_def, key))
+              {
+                obj.insert(key.clone(), value);
               }
-              Ok(Value::Object(obj))
-            })
-            .collect();
-          Value::Array(mapped?)
-        },
-        _ => {
-          let mut obj = Map::new();
-          for (key, mapping) in map {
-            if let Ok(Some(value)) =
-              extract_mapped_value(&source, mapping, &get_field_def(field_def, key))
-            {
-              obj.insert(key.clone(), value);
             }
+            Ok(Value::Object(obj))
+          })
+          .collect();
+        Value::Array(mapped?)
+      } else {
+        let mut obj = Map::new();
+        for (key, mapping) in map {
+          if let Ok(Some(value)) =
+            extract_mapped_value(&source, mapping, &get_field_def(field_def, key))
+          {
+            obj.insert(key.clone(), value);
           }
-          Value::Object(obj)
-        },
+        }
+        Value::Object(obj)
       }
     },
   };
@@ -273,12 +269,7 @@ fn coerce_value(value: &Value, field_def: &FieldDefinition) -> Result<Value> {
     "string" => match value {
       // If we have a single-element array and need a string
       Value::Array(arr) if arr.len() == 1 =>
-        if let Some(s) = arr[0].as_str() {
-          Value::String(s.to_string())
-        } else {
-          arr[0].clone()
-        },
-      Value::String(_) => value.clone(),
+        arr[0].as_str().map_or_else(|| arr[0].clone(), |s| Value::String(s.to_string())),
       _ => value.clone(),
     },
     "object" => match value {
