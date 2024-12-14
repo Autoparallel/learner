@@ -1,0 +1,14 @@
+description = "Base storage configuration template"
+name        = "storage"
+
+[files]
+base_type = "object"
+required  = true
+
+[original_filenames]
+base_type = "object"
+required  = true
+
+[added_at]
+base_type = "object"
+required  = true

@@ -49,17 +49,6 @@ pub struct State {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct RetrievalData {
-  pub source:            Option<String>,
-  pub source_identifier: Option<String>,
-  pub urls:              BTreeMap<String, String>,
-  pub doi:               Option<String>,
-  pub last_checked:      Option<DateTime<Utc>>, // When we last verified URLs
-  pub access_type:       Option<String>,        // "open", "subscription", "institutional"
-  pub verified:          bool,                  // Whether we've confirmed this data
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StorageData {
   pub files:              BTreeMap<String, PathBuf>,
   pub original_filenames: BTreeMap<String, String>,
