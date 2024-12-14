@@ -527,40 +527,82 @@ impl FieldDefinition {
 
     // Validate individual items if we have an item definition
     if let Some(item_def) = &self.items {
+      debug!(
+          path = %path,
+          expected_type = %item_def.base_type,
+          "Validating array items"
+      );
+
       for (index, item) in items.iter().enumerate() {
         let item_path = format!("{path}[{index}]");
 
-        match (item_def.base_type.as_str(), item) {
-          ("object", Value::Object(obj)) => {
-            if let Err(e) = item_def.validate_object(obj, &item_path) {
+        match item_def.base_type.as_str() {
+          "string" =>
+            if let Value::String(s) = item {
+              if let Err(e) = item_def.validate_string(s, &item_path) {
+                error!(
+                    path = %item_path,
+                    error = %e,
+                    validation_type = "string",
+                    "Array item validation failed"
+                );
+                return Err(e);
+              }
+            } else {
               error!(
                   path = %item_path,
-                  error = %e,
-                  validation_type = "object",
-                  "Array item validation failed"
+                  expected_type = "string",
+                  actual_type = %type_name_of_value(item),
+                  validation_type = "type_check",
+                  "Array item type mismatch"
               );
-              return Err(e);
-            }
-          },
-          (expected, got) => {
+              return Err(LearnerError::TemplateInvalidation(format!(
+                "Item at index {} in '{}' expected type 'string' but got '{}'",
+                index,
+                path,
+                type_name_of_value(item)
+              )));
+            },
+          "object" =>
+            if let Value::Object(obj) = item {
+              if let Err(e) = item_def.validate_object(obj, &item_path) {
+                error!(
+                    path = %item_path,
+                    error = %e,
+                    validation_type = "object",
+                    "Array item validation failed"
+                );
+                return Err(e);
+              }
+            } else {
+              error!(
+                  path = %item_path,
+                  expected_type = "object",
+                  actual_type = %type_name_of_value(item),
+                  validation_type = "type_check",
+                  "Array item type mismatch"
+              );
+              return Err(LearnerError::TemplateInvalidation(format!(
+                "Item at index {} in '{}' expected type 'object' but got '{}'",
+                index,
+                path,
+                type_name_of_value(item)
+              )));
+            },
+          other => {
             error!(
                 path = %item_path,
-                expected_type = %expected,
-                actual_type = %type_name_of_value(got),
                 validation_type = "type_check",
-                "Array item type mismatch"
+                "Unsupported array item type"
             );
             return Err(LearnerError::TemplateInvalidation(format!(
-              "Item at index {} in '{}' expected type '{}' but got '{}'",
-              index,
-              path,
-              expected,
-              type_name_of_value(got)
+              "Unsupported array item type '{other}' at index {index} in '{path}'",
             )));
           },
         }
       }
     }
+
     Ok(())
   }
 
