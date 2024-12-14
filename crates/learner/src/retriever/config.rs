@@ -164,15 +164,13 @@ fn extract_mapped_value(
   mapping: &Mapping,
   field_def: &FieldDefinition,
 ) -> Result<Option<Value>> {
-  let value = match mapping {
-    // Simple path extraction - most common case
+  // First get the raw value through mapping
+  let raw_value = match mapping {
     Mapping::Path(path) => {
       let components: Vec<&str> = path.split('/').collect();
       get_path_value(json, &components)
         .ok_or_else(|| LearnerError::ApiError(format!("Path '{}' not found", path)))?
     },
-
-    // Join multiple string values with a delimiter
     Mapping::Join { paths, with } => {
       let parts: Result<Vec<String>> = paths
         .iter()
@@ -185,8 +183,6 @@ fn extract_mapped_value(
         .collect();
       Value::String(parts?.join(with))
     },
-
-    // Map values into new structures - handles both arrays and objects
     Mapping::Map { from, map } => {
       // Get the source to map from, if specified
       let source = if let Some(path) = from {
@@ -197,16 +193,16 @@ fn extract_mapped_value(
         json.clone()
       };
 
-      // Process based on whether the source is an array or not
       match source {
         Value::Array(items) => {
-          // Map each array item
           let mapped: Result<Vec<Value>> = items
             .iter()
             .map(|item| {
               let mut obj = Map::new();
               for (key, mapping) in map {
-                if let Ok(Some(value)) = extract_mapped_value(item, mapping, field_def) {
+                if let Ok(Some(value)) =
+                  extract_mapped_value(item, mapping, &get_field_def(field_def, key))
+                {
                   obj.insert(key.clone(), value);
                 }
               }
@@ -215,11 +211,12 @@ fn extract_mapped_value(
             .collect();
           Value::Array(mapped?)
         },
-        // Process as a single object
         _ => {
           let mut obj = Map::new();
           for (key, mapping) in map {
-            if let Ok(Some(value)) = extract_mapped_value(&source, mapping, field_def) {
+            if let Ok(Some(value)) =
+              extract_mapped_value(&source, mapping, &get_field_def(field_def, key))
+            {
               obj.insert(key.clone(), value);
             }
           }
@@ -229,24 +226,81 @@ fn extract_mapped_value(
     },
   };
 
-  dbg!(&field_def);
-  let array_coerced = if field_def.base_type == "array" {
-    println!("{field_def:?} should be array");
-    match value {
-      Value::Array(_) => value,
-      _ => Value::Array(vec![value]),
-    }
-  } else {
-    match (field_def.base_type.as_str(), &value) {
-      ("string", Value::Array(arr)) if arr.len() == 1 => {
-        println!("should be string");
-        arr[0].clone()
-      },
-      _ => value,
-    }
-  };
+  // Then coerce the value based on the expected type
+  let coerced = coerce_value(&raw_value, field_def)?;
 
-  Ok(Some(array_coerced))
+  Ok(Some(coerced))
+}
+
+// Helper function to get field definition for nested fields
+fn get_field_def<'a>(parent: &'a FieldDefinition, field_name: &str) -> FieldDefinition {
+  // Check for object fields first
+  if let Some(fields) = &parent.fields {
+    if let Some(field) = fields.iter().find(|f| f.name == field_name) {
+      return field.clone();
+    }
+  }
+
+  // Then check array items if they exist
+  if let Some(items) = &parent.items {
+    if let Some(fields) = &items.fields {
+      if let Some(field) = fields.iter().find(|f| f.name == field_name) {
+        return field.clone();
+      }
+    }
+  }
+
+  // Return a default field definition if not found
+  FieldDefinition {
+    name:        field_name.to_string(),
+    base_type:   "string".to_string(),
+    required:    false,
+    description: None,
+    validation:  None,
+    items:       None,
+    fields:      None,
+  }
+}
+
+// Helper function to coerce values based on expected type
+fn coerce_value(value: &Value, field_def: &FieldDefinition) -> Result<Value> {
+  let result = match field_def.base_type.as_str() {
+    "array" => match value {
+      Value::Array(_) => value.clone(),
+      // If not an array but should be, wrap it
+      _ => Value::Array(vec![value.clone()]),
+    },
+    "string" => match value {
+      // If we have a single-element array and need a string
+      Value::Array(arr) if arr.len() == 1 =>
+        if let Some(s) = arr[0].as_str() {
+          Value::String(s.to_string())
+        } else {
+          arr[0].clone()
+        },
+      Value::String(_) => value.clone(),
+      _ => value.clone(),
+    },
+    "object" => match value {
+      Value::Object(obj) => {
+        let mut new_obj = Map::new();
+        // If we have fields defined, try to coerce each field
+        if let Some(fields) = &field_def.fields {
+          for field in fields {
+            if let Some(val) = obj.get(&field.name) {
+              new_obj.insert(field.name.clone(), coerce_value(val, field)?);
+            }
+          }
+          Value::Object(new_obj)
+        } else {
+          value.clone()
+        }
+      },
+      _ => value.clone(),
+    },
+    _ => value.clone(),
+  };
+  Ok(result)
 }
 
 /// Get a value from JSON using a path

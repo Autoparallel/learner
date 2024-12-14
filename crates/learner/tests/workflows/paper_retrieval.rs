@@ -52,7 +52,7 @@ async fn test_arxiv_pdf_from_paper() -> TestResult<()> {
   // Ok(())
 }
 
-#[traced_test]
+// #[traced_test]
 #[tokio::test]
 async fn test_iacr_retriever_integration() -> TestResult<()> {
   let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
@@ -97,7 +97,7 @@ async fn test_iacr_pdf_from_paper() -> TestResult<()> {
 }
 
 #[tokio::test]
-#[traced_test]
+// #[traced_test]
 async fn test_doi_retriever_integration() -> TestResult<()> {
   let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
   let retriever: Retriever = dbg!(manager.load_config("config_new/doi.toml")?);
