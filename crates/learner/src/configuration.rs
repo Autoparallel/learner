@@ -1,90 +1,246 @@
+use std::collections::BTreeMap;
+
 use template::Template;
 
 use super::*;
 
+/// Represents the complete application configuration
+#[derive(Debug, Clone, Deserialize)]
+pub struct Configuration {
+  /// Common state tracking template
+  pub state:      Template,
+  /// Common storage configuration template
+  pub storage:    Template,
+  /// Common retrieval configuration template
+  pub retrieval:  Template,
+  /// Available resource types (paper, book, etc.)
+  pub resources:  BTreeMap<String, Template>,
+  /// Available retrievers (arxiv, doi, etc.)
+  pub retrievers: BTreeMap<String, Retriever>,
+}
+
 pub struct ConfigurationManager {
-  builder:        config::ConfigBuilder<config::builder::DefaultState>,
-  loaded_configs: BTreeMap<String, Value>,
-  // Track config paths for loading extends
-  config_paths:   PathBuf,
+  config_paths:  PathBuf,
+  /// Cached configuration components
+  configuration: Option<Configuration>,
 }
 
 impl ConfigurationManager {
+  #[instrument(skip_all, fields(path = %config_path.as_ref().display()))]
   pub fn new(config_path: impl AsRef<Path>) -> Self {
-    Self {
-      builder:        config::Config::builder(),
-      loaded_configs: BTreeMap::new(),
-      config_paths:   config_path.as_ref().to_path_buf(),
+    debug!("Creating new configuration manager");
+    Self { config_paths: config_path.as_ref().to_path_buf(), configuration: None }
+  }
+
+  #[instrument(skip_all, fields(template = %name))]
+  fn load_template(&self, name: &str) -> Result<Template> {
+    let path = self.config_paths.join(format!("{name}.toml"));
+    debug!(path = %path.display(), "Loading template");
+
+    match std::fs::read_to_string(&path) {
+      Ok(content) => match toml::from_str(&content) {
+        Ok(template) => {
+          debug!("Successfully loaded template");
+          Ok(template)
+        },
+        Err(e) => {
+          error!(error = %e, "Failed to parse template TOML");
+          Err(e.into())
+        },
+      },
+      Err(e) => {
+        error!(error = %e, "Failed to read template file");
+        Err(e.into())
+      },
     }
   }
 
-  pub fn load_config(&mut self) -> Result<Template> {
-    let config_path = self.config_paths.join("config.toml");
-    let content = std::fs::read_to_string(&config_path)?;
-    let mut config: toml::Value = toml::from_str(&content)?;
+  #[instrument(skip_all, fields(retriever = %name))]
+  fn load_retriever(&self, name: &str) -> Result<Retriever> {
+    let path = self.config_paths.join(format!("{name}.toml"));
+    debug!(path = %path.display(), "Loading retriever");
 
-    // Load core templates
-    let core_templates = ["state_template", "storage_template", "retrieval_template"];
-    let mut composed_config = toml::value::Table::new();
+    // First load as generic TOML value
+    let content = std::fs::read_to_string(&path)?;
+    let mut raw_config: toml::Value = toml::from_str(&content)?;
 
-    for template_field in &core_templates {
-      if let Some(toml::Value::String(template_name)) = config.get(template_field) {
+    // Handle template references
+    let template_fields = ["resource_template", "retrieval_template"];
+
+    for field in &template_fields {
+      if let Some(toml::Value::String(template_name)) = raw_config.get(field) {
+        debug!(field = %field, template = %template_name, "Loading template reference");
+        // Load the referenced template
         let template_path = self.config_paths.join(format!("{template_name}.toml"));
         let template_content = std::fs::read_to_string(template_path)?;
         let template_config: toml::Value = toml::from_str(&template_content)?;
 
-        if let toml::Value::Table(template_table) = template_config {
-          composed_config.extend(template_table);
+        // Replace the string reference with the template config
+        if let Some(table) = raw_config.as_table_mut() {
+          table.insert((*field).to_string(), template_config);
         }
       }
     }
 
-    // Load resource templates
-    if let Some(toml::Value::Array(resources)) = config.get("resources") {
-      let mut resource_values = Vec::new();
+    // Now convert to final Retriever type
+    let retriever: Retriever = raw_config.try_into()?;
+    Ok(retriever)
+  }
 
-      for resource in resources {
-        if let Some(toml::Value::String(template_name)) = resource.get("template") {
-          let template_path = self.config_paths.join(format!("{template_name}.toml"));
-          let template_content = std::fs::read_to_string(template_path)?;
-          // Keep as toml::Value instead of converting to Template
-          let template_config: toml::Value = toml::from_str(&template_content)?;
-          resource_values.push(template_config);
+  #[instrument(skip(self))]
+  pub fn reload_config(&mut self) -> Result<()> {
+    info!("Reloading configuration");
+    let config_path = self.config_paths.join("config.toml");
+
+    debug!(path = %config_path.display(), "Reading config file");
+    let content = std::fs::read_to_string(&config_path)?;
+    let config: toml::Value = toml::from_str(&content)?;
+
+    // We build up all parts of the configuration before setting it
+    let mut composed_config = BTreeMap::new();
+
+    // 1. Load core templates first
+    debug!("Loading core templates");
+    let state = self.load_template(
+      config.get("state_template").and_then(|v| v.as_str()).ok_or_else(|| {
+        error!("Missing state_template in config");
+        LearnerError::Config("Missing state_template".into())
+      })?,
+    )?;
+    composed_config.insert("state".to_string(), state.clone());
+
+    let storage = self.load_template(
+      config.get("storage_template").and_then(|v| v.as_str()).ok_or_else(|| {
+        error!("Missing storage_template in config");
+        LearnerError::Config("Missing storage_template".into())
+      })?,
+    )?;
+    composed_config.insert("storage".to_string(), storage.clone());
+
+    let retrieval = self.load_template(
+      config.get("retrieval_template").and_then(|v| v.as_str()).ok_or_else(|| {
+        error!("Missing retrieval_template in config");
+        LearnerError::Config("Missing retrieval_template".into())
+      })?,
+    )?;
+    composed_config.insert("retrieval".to_string(), retrieval.clone());
+
+    // 2. Load resource templates next
+    debug!("Loading resource templates");
+    let mut resources = BTreeMap::new();
+    if let Some(resource_list) = config.get("resources").and_then(|v| v.as_array()) {
+      for resource in resource_list {
+        if let Some(template_name) = resource.get("template").and_then(|v| v.as_str()) {
+          debug!(template = %template_name, "Loading resource template");
+          match self.load_template(template_name) {
+            Ok(template) => {
+              resources.insert(template_name.to_string(), template);
+            },
+            Err(e) => {
+              error!(error = %e, template = %template_name, "Failed to load resource template");
+              return Err(e);
+            },
+          }
         }
       }
+    }
+    if resources.is_empty() {
+      error!("No resource templates loaded successfully");
+      return Err(LearnerError::Config("No resource templates loaded".into()));
+    }
+    composed_config.extend(resources.clone());
 
-      composed_config.insert("resources".into(), toml::Value::Array(resource_values));
+    // 3. Finally load retrievers, which can now reference the loaded resources
+    debug!("Loading retriever templates");
+    let mut retrievers = BTreeMap::new();
+    if let Some(retriever_list) = config.get("retrievers").and_then(|v| v.as_array()) {
+      for retriever in retriever_list {
+        if let Some(template_name) = retriever.get("template").and_then(|v| v.as_str()) {
+          debug!(template = %template_name, "Loading retriever template");
+          match self.load_retriever(template_name) {
+            Ok(retriever_config) => {
+              retrievers.insert(template_name.to_string(), retriever_config);
+            },
+            Err(e) => {
+              error!(error = %e, template = %template_name, "Failed to load retriever");
+              return Err(e);
+            },
+          }
+        }
+      }
+    }
+    if retrievers.is_empty() {
+      error!("No retriever templates loaded successfully");
+      return Err(LearnerError::Config("No retriever templates loaded".into()));
     }
 
-    Ok(toml::Value::Table(composed_config).try_into()?)
+    info!(
+        resource_count = %resources.len(),
+        retriever_count = %retrievers.len(),
+        "Configuration loaded successfully"
+    );
+
+    // Set the complete configuration
+    self.configuration = Some(Configuration { state, storage, retrieval, resources, retrievers });
+
+    Ok(())
+  }
+
+  /// Get a reference to the current configuration
+  fn config(&self) -> Result<&Configuration> {
+    self
+      .configuration
+      .as_ref()
+      .ok_or_else(|| LearnerError::Config("Configuration not loaded".into()))
+  }
+
+  // Public interface methods that use the loaded configuration
+
+  /// Get all available resource types
+  pub fn get_resource_types(&self) -> Result<Vec<String>> {
+    Ok(self.config()?.resources.keys().cloned().collect())
+  }
+
+  /// Get all available retrievers
+  pub fn get_retrievers(&self) -> Result<Vec<String>> {
+    Ok(self.config()?.retrievers.keys().cloned().collect())
+  }
+
+  /// Get a specific resource template
+  pub fn get_resource_template(&self, name: &str) -> Result<&Template> {
+    Ok(
+      self
+        .config()?
+        .resources
+        .get(name)
+        .ok_or_else(|| LearnerError::Config(format!("Resource template {name} not found")))?,
+    )
   }
 }
 
 #[cfg(test)]
 mod tests {
-
   use super::*;
 
   #[test]
-  fn test_config_extension() {
+  #[traced_test]
+  fn test_config_loading() {
     let mut manager = ConfigurationManager::new(PathBuf::from("config_new"));
 
-    let template = dbg!(manager.load_config().unwrap());
-    // Load configurations in order
-    // let paper: Template = dbg!(manager.load_config("config_new/paper.toml").unwrap());
+    // Explicit loading
+    manager.reload_config().unwrap();
 
-    // let retreival: Template = dbg!(manager.load_config("config_new/retrieval.toml")).unwrap();
+    // Access configuration
+    let resource_types = manager.get_resource_types().unwrap();
+    assert!(resource_types.contains(&"paper".to_string()));
 
-    // let arxiv_retriever: Retriever = dbg!(manager.load_config("config_new/arxiv.toml").unwrap());
-    // let doi_retriever: Retriever = dbg!(manager.load_config("config_new/doi.toml").unwrap());
-    // let iacr_retriever: Retriever = dbg!(manager.load_config("config_new/iacr.toml").unwrap());
+    // Test reload
+    manager.reload_config().unwrap();
+    let retrievers = manager.get_retrievers().unwrap();
+    assert!(retrievers.contains(&"arxiv".to_string()));
 
-    todo!("Clean this up")
-    // The paper_record now has all fields from base_resource and paper,
-    // plus its own record-specific configuration
-
-    // assert_eq!(paper_record.item.resource.resource_type, "paper");
-    // assert!(paper_record.item.resource.required_fields.contains(&"abstract_text".to_string()));
-    // assert!(paper_record.item.state_tracking.progress_tracking);
+    // Get specific templates
+    let paper_template = manager.get_resource_template("paper").unwrap();
+    assert!(paper_template.fields.iter().any(|f| f.name == "title"));
   }
 }

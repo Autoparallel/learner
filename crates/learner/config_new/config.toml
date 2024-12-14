@@ -1,11 +1,15 @@
-description = "Global configuration"
-name        = "learner"
-
-# Core templates that apply to all resources
 retrieval_template = "retrieval"
 state_template     = "state"
 storage_template   = "storage"
 
-# List of available resource types
 [[resources]]
 template = "paper"
+
+# [[resources]]
+# template = "book"
+
+[[retrievers]]
+template = "arxiv"
+
+[[retrievers]]
+template = "doi"
