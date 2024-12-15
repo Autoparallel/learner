@@ -9,42 +9,60 @@ pub type TemplatedItem = BTreeMap<String, Value>;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Template {
-  pub name:        String,
+  pub name:          String,
+  #[serde(rename = "type")]
+  pub template_type: TemplateType,
   #[serde(default)]
-  pub description: Option<String>,
+  pub description:   Option<String>,
   #[serde(default)]
-  pub fields:      Vec<FieldDefinition>,
+  pub fields:        Vec<FieldDefinition>,
+}
+
+/// Types of configuration files we can identify
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TemplateType {
+  Resource,
+  Retrieval,
+  State,
+  Storage,
 }
 
 // Custom deserialization to handle the flattened field structure
-
 impl<'de> Deserialize<'de> for Template {
   fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
   where D: serde::Deserializer<'de> {
     #[derive(Deserialize)]
     struct TemplateHelper {
-      name:        String,
+      name:          String,
+      #[serde(rename = "type")]
+      template_type: TemplateType,
       #[serde(default)]
-      description: Option<String>,
+      description:   Option<String>,
       #[serde(flatten)]
-      fields:      BTreeMap<String, FieldDefinition>,
+      fields:        BTreeMap<String, FieldDefinition>,
     }
 
     let helper = TemplateHelper::deserialize(deserializer)?;
 
     // Convert map into vec and set top-level field names
-    let mut fields: Vec<FieldDefinition> = helper
+    let fields: Vec<FieldDefinition> = helper
       .fields
       .into_iter()
       .filter(|(key, _)| key != "name" && key != "description")
       .map(|(key, mut field_def)| {
-        field_def.name = key.clone();
+        field_def.name = key;
         field_def.process_nested_names();
         field_def
       })
       .collect();
 
-    Ok(Template { name: helper.name, description: helper.description, fields })
+    Ok(Self {
+      name: helper.name,
+      template_type: helper.template_type,
+      description: helper.description,
+      fields,
+    })
   }
 }
 

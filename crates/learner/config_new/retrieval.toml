@@ -1,5 +1,8 @@
+name = "retrieval"
+
 description = "Standard retrieval data template"
-name        = "retrieval"
+
+type = "retrieval"
 
 [source]
 base_type = "string"

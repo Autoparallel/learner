@@ -1,7 +1,9 @@
-description = "Configuration for a paper"
-name        = "paper"
+name = "paper"
 
-# Existing fields
+description = "Configuration for a paper"
+
+type = "resource"
+
 [abstract]
 base_type = "string"
 required  = false
@@ -47,8 +49,6 @@ items     = { base_type = "string", validation = { datetime = true } }
 name      = "published_print"
 required  = false
 
-
-# New suggested fields
 [publisher]
 base_type = "string"
 required  = false
@@ -64,7 +64,7 @@ fields = [
 ]
 required = false
 
-[type]
+[paper_type]
 base_type = "string"
 required = false
 validation = { enum_values = [
@@ -83,7 +83,7 @@ required  = false
 base_type = "string"
 required  = false
 
-[citations_count] # This is "is-referenced-by-count" in the DOI response
+[citations_count]
 base_type = "number"
 required  = false
 

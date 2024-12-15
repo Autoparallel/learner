@@ -1,5 +1,8 @@
+name = "state"
+
 description = "Base state tracking template"
-name        = "state"
+
+type = "state"
 
 [read_status]
 base_type  = "string"
