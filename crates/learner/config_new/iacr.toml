@@ -2,8 +2,6 @@ name = "iacr"
 
 description = "Retriever template for getting a paper from IACR"
 
-type = "retriever"
-
 resource_template  = "paper"
 retrieval_template = "retrieval"
 

@@ -150,23 +150,52 @@ impl ConfigurationManager {
       .and_then(|v| v.as_str())
       .ok_or_else(|| LearnerError::Config("Retriever missing resource_template".into()))?;
 
-    let resource_template = self.get_resource_template(resource_template_name)?;
+    let resource_template = self.get_resource_template(resource_template_name)?.clone();
     let retrieval_template = self
       .retrieval
       .as_ref()
-      .ok_or_else(|| LearnerError::Config("Retrieval template not loaded".into()))?;
+      .ok_or_else(|| LearnerError::Config("Retrieval template not loaded".into()))?
+      .clone();
 
     let mut raw_config = raw_config.try_into::<Map<String, toml::Value>>()?;
-    raw_config.insert(
-      "resource_template".into(),
-      toml::Value::try_from(resource_template.clone()).unwrap(),
-    ); // TODO: fix unwrap
-    raw_config.insert(
-      "retrieval_template".into(),
-      toml::Value::try_from(retrieval_template.clone()).unwrap(),
-    ); // TODO: fix unwrap
+    // raw_config.insert(
+    //   "resource_template".into(),
+    //   toml::Value::try_from(resource_template.clone()).unwrap(),
+    // ); // TODO: fix unwrap
+    // raw_config.insert(
+    //   "retrieval_template".into(),
+    //   toml::Value::try_from(retrieval_template.clone()).unwrap(),
+    // ); // TODO: fix unwrap
 
-    let retriever: Retriever = toml::Value::Table(raw_config).try_into().unwrap(); // TODO: fix unwrap
+    trace!("Raw retriever config: {raw_config:#?}");
+    let retriever = Retriever {
+      name: raw_config.get("name").unwrap().as_str().unwrap().to_owned(),
+      description: raw_config.get("description").map(toml::Value::to_string),
+      base_url: raw_config.get("base_url").unwrap().to_string(),
+      pattern: Regex::new(&raw_config.get("pattern").unwrap().to_string()).unwrap(),
+      source: raw_config.get("source").unwrap().to_string(),
+      endpoint_template: raw_config.get("endpoint_template").unwrap().to_string(),
+      response_format: ResponseFormat::Xml { strip_namespaces: true, clean_content: true }, /* Fix later */
+      headers: raw_config.get("headers").unwrap().as_table().cloned().unwrap().try_into().unwrap(),
+      resource_template,
+      resource_mappings: raw_config
+        .get("resource_mappings")
+        .unwrap()
+        .as_table()
+        .cloned()
+        .unwrap()
+        .try_into()
+        .unwrap(),
+      retrieval_template,
+      retrieval_mappings: raw_config
+        .get("retrieval_mappings")
+        .unwrap()
+        .as_table()
+        .cloned()
+        .unwrap()
+        .try_into()
+        .unwrap(),
+    };
     Ok(retriever)
   }
 
@@ -224,7 +253,6 @@ impl ConfigurationManager {
 
 #[cfg(test)]
 mod tests {
-  use tempfile::tempdir;
 
   use super::*;
 
@@ -243,6 +271,7 @@ mod tests {
     // Test reload
     manager.reload_config().unwrap();
     let retrievers = manager.get_retrievers();
+    dbg!(&retrievers);
     assert!(retrievers.contains(&"arxiv".to_string()));
 
     // Get specific templates
