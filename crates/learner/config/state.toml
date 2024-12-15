@@ -1,13 +1,17 @@
 name = "state"
 
-description = "Base state tracking template"
+description = "State tracking template"
 
 type = "state"
 
-[read_status]
+[status]
 base_type  = "string"
 required   = true
 validation = { enum_values = ["unopened", "opened", "completed"] }
+
+[tags]
+base_type = "string"
+required  = true
 
 [starred]
 base_type = "boolean"
@@ -18,5 +22,3 @@ required  = true
 base_type  = "number"
 required   = false
 validation = { minimum = 1, maximum = 5 }
-
-# Additional fields can be added by extending this template

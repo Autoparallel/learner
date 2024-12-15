@@ -29,12 +29,12 @@ map = { created = "OAI-PMH/GetRecord/record/metadata/dc/date" }
 [retrieval_mappings.urls]
 from = "OAI-PMH/GetRecord/record/metadata/dc/identifier"
 [retrieval_mappings.urls.map]
+document = { paths = [
+    ".",
+], transform = "replace:.*/(\\d{4}/\\d+)$:https://eprint.iacr.org/$1.pdf" }
 html = { paths = [
     ".",
 ], transform = "replace:.*/(\\d{4}/\\d+)$:https://eprint.iacr.org/$1" }
-pdf = { paths = [
-    ".",
-], transform = "replace:.*/(\\d{4}/\\d+)$:https://eprint.iacr.org/$1.pdf" }
 
 
 [headers]

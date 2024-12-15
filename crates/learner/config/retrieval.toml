@@ -15,7 +15,7 @@ required  = false
 [urls]
 base_type = "object"
 fields = [
-    { name = "pdf", base_type = "string", required = false },
+    { name = "document", base_type = "string", required = false },
     { name = "html", base_type = "string", required = false },
 ]
 required = false

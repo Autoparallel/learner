@@ -49,7 +49,7 @@ affiliation = "affiliation/0/name"
 name        = { paths = ["given", "family"], with = " " }
 
 [retrieval_mappings]
-urls = { map = { pdf = "message/link/0/URL" } }
+urls = { map = { document = "message/link/0/URL" } }
 
 [headers]
 Accept = "application/json"

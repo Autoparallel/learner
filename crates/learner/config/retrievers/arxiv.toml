@@ -29,7 +29,7 @@ created = "feed/entry/published"
 
 [retrieval_mappings.urls]
 from = "feed/entry/id"
-[retrieval_mappings.urls.map.pdf]
+[retrieval_mappings.urls.map.document]
 paths     = ["."]
 transform = "replace:.*/(?:abs|pdf)/(.+?)(?:v\\d+)?$:http://arxiv.org/pdf/$1.pdf" # No delimiter needed for single value
 [retrieval_mappings.urls.map.html]
