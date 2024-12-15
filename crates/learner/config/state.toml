@@ -4,14 +4,20 @@ description = "State tracking template"
 
 type = "state"
 
-[status]
+[progress]
 base_type  = "string"
 required   = true
 validation = { enum_values = ["unopened", "opened", "completed"] }
 
 [tags]
+base_type = "array"
+required  = false
+[tags.items]
 base_type = "string"
-required  = true
+
+[notes]
+base_type = "string"
+required  = false
 
 [starred]
 base_type = "boolean"
@@ -19,6 +25,11 @@ default   = false
 required  = true
 
 [rating]
+base_type  = "number"
+required   = false
+validation = { minimum = 1, maximum = 5 }
+
+[importance]
 base_type  = "number"
 required   = false
 validation = { minimum = 1, maximum = 5 }

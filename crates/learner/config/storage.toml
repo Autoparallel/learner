@@ -6,12 +6,21 @@ type = "storage"
 
 [files]
 base_type = "object"
-required  = true
+required  = false
 
 [original_filenames]
 base_type = "object"
-required  = true
+required  = false
+
+[file_sizes]
+base_type = "object"
+required  = false
 
 [added_at]
+base_type  = "string"
+required   = false
+validation = { datetime = true }
+
+[checksums]
 base_type = "object"
-required  = true
+required  = false
