@@ -141,62 +141,60 @@ impl ConfigurationManager {
   }
 
   #[instrument(skip(self))]
-  fn process_retriever(&self, raw_config: toml::Value) -> Result<Retriever> {
+  fn process_retriever(&self, mut raw_config: toml::Value) -> Result<Retriever> {
     debug!("Processing retriever configuration");
 
-    // Get the referenced template names
+    // First get the referenced template names
     let resource_template_name = raw_config
       .get("resource_template")
       .and_then(|v| v.as_str())
       .ok_or_else(|| LearnerError::Config("Retriever missing resource_template".into()))?;
 
-    let resource_template = self.get_resource_template(resource_template_name)?.clone();
+    // Get the resource template from resources
+    let resource_template = self.get_resource_template(resource_template_name)?;
+
+    // Get the retrieval template
     let retrieval_template = self
       .retrieval
       .as_ref()
-      .ok_or_else(|| LearnerError::Config("Retrieval template not loaded".into()))?
-      .clone();
+      .ok_or_else(|| LearnerError::Config("Retrieval template not loaded".into()))?;
 
-    let mut raw_config = raw_config.try_into::<Map<String, toml::Value>>()?;
-    // raw_config.insert(
-    //   "resource_template".into(),
-    //   toml::Value::try_from(resource_template.clone()).unwrap(),
-    // ); // TODO: fix unwrap
-    // raw_config.insert(
-    //   "retrieval_template".into(),
-    //   toml::Value::try_from(retrieval_template.clone()).unwrap(),
-    // ); // TODO: fix unwrap
+    // First deserialize the raw config without the templates
+    #[derive(Deserialize)]
+    struct RetrieverPartial {
+      name:               String,
+      description:        Option<String>,
+      base_url:           String,
+      #[serde(deserialize_with = "deserialize_regex")]
+      pattern:            Regex,
+      source:             String,
+      endpoint_template:  String,
+      response_format:    ResponseFormat,
+      #[serde(default)]
+      headers:            BTreeMap<String, String>,
+      #[serde(default)]
+      resource_mappings:  BTreeMap<String, Mapping>,
+      #[serde(default)]
+      retrieval_mappings: BTreeMap<String, Mapping>,
+    }
 
-    trace!("Raw retriever config: {raw_config:#?}");
-    let retriever = Retriever {
-      name: raw_config.get("name").unwrap().as_str().unwrap().to_owned(),
-      description: raw_config.get("description").map(toml::Value::to_string),
-      base_url: raw_config.get("base_url").unwrap().to_string(),
-      pattern: Regex::new(&raw_config.get("pattern").unwrap().to_string()).unwrap(),
-      source: raw_config.get("source").unwrap().to_string(),
-      endpoint_template: raw_config.get("endpoint_template").unwrap().to_string(),
-      response_format: ResponseFormat::Xml { strip_namespaces: true, clean_content: true }, /* Fix later */
-      headers: raw_config.get("headers").unwrap().as_table().cloned().unwrap().try_into().unwrap(),
-      resource_template,
-      resource_mappings: raw_config
-        .get("resource_mappings")
-        .unwrap()
-        .as_table()
-        .cloned()
-        .unwrap()
-        .try_into()
-        .unwrap(),
-      retrieval_template,
-      retrieval_mappings: raw_config
-        .get("retrieval_mappings")
-        .unwrap()
-        .as_table()
-        .cloned()
-        .unwrap()
-        .try_into()
-        .unwrap(),
-    };
-    Ok(retriever)
+    let partial: RetrieverPartial = raw_config.try_into()?;
+
+    // Now construct the full Retriever
+    Ok(Retriever {
+      name:               partial.name,
+      description:        partial.description,
+      base_url:           partial.base_url,
+      pattern:            partial.pattern,
+      source:             partial.source,
+      endpoint_template:  partial.endpoint_template,
+      response_format:    partial.response_format,
+      headers:            partial.headers,
+      resource_template:  resource_template.clone(),
+      resource_mappings:  partial.resource_mappings,
+      retrieval_template: retrieval_template.clone(),
+      retrieval_mappings: partial.retrieval_mappings,
+    })
   }
 
   #[instrument(skip(self))]

@@ -151,7 +151,7 @@ impl Retrievers {
 /// # Errors
 ///
 /// Returns a deserialization error if the pattern is not a valid regular expression.
-fn deserialize_regex<'de, D>(deserializer: D) -> std::result::Result<Regex, D::Error>
+pub fn deserialize_regex<'de, D>(deserializer: D) -> std::result::Result<Regex, D::Error>
 where D: serde::Deserializer<'de> {
   let s: String = String::deserialize(deserializer)?;
   Regex::new(&s).map_err(serde::de::Error::custom)
