@@ -1,56 +1,55 @@
+name = "doi"
+
+description = "Retriever template for getting a paper from DOI/Crossref"
+
+resource_template  = "paper"
+retrieval_template = "retrieval"
+
 base_url          = "https://api.crossref.org/works"
 endpoint_template = "https://api.crossref.org/works/{identifier}"
-name              = "doi"
-pattern           = "(?:^|https?://doi\\.org/)(10\\.\\d{4,9}/[-._;()/:\\w]+)$"
-resource          = "paper"
-source            = "doi"
+
+pattern = "(?:^|https?://doi\\.org/)(10\\.\\d{4,9}/[-._;()/:\\w]+)$"
+source  = "doi"
 
 [response_format]
-type = "json"
+clean_content = true
+type          = "json"
 
-[response_format.field_maps.title]
-path = "message"
-[response_format.field_maps.title.transform]
-sources = [
-    { type = "path", value = "title/0" },
-    { type = "path", value = "subtitle/0" },
-]
-type = "Compose"
+[resource_mappings]
+abstract         = "message/abstract"
+citations_count  = "message/is-referenced-by-count"
+doi              = "message/DOI"
+language         = "message/language"
+publisher        = "message/publisher"
+references_count = "message/reference-count"
+title            = { paths = ["message/title/0", "message/subtitle/0"], with = ": " }
+type             = "message/type"
 
-[response_format.field_maps.title.transform.format]
-delimiter = ": "
-type      = "Join"
+[resource_mappings.publication_dates]
+from = "message"
+[resource_mappings.publication_dates.map]
+created          = "created/date-time"
+published        = "published/date-time"
+published_online = "published-online/date-time"
+published_print  = "published-print/date-time"
 
+[resource_mappings.container]
+from = "message"
+[resource_mappings.container.map]
+issn   = "ISSN"
+issue  = "issue"
+pages  = "page"
+title  = "container-title/0"
+volume = "volume"
 
-[response_format.field_maps.abstract]
-path = "message/abstract"
+[resource_mappings.authors]
+from = "message/author"
+[resource_mappings.authors.map]
+affiliation = "affiliation/0/name"
+name        = { paths = ["given", "family"], with = " " }
 
-[response_format.field_maps.abstract.transform]
-pattern     = "<[^>]+>"
-replacement = ""
-type        = "Replace"
-
-[response_format.field_maps.authors]
-path = "message/author"
-[response_format.field_maps.authors.transform]
-sources = [
-    { type = "key_value", value = { key = "family", path = "family" } },
-    { type = "key_value", value = { key = "given", path = "given" } },
-]
-type = "Compose"
-
-[response_format.field_maps.authors.transform.format]
-template = { name = "{given} {family}" }
-type     = "ArrayOfObjects"
-
-[response_format.field_maps.publication_dates]
-path = "message/created/date-time"
-
-[response_format.field_maps.pdf_url]
-path = "message/link/0/URL"
-
-[response_format.field_maps.doi]
-path = "message/DOI"
+[retrieval_mappings]
+urls = { map = { pdf = "message/link/0/URL" } }
 
 [headers]
 Accept = "application/json"

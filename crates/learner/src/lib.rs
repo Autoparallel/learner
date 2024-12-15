@@ -184,9 +184,9 @@ pub const IACR_CONFIG: &str = include_str!("../config/retrievers/iacr.toml");
 /// Paper default configuration
 pub const PAPER_CONFIG: &str = include_str!("../config/resources/paper.toml");
 /// Book default configuration
-pub const BOOK_CONFIG: &str = include_str!("../config/resources/book.toml");
-/// Thesis default configuration
-pub const THESIS_CONFIG: &str = include_str!("../config/resources/thesis.toml");
+// pub const BOOK_CONFIG: &str = include_str!("../config/resources/book.toml");
+// /// Thesis default configuration
+// pub const THESIS_CONFIG: &str = include_str!("../config/resources/thesis.toml");
 
 /// Common traits and types for ergonomic imports.
 ///
@@ -424,8 +424,8 @@ impl Config {
     std::fs::create_dir_all(resources_dir)?;
 
     std::fs::write(resources_dir.join("paper.toml"), PAPER_CONFIG)?;
-    std::fs::write(resources_dir.join("book.toml"), BOOK_CONFIG)?;
-    std::fs::write(resources_dir.join("thesis.toml"), THESIS_CONFIG)?;
+    // std::fs::write(resources_dir.join("book.toml"), BOOK_CONFIG)?;
+    // std::fs::write(resources_dir.join("thesis.toml"), THESIS_CONFIG)?;
 
     // Write example retriever configs
     let retrievers_dir = &config.retrievers_path;

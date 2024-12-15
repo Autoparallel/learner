@@ -1,35 +1,40 @@
+name = "arxiv"
+
+description = "Retriever template for getting a paper from arXiv"
+
+resource_template  = "paper"
+retrieval_template = "retrieval"
+
 base_url          = "http://export.arxiv.org"
 endpoint_template = "http://export.arxiv.org/api/query?id_list={identifier}&max_results=1"
-name              = "arxiv"
 pattern           = "(?:^|https?://arxiv\\.org/(?:abs|pdf)/)(\\d{4}\\.\\d{4,5}|[a-zA-Z-]+(?:\\.[A-Z]{2})?/\\d{7})(?:\\.pdf)?$"
-resource          = "paper"
 source            = "arxiv"
 
 [response_format]
+clean_content    = true
 strip_namespaces = true
 type             = "xml"
 
+[resource_mappings]
+abstract = "feed/entry/summary"
+title    = "feed/entry/title"
 
-# TODO: Could flatten out the `field_maps`?
-[response_format.field_maps.title]
-path = "feed/entry/title"
+[resource_mappings.authors]
+from = "feed/entry/author/name"
+[resource_mappings.authors.map]
+name = "."
 
-[response_format.field_maps.abstract]
-path = "feed/entry/summary"
+[resource_mappings.publication_dates.map]
+created = "feed/entry/published"
 
-[response_format.field_maps.authors]
-path = "feed/entry/author"
-
-[response_format.field_maps.publication_dates]
-path = "feed/entry/published"
-
-[retrieval_data.urls]
-path = "feed/entry/id"
-
-[retrieval_data.urls.transform]
-pattern     = "/abs/"
-replacement = "/pdf/"
-type        = "Replace"
+[retrieval_mappings.urls]
+from = "feed/entry/id"
+[retrieval_mappings.urls.map.pdf]
+paths     = ["."]
+transform = "replace:.*/(?:abs|pdf)/(.+?)(?:v\\d+)?$:http://arxiv.org/pdf/$1.pdf" # No delimiter needed for single value
+[retrieval_mappings.urls.map.html]
+paths     = ["."]
+transform = "replace:.*/(?:abs|pdf)/(.+?)(?:v\\d+)?$:http://arxiv.org/abs/$1"
 
 [headers]
 Accept = "application/xml"

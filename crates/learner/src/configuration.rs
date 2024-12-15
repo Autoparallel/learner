@@ -1,13 +1,6 @@
-use std::{
-  collections::BTreeMap,
-  ffi::OsStr,
-  path::{Path, PathBuf},
-};
+use std::ffi::OsStr;
 
-use serde::Deserialize;
 use template::{Template, TemplateType};
-use toml::map::Map;
-use tracing::{debug, error, info, instrument, warn};
 
 use super::*;
 
@@ -72,17 +65,16 @@ impl ConfigurationManager {
     self.resources.clear();
     self.retrievers.clear();
 
-    // First pass - collect all potential TOML files
+    // Collect all potential TOML files recursively
     let mut toml_files = Vec::new();
-    for entry in std::fs::read_dir(&self.config_root)? {
-      let entry = entry?;
+    for entry in walkdir::WalkDir::new(&self.config_root).into_iter().filter_map(|e| e.ok()) {
       let path = entry.path();
 
       if path.extension() == Some(OsStr::new("toml")) {
         if path.file_name() == Some(OsStr::new("config.toml")) {
           continue;
         }
-        toml_files.push(path);
+        toml_files.push(path.to_path_buf());
       }
     }
 
@@ -257,7 +249,7 @@ mod tests {
   #[test]
   #[traced_test]
   fn test_config_loading() {
-    let mut manager = ConfigurationManager::new(PathBuf::from("config_new")).unwrap();
+    let mut manager = ConfigurationManager::new(PathBuf::from("config")).unwrap();
 
     // Explicit loading
     manager.reload_config().unwrap();

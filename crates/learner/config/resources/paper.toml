@@ -1,100 +1,93 @@
-# Core resource definition
-description = "A scholarly paper or article published in an academic context"
-name        = "paper"
+name = "paper"
 
-# Title field - simple string type
-[[fields]]
-description = "The full title of the paper"
-field_type  = "string"
-name        = "title"
-required    = true
-validation  = { min_length = 1, max_length = 500 }
+description = "Configuration for a paper"
 
-# Authors field - array of complex author objects
-[[fields]]
-description = "The paper's authors with their affiliations"
-field_type  = "array"
-name        = "authors"
-required    = true
-validation  = { min_items = 1 }
+type = "resource"
 
-[fields.type_definition.element_type]
-field_type = "table"
+[abstract]
+base_type = "string"
+required  = false
+
+[title]
+base_type  = "string"
+required   = true
+validation = { min_length = 1, max_length = 500 }
+
+[authors]
+base_type  = "array"
+required   = true
+validation = { min_items = 1 }
+[authors.items]
+base_type = "object"
 fields = [
-    { name = "name", field_type = "string", description = "Author's full name", required = true },
-    { name = "affiliation", field_type = "string", description = "Author's institutional affiliation", required = false },
-    { name = "email", field_type = "string", description = "Author's contact email", required = false },
+    { name = "name", base_type = "string", required = true, validation = { min_length = 1 } },
+    { name = "affiliation", base_type = "string", required = false },
 ]
-name = "author"
 
-# Abstract field - simple string
-[[fields]]
-description = "The paper's abstract or summary"
-field_type  = "string"
-name        = "abstract"
-required    = false
+[publication_dates]
+base_type = "object"
+required  = true
+[[publication_dates.fields]]
+base_type  = "array"
+items      = { base_type = "string", validation = { datetime = true } }
+name       = "created"
+required   = true
+validation = { min_items = 1 }
+[[publication_dates.fields]]
+base_type = "array"
+items     = { base_type = "string", validation = { datetime = true } }
+name      = "published"
+required  = false
+[[publication_dates.fields]]
+base_type = "array"
+items     = { base_type = "string", validation = { datetime = true } }
+name      = "published_online"
+required  = false
+[[publication_dates.fields]]
+base_type = "array"
+items     = { base_type = "string", validation = { datetime = true } }
+name      = "published_print"
+required  = false
 
-[[fields]]
-description = "Publication and update history"
-field_type  = "array"
-name        = "publication_dates"
-required    = false
+[publisher]
+base_type = "string"
+required  = false
 
-[fields.type_definition.element_type]
-field_type = "string"
-name       = "date"
-validation = { datetime = true }
+[container]
+base_type = "object"
+fields = [
+    { name = "title", base_type = "string", required = true },
+    { name = "issn", base_type = "array", required = false },
+    { name = "volume", base_type = "string", required = false },
+    { name = "issue", base_type = "string", required = false },
+    { name = "pages", base_type = "string", required = false },
+]
+required = false
 
-# DOI field - string with pattern validation
-[[fields]]
-description = "Digital Object Identifier"
-field_type  = "string"
-name        = "doi"
-required    = false
-validation  = { pattern = "^10\\.\\d{4,9}/[-._;()/:a-zA-Z0-9]+$" }
+[paper_type]
+base_type = "string"
+required = false
+validation = { enum_values = [
+    "journal-article",
+    "book",
+    "conference-paper",
+    "report",
+    "thesis",
+] }
 
-# Keywords field - array of strings
-[[fields]]
-description = "Keywords or subject areas"
-field_type  = "array"
-name        = "keywords"
-required    = false
+[references_count]
+base_type = "number"
+required  = false
 
-[fields.type_definition.element_type]
-description = "A single keyword or subject area"
-field_type  = "string"
-name        = "keyword"                          # Add this!
-required    = false
+[language]
+base_type = "string"
+required  = false
 
-# Publication details - all simple strings
-[[fields]]
-description = "Journal where the paper was published"
-field_type  = "string"
-name        = "journal"
-required    = false
+[citations_count]
+base_type = "number"
+required  = false
 
-[[fields]]
-description = "Journal volume number"
-field_type  = "string"
-name        = "volume"
-required    = false
-
-[[fields]]
-description = "Journal issue number"
-field_type  = "string"
-name        = "issue"
-required    = false
-
-[[fields]]
-description = "Page range in the journal"
-field_type  = "string"
-name        = "pages"
-required    = false
-
-# Peer review flag - boolean with default
-[[fields]]
-default     = true
-description = "Whether the paper underwent peer review"
-field_type  = "boolean"
-name        = "peer_reviewed"
-required    = false
+[doi]
+base_type  = "string"
+required   = false
+validation = { pattern = "10\\.\\d{4,9}/[-._;()/:\\w]+" }
