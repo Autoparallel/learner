@@ -4,21 +4,7 @@ use template::{Template, TemplateType};
 
 use super::*;
 
-/// Complete application configuration with all loaded templates
-#[derive(Debug, Clone)]
-pub struct Configuration {
-  /// Common state tracking template
-  pub state:      Template,
-  /// Common storage configuration template
-  pub storage:    Template,
-  /// Common retrieval configuration template
-  pub retrieval:  Template,
-  /// Available resource types (paper, book, etc.)
-  pub resources:  BTreeMap<String, Template>,
-  /// Available retrievers (arxiv, doi, etc.)
-  pub retrievers: BTreeMap<String, Retriever>,
-}
-
+// TODO: Making defaults here would probably just be smart
 /// Main configuration manager that handles loading and access to all configs
 #[derive(Debug)]
 pub struct ConfigurationManager {
@@ -133,24 +119,7 @@ impl ConfigurationManager {
   }
 
   #[instrument(skip(self))]
-  fn process_retriever(&self, mut raw_config: toml::Value) -> Result<Retriever> {
-    debug!("Processing retriever configuration");
-
-    // First get the referenced template names
-    let resource_template_name = raw_config
-      .get("resource_template")
-      .and_then(|v| v.as_str())
-      .ok_or_else(|| LearnerError::Config("Retriever missing resource_template".into()))?;
-
-    // Get the resource template from resources
-    let resource_template = self.get_resource_template(resource_template_name)?;
-
-    // Get the retrieval template
-    let retrieval_template = self
-      .retrieval
-      .as_ref()
-      .ok_or_else(|| LearnerError::Config("Retrieval template not loaded".into()))?;
-
+  fn process_retriever(&self, raw_config: toml::Value) -> Result<Retriever> {
     // First deserialize the raw config without the templates
     #[derive(Deserialize)]
     struct RetrieverPartial {
@@ -169,6 +138,22 @@ impl ConfigurationManager {
       #[serde(default)]
       retrieval_mappings: BTreeMap<String, Mapping>,
     }
+    debug!("Processing retriever configuration");
+
+    // First get the referenced template names
+    let resource_template_name = raw_config
+      .get("resource_template")
+      .and_then(|v| v.as_str())
+      .ok_or_else(|| LearnerError::Config("Retriever missing resource_template".into()))?;
+
+    // Get the resource template from resources
+    let resource_template = self.get_resource_template(resource_template_name)?;
+
+    // Get the retrieval template
+    let retrieval_template = self
+      .retrieval
+      .as_ref()
+      .ok_or_else(|| LearnerError::Config("Retrieval template not loaded".into()))?;
 
     let partial: RetrieverPartial = raw_config.try_into()?;
 
