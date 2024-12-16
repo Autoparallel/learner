@@ -1,8 +1,18 @@
 use std::ffi::OsStr;
 
-use template::{Template, TemplateType};
+use template::{Template, TemplateType, TemplatedItem};
 
 use super::*;
+
+/// ArXiv default configuration
+pub const ARXIV_CONFIG: &str = include_str!("../config/retrievers/arxiv.toml");
+/// DOI default configuration
+pub const DOI_CONFIG: &str = include_str!("../config/retrievers/doi.toml");
+/// IACR default configuration
+pub const IACR_CONFIG: &str = include_str!("../config/retrievers/iacr.toml");
+
+/// Paper default configuration
+pub const PAPER_CONFIG: &str = include_str!("../config/resources/paper.toml");
 
 // TODO: Making defaults here would probably just be smart
 /// Main configuration manager that handles loading and access to all configs
@@ -16,6 +26,21 @@ pub struct ConfigurationManager {
   state:       Option<Template>,
   storage:     Option<Template>,
   retrieval:   Option<Template>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Record {
+  /// The resource type this record manages
+  pub resource: TemplatedItem,
+
+  /// State tracking configuration
+  pub state: TemplatedItem,
+
+  /// Storage configuration
+  pub storage: TemplatedItem,
+
+  /// Retrieval configuration
+  pub retrieval: TemplatedItem,
 }
 
 impl ConfigurationManager {
