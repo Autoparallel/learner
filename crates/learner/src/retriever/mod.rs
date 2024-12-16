@@ -6,7 +6,7 @@ pub use response::*;
 use serde_json::Map;
 
 use crate::{
-  configuration::Record,
+  record::Record,
   template::{FieldDefinition, Template, TemplatedItem},
 };
 
@@ -124,6 +124,7 @@ impl Retriever {
     self.resource_template.validate(dbg!(&resource))?;
     self.retrieval_template.validate(dbg!(&retrieval))?;
 
+    // TODO: Fix this
     Ok(Record { resource, state: BTreeMap::new(), storage: BTreeMap::new(), retrieval })
   }
 

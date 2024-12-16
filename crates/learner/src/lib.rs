@@ -168,6 +168,7 @@ pub mod error;
 pub mod format;
 pub mod llm;
 pub mod pdf;
+pub mod record;
 pub mod resource;
 pub mod template;
 

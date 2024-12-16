@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 
-use template::{Template, TemplateType, TemplatedItem};
+use template::{Template, TemplateType};
 
 use super::*;
 
@@ -26,21 +26,6 @@ pub struct ConfigurationManager {
   state:       Option<Template>,
   storage:     Option<Template>,
   retrieval:   Option<Template>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Record {
-  /// The resource type this record manages
-  pub resource: TemplatedItem,
-
-  /// State tracking configuration
-  pub state: TemplatedItem,
-
-  /// Storage configuration
-  pub storage: TemplatedItem,
-
-  /// Retrieval configuration
-  pub retrieval: TemplatedItem,
 }
 
 impl ConfigurationManager {
