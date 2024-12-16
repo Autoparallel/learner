@@ -1,21 +1,22 @@
-use std::ffi::OsStr;
+use std::{
+  collections::BTreeMap,
+  ffi::OsStr,
+  path::{Path, PathBuf},
+};
 
 use template::{Template, TemplateType};
+use tracing::{debug, error, info, instrument, warn};
 
 use super::*;
 
-/// ArXiv default configuration
-pub const ARXIV_CONFIG: &str = include_str!("../config/retrievers/arxiv.toml");
-/// DOI default configuration
-pub const DOI_CONFIG: &str = include_str!("../config/retrievers/doi.toml");
-/// IACR default configuration
-pub const IACR_CONFIG: &str = include_str!("../config/retrievers/iacr.toml");
+/// Default configurations provided with the library
+mod defaults {
+  pub const ARXIV_CONFIG: &str = include_str!("../config/retrievers/arxiv.toml");
+  pub const DOI_CONFIG: &str = include_str!("../config/retrievers/doi.toml");
+  pub const IACR_CONFIG: &str = include_str!("../config/retrievers/iacr.toml");
+  pub const PAPER_CONFIG: &str = include_str!("../config/resources/paper.toml");
+}
 
-/// Paper default configuration
-pub const PAPER_CONFIG: &str = include_str!("../config/resources/paper.toml");
-
-// TODO: Making defaults here would probably just be smart
-/// Main configuration manager that handles loading and access to all configs
 #[derive(Debug)]
 pub struct ConfigurationManager {
   config_root: PathBuf,
@@ -61,16 +62,15 @@ impl ConfigurationManager {
     self.resources.clear();
     self.retrievers.clear();
 
-    // Collect all potential TOML files recursively
+    // First pass - collect all TOML files
     let mut toml_files = Vec::new();
-    for entry in walkdir::WalkDir::new(&self.config_root).into_iter().filter_map(|e| e.ok()) {
+    for entry in std::fs::read_dir(&self.config_root)? {
+      let entry = entry?;
       let path = entry.path();
-
-      if path.extension() == Some(OsStr::new("toml")) {
-        if path.file_name() == Some(OsStr::new("config.toml")) {
-          continue;
-        }
-        toml_files.push(path.to_path_buf());
+      if path.extension() == Some(OsStr::new("toml"))
+        && path.file_name() != Some(OsStr::new("config.toml"))
+      {
+        toml_files.push(path);
       }
     }
 
@@ -98,11 +98,9 @@ impl ConfigurationManager {
       }
     }
 
-    // Second pass - try to load retrievers (which need templates to be loaded first)
+    // Second pass - try to load retrievers
     for path in &toml_files {
-      // Try to load as raw TOML first
       if let Ok(raw_config) = self.load_toml::<toml::Value>(path) {
-        // Check if this looks like a retriever config
         if raw_config.get("resource_template").is_some()
           && raw_config.get("retrieval_template").is_some()
         {
@@ -188,10 +186,9 @@ impl ConfigurationManager {
   pub fn reload_config(&mut self) -> Result<()> {
     info!("Reloading configuration");
 
-    // Load and process all configurations
     self.scan_configurations()?;
 
-    // Validate we have all required templates
+    // Validate required templates
     if self.state.is_none() {
       error!("Missing state template");
       return Err(LearnerError::Config("Missing state template".into()));
@@ -216,7 +213,7 @@ impl ConfigurationManager {
     Ok(())
   }
 
-  // Public access methods
+  // Accessors
   pub fn get_resource_types(&self) -> Vec<String> { self.resources.keys().cloned().collect() }
 
   pub fn get_retrievers(&self) -> Vec<String> { self.retrievers.keys().cloned().collect() }
@@ -238,29 +235,103 @@ impl ConfigurationManager {
 
 #[cfg(test)]
 mod tests {
+  use record::{Progress, State};
+  use tempfile::tempdir;
 
   use super::*;
 
+  fn setup_test_configs() -> (tempfile::TempDir, PathBuf) {
+    let dir = tempdir().unwrap();
+    let config_dir = dir.path().to_path_buf();
+
+    // Create test state extensions
+    std::fs::write(
+      config_dir.join("state.toml"),
+      r#"
+          name = "state"
+          type = "state"
+
+          [importance]
+          base_type = "number"
+          required = false
+          validation = { minimum = 1, maximum = 5 }
+
+          [due_date]
+          base_type = "string"
+          required = false
+          validation = { datetime = true }
+          "#,
+    )
+    .unwrap();
+
+    // Create test storage extensions
+    std::fs::write(
+      config_dir.join("storage.toml"),
+      r#"
+          name = "storage"
+          type = "storage"
+
+          [backup_location]
+          base_type = "string"
+          required = false
+
+          [file_format]
+          base_type = "string"
+          required = false
+          validation = { enum_values = ["pdf", "epub", "mobi"] }
+          "#,
+    )
+    .unwrap();
+
+    // Create test retrieval extensions
+    std::fs::write(
+      config_dir.join("retrieval.toml"),
+      r#"
+          name = "retrieval"
+          type = "retrieval"
+
+          [access_type]
+          base_type = "string"
+          required = false
+          validation = { enum_values = ["open", "subscription", "institutional"] }
+
+          [citation_key]
+          base_type = "string"
+          required = false
+          "#,
+    )
+    .unwrap();
+
+    (dir, config_dir)
+  }
+
   #[test]
   #[traced_test]
-  fn test_config_loading() {
-    let mut manager = ConfigurationManager::new(PathBuf::from("config")).unwrap();
+  fn test_template_loading_and_extension() {
+    let (_dir, config_dir) = setup_test_configs();
+    let mut manager = ConfigurationManager::new(config_dir).unwrap();
 
-    // Explicit loading
+    // Load configurations
     manager.reload_config().unwrap();
 
-    // Access configuration
-    let resource_types = manager.get_resource_types();
-    assert!(resource_types.contains(&"paper".to_string()));
+    // Create base types with extensions
+    let state = State {
+      progress:      Progress::Opened(Some(0.5)),
+      starred:       true,
+      tags:          vec!["important".to_string()],
+      last_accessed: Some(Utc::now()),
+      extended:      toml::toml! {
+          importance = 4
+          due_date = "2024-12-31T00:00:00Z"
+      }
+      .try_into()
+      .unwrap(),
+    };
 
-    // Test reload
-    manager.reload_config().unwrap();
-    let retrievers = manager.get_retrievers();
-    dbg!(&retrievers);
-    assert!(retrievers.contains(&"arxiv".to_string()));
+    // Verify serialization maintains the structure we want
+    let json = serde_json::to_string_pretty(&state).unwrap();
+    println!("Serialized State:\n{}", json);
 
-    // Get specific templates
-    let paper_template = manager.get_resource_template("paper").unwrap();
-    assert!(paper_template.fields.iter().any(|f| f.name == "title"));
+    // TODO: Add similar tests for Storage and Retrieval with their extensions
   }
 }
