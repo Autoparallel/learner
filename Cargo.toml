@@ -28,9 +28,9 @@ tokio = { version = "1.41", features = [
 ] }
 tracing = { version = "0.1" }
 
-
 # learner dependencies
 async-trait = { version = "0.1" }
+config = { version = "0.14.1" }
 dirs = { version = "5.0" }
 futures = { version = "0.3.31" }
 lazy_static = { version = "1.5" }
@@ -45,6 +45,7 @@ rusqlite = { version = "0.32", features = ["bundled", "functions", "chrono"] }
 serde_json = { version = "1.0" }
 tokio-rusqlite = { version = "0.6" }
 toml = { version = "0.8" }
+walkdir = { version = "2.5" }
 
 ## TUI dependencies
 crossterm = { version = "0.28" }
