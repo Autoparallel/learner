@@ -1,7 +1,6 @@
-use learner::retriever::RetrieverConfig;
+use learner::retriever::Retriever;
 
 use super::*;
 
-mod build_retriever;
 mod database_operations;
 mod paper_retrieval;

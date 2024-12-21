@@ -52,12 +52,12 @@
 //! # }
 //! ```
 
+use resource::{paper::Paper, shared::Author};
 use tokio_rusqlite::Connection;
 
 use super::*;
-
 mod instruction;
-// pub mod models;
+
 #[cfg(test)] mod tests;
 
 pub use self::instruction::{

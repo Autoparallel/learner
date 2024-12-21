@@ -1,0 +1,15 @@
+retrieval_template = "retrieval"
+state_template     = "state"
+storage_template   = "storage"
+
+[[resources]]
+template = "paper"
+
+# [[resources]]
+# template = "book"
+
+[[retrievers]]
+template = "arxiv"
+
+[[retrievers]]
+template = "doi"

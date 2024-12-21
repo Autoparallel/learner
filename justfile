@@ -150,19 +150,99 @@ debug:
     @just header "Installing learnerd in debug mode"
     cargo install --path crates/learnerd --features tui --debug
 
+# Display usage information for resource validation
+help-resource:
+    @echo "Validate a resource configuration file"
+    @echo
+    @echo "Usage:"
+    @echo "    just validate-resource path/to/resource.toml"
+    @echo
+    @echo "Examples:"
+    @echo "    just validate-resource crates/learner/config/resources/paper.toml"
+    @echo "    just validate-resource crates/learner/config/resources/book.toml"
+    @echo "    just validate-resource crates/learner/config/resources/thesis.toml"
+
+# Display usage information for retriever validation
+help-retriever:
+    @echo "Validate a retriever configuration file and optionally test with an identifier"
+    @echo
+    @echo "Usage:"
+    @echo "    just validate-retriever path/to/retriever.toml [identifier]"
+    @echo
+    @echo "Examples:"
+    @echo "    just validate-retriever crates/learner/config/retrievers/arxiv.toml"
+    @echo "    just validate-retriever crates/learner/config/retrievers/arxiv.toml 2301.07041"
+    @echo "    just validate-retriever crates/learner/config/retrievers/doi.toml \"10.1145/1327452.1327492\""
+    @echo "    just validate-retriever crates/learner/config/retrievers/iacr.toml \"2023/123\""
+
 # Setup SDK
 setup-sdk:
+    @echo "Installing learner-sdk..."
     cargo install --path crates/sdk --debug
+    @echo "Run 'just help-resource' or 'just help-retriever' for usage information"
 
-# Validate a retriever config
-validate-retriever path input="":
-    @just header "Validating retriever config"
-    learner-sdk validate-retriever {{path}} {{input}} 
+# Check if a path argument is provided for resource validation
+[private]
+_check-resource-args args:
+    #!/usr/bin/env bash
+    if [ -z "{{args}}" ]; then
+        printf "{{error}}Error: Missing required path argument{{reset}}\n"
+        echo
+        just help-resource
+        exit 1
+    fi
+
+# Check if required arguments are provided for retriever validation
+[private]
+_check-retriever-args args:
+    #!/usr/bin/env bash
+    if [ -z "{{args}}" ]; then
+        printf "{{error}}Error: Missing required path argument{{reset}}\n"
+        echo
+        just help-retriever
+        exit 1
+    fi
 
 # Validate a resource config
-validate-resource path:
+validate-resource +args="": (_check-resource-args args)
+    #!/usr/bin/env bash
+    if [ ! -f "{{args}}" ]; then
+        printf "{{error}}Error: File not found: {{args}}{{reset}}\n"
+        echo
+        just help-resource
+        exit 1
+    fi
     @just header "Validating resource config"
-    learner-sdk validate-resource {{path}}
+    learner-sdk validate-resource {{args}}
+
+# Validate a retriever config
+validate-retriever +args="": (_check-retriever-args args)
+    #!/usr/bin/env bash
+    # Split args into path and input
+    read -r path input <<< "{{args}}"
+    if [ ! -f "$path" ]; then
+        printf "{{error}}Error: File not found: $path{{reset}}\n"
+        echo
+        just help-retriever
+        exit 1
+    fi
+    @just header "Validating retriever config"
+    learner-sdk validate-retriever "$path" $input
+
+# Run all example validations (useful for CI)
+validate-examples:
+    #!/usr/bin/env bash
+    echo "==> Validating all example configurations"
+    echo
+    echo "Resource Configurations:"
+    just validate-resource crates/learner/config/resources/paper.toml
+    just validate-resource crates/learner/config/resources/book.toml
+    just validate-resource crates/learner/config/resources/thesis.toml
+    echo
+    echo "Retriever Configurations:"
+    just validate-retriever crates/learner/config/retrievers/arxiv.toml "2301.07041"
+    just validate-retriever crates/learner/config/retrievers/doi.toml "10.1145/1327452.1327492"
+    just validate-retriever crates/learner/config/retrievers/iacr.toml "2023/123"
 
 # Show your relevant environment information
 info:

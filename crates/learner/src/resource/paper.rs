@@ -42,6 +42,8 @@
 //! # }
 //! ```
 
+use shared::Author;
+
 use super::*;
 
 /// Complete representation of an academic paper with metadata.
@@ -187,8 +189,4 @@ impl Paper {
     let formatted_title = format::format_title(&self.title, Some(50));
     PathBuf::from(format!("{}.pdf", formatted_title))
   }
-}
-
-impl Resource for Paper {
-  fn resource_type(&self) -> String { "paper".to_string() }
 }
