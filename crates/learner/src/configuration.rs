@@ -4,7 +4,8 @@ use std::{
   path::{Path, PathBuf},
 };
 
-use template::{Template, TemplateType};
+use record::{Resource, Retrieval, State, Storage};
+use template::{Template, TemplateType, TemplatedItem};
 use tracing::{debug, error, info, instrument, warn};
 
 use super::*;
@@ -17,16 +18,15 @@ mod defaults {
   pub const PAPER_CONFIG: &str = include_str!("../config/resources/paper.toml");
 }
 
-#[derive(Debug)]
 pub struct ConfigurationManager {
   config_root: PathBuf,
-  // Cache the actual parsed configurations
-  resources:   BTreeMap<String, Template>,
+  // Cache the actual constructed types
+  resources:   BTreeMap<String, Resource>,
   retrievers:  BTreeMap<String, Retriever>,
-  // Core templates that apply to all resources
-  state:       Option<Template>,
-  storage:     Option<Template>,
-  retrieval:   Option<Template>,
+  // Core constructed types
+  state:       State,
+  storage:     Storage,
+  retrieval:   Retrieval,
 }
 
 impl ConfigurationManager {
@@ -39,9 +39,9 @@ impl ConfigurationManager {
       config_root,
       resources: BTreeMap::new(),
       retrievers: BTreeMap::new(),
-      state: None,
-      storage: None,
-      retrieval: None,
+      state: State::default(),
+      storage: Storage::default(),
+      retrieval: Retrieval::default(),
     };
 
     Ok(manager)
@@ -74,31 +74,58 @@ impl ConfigurationManager {
       }
     }
 
-    // First pass - load all templates
+    // First pass - load and process templates
     for path in &toml_files {
       if let Ok(template) = self.load_toml::<Template>(path) {
         match template.template_type {
           TemplateType::Resource => {
             debug!(name = %template.name, "Found resource template");
-            self.resources.insert(template.name.clone(), template);
+            // Create Resource with extended fields from template
+            let mut extended = TemplatedItem::new();
+            for field in &template.fields {
+              if field.name != "title" {
+                // Skip base fields
+                extended.insert(field.name.clone(), serde_json::Value::Object(Default::default()));
+              }
+            }
+            let resource = Resource {
+              title: String::new(), // Will be filled when used
+              extended,
+            };
+            self.resources.insert(template.name.clone(), resource);
           },
           TemplateType::State => {
             debug!(name = %template.name, "Found state template");
-            self.state = Some(template);
+            // Add template fields to base State
+            let mut extended = TemplatedItem::new();
+            for field in &template.fields {
+              extended.insert(field.name.clone(), serde_json::Value::Object(Default::default()));
+            }
+            self.state.extended = extended;
           },
           TemplateType::Storage => {
             debug!(name = %template.name, "Found storage template");
-            self.storage = Some(template);
+            // Add template fields to base Storage
+            let mut extended = TemplatedItem::new();
+            for field in &template.fields {
+              extended.insert(field.name.clone(), serde_json::Value::Object(Default::default()));
+            }
+            self.storage.extended = extended;
           },
           TemplateType::Retrieval => {
             debug!(name = %template.name, "Found retrieval template");
-            self.retrieval = Some(template);
+            // Add template fields to base Retrieval
+            let mut extended = TemplatedItem::new();
+            for field in &template.fields {
+              extended.insert(field.name.clone(), serde_json::Value::Object(Default::default()));
+            }
+            self.retrieval.extended = extended;
           },
         }
       }
     }
 
-    // Second pass - try to load retrievers
+    // Second pass - process retrievers
     for path in &toml_files {
       if let Ok(raw_config) = self.load_toml::<toml::Value>(path) {
         if raw_config.get("resource_template").is_some()
@@ -148,24 +175,20 @@ impl ConfigurationManager {
     }
     debug!("Processing retriever configuration");
 
-    // First get the referenced template names
+    // First parse the basic retriever fields
+    let partial: RetrieverPartial = raw_config.clone().try_into()?;
+
+    // Get the resource template name and construct Resource
     let resource_template_name = raw_config
       .get("resource_template")
       .and_then(|v| v.as_str())
       .ok_or_else(|| LearnerError::Config("Retriever missing resource_template".into()))?;
 
-    // Get the resource template from resources
-    let resource_template = self.get_resource_template(resource_template_name)?;
+    let resource = self.resources.get(resource_template_name).ok_or_else(|| {
+      LearnerError::Config(format!("Resource template {resource_template_name} not found"))
+    })?;
 
-    // Get the retrieval template
-    let retrieval_template = self
-      .retrieval
-      .as_ref()
-      .ok_or_else(|| LearnerError::Config("Retrieval template not loaded".into()))?;
-
-    let partial: RetrieverPartial = raw_config.try_into()?;
-
-    // Now construct the full Retriever
+    // Construct the final Retriever
     Ok(Retriever {
       name:               partial.name,
       description:        partial.description,
@@ -175,9 +198,9 @@ impl ConfigurationManager {
       endpoint_template:  partial.endpoint_template,
       response_format:    partial.response_format,
       headers:            partial.headers,
-      resource_template:  resource_template.clone(),
+      resource:           resource.clone(),
+      retrieval:          self.retrieval.clone(),
       resource_mappings:  partial.resource_mappings,
-      retrieval_template: retrieval_template.clone(),
       retrieval_mappings: partial.retrieval_mappings,
     })
   }
@@ -189,18 +212,6 @@ impl ConfigurationManager {
     self.scan_configurations()?;
 
     // Validate required templates
-    if self.state.is_none() {
-      error!("Missing state template");
-      return Err(LearnerError::Config("Missing state template".into()));
-    }
-    if self.storage.is_none() {
-      error!("Missing storage template");
-      return Err(LearnerError::Config("Missing storage template".into()));
-    }
-    if self.retrieval.is_none() {
-      error!("Missing retrieval template");
-      return Err(LearnerError::Config("Missing retrieval template".into()));
-    }
     if self.resources.is_empty() {
       error!("No resource templates loaded");
       return Err(LearnerError::Config("No resource templates loaded".into()));
@@ -218,14 +229,14 @@ impl ConfigurationManager {
 
   pub fn get_retrievers(&self) -> Vec<String> { self.retrievers.keys().cloned().collect() }
 
-  pub fn get_resource_template(&self, name: &str) -> Result<&Template> {
+  pub fn get_resource(&self, name: &str) -> Result<&Resource> {
     self
       .resources
       .get(name)
       .ok_or_else(|| LearnerError::Config(format!("Resource template {name} not found")))
   }
 
-  pub fn get_retriever_template(&self, name: &str) -> Result<&Retriever> {
+  pub fn get_retriever(&self, name: &str) -> Result<&Retriever> {
     self
       .retrievers
       .get(name)
@@ -243,6 +254,20 @@ mod tests {
   fn setup_test_configs() -> (tempfile::TempDir, PathBuf) {
     let dir = tempdir().unwrap();
     let config_dir = dir.path().to_path_buf();
+
+    // Create test resource
+    std::fs::write(
+      config_dir.join("resource.toml"),
+      r#"
+          name = "resource"
+          type = "resource"
+          
+          [abstract]
+          base_type = "string"
+          required  = false
+          "#,
+    )
+    .unwrap();
 
     // Create test state extensions
     std::fs::write(
@@ -302,6 +327,36 @@ mod tests {
     )
     .unwrap();
 
+    // Create test retriever
+    std::fs::write(
+      config_dir.join("retriever.toml"),
+      r#"
+        name = "retriever"
+        type = "retriever"
+
+        resource_template  = "resource"
+        retrieval_template = "retrieval"
+  
+        base_url          = "http://example.com"
+        endpoint_template = "http://example.com"
+        pattern           = ""
+        source            = "test_source"
+        
+        [response_format]
+        clean_content    = true
+        strip_namespaces = true
+        type             = "xml"
+  
+        [resource_mappings]
+        abstract = "response/abstract"
+        title    = "response/title"
+  
+        [headers]
+        Accept = "application/xml"
+        "#,
+    )
+    .unwrap();
+
     (dir, config_dir)
   }
 
@@ -314,7 +369,11 @@ mod tests {
     // Load configurations
     manager.reload_config().unwrap();
 
-    // Create base types with extensions
+    // Verify state template was applied
+    assert!(manager.state.extended.contains_key("importance"));
+    assert!(manager.state.extended.contains_key("due_date"));
+
+    // Create a state with actual values
     let state = State {
       progress:      Progress::Opened(Some(0.5)),
       starred:       true,
@@ -328,10 +387,24 @@ mod tests {
       .unwrap(),
     };
 
-    // Verify serialization maintains the structure we want
-    let json = serde_json::to_string_pretty(&state).unwrap();
-    println!("Serialized State:\n{}", json);
+    // Verify storage template was applied
+    assert!(manager.storage.extended.contains_key("backup_location"));
+    assert!(manager.storage.extended.contains_key("file_format"));
 
-    // TODO: Add similar tests for Storage and Retrieval with their extensions
+    // Verify retrieval template was applied
+    assert!(manager.retrieval.extended.contains_key("access_type"));
+    assert!(manager.retrieval.extended.contains_key("citation_key"));
+
+    // Serialize and verify structure
+    let json = serde_json::to_string_pretty(&state).unwrap();
+    let value: serde_json::Value = dbg!(serde_json::from_str(&json).unwrap());
+
+    // Base fields should be present
+    assert!(value["progress"].is_object());
+    assert!(value["starred"].is_boolean());
+
+    // Extended fields should be at the same level
+    assert_eq!(value["importance"], 4);
+    assert_eq!(value["due_date"], "2024-12-31T00:00:00Z");
   }
 }

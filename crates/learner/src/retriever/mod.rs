@@ -2,6 +2,7 @@ use super::*;
 
 mod response;
 
+use record::{Resource, Retrieval, State, Storage};
 pub use response::*;
 use serde_json::Map;
 
@@ -29,11 +30,11 @@ pub struct Retriever {
   #[serde(default)]
   pub headers:         BTreeMap<String, String>,
 
-  pub resource_template: Template,
+  pub resource:          Resource,
   #[serde(default)]
   pub resource_mappings: BTreeMap<String, Mapping>,
 
-  pub retrieval_template: Template,
+  pub retrieval:          Retrieval,
   #[serde(default)]
   pub retrieval_mappings: BTreeMap<String, Mapping>,
 }
@@ -120,20 +121,23 @@ impl Retriever {
     resource.insert("source_identifier".into(), Value::String(identifier.to_string()));
 
     // Validate full resource against config
-    // TODO: Add in validations here.
-    self.resource_template.validate(dbg!(&resource))?;
-    self.retrieval_template.validate(dbg!(&retrieval))?;
+    // TODO: Need to validate but also place into the respective struct. So we should validate the
+    // struct itself.
+    // self.resource_template.validate(dbg!(&resource))?;
+    // self.retrieval_template.validate(dbg!(&retrieval))?;
 
     // TODO: Fix this
-    Ok(Record { resource, state: BTreeMap::new(), storage: BTreeMap::new(), retrieval })
+    // Ok(Record { resource, state: State::default(), storage: Storage::default(), retrieval })
+    todo!("Needs fixed")
   }
 
   pub fn process_json_value(&self, json: &Value) -> Result<(TemplatedItem, TemplatedItem)> {
-    let resource = process_template_fields(json, &self.resource_template, &self.resource_mappings)?;
-    let retrieval =
-      process_template_fields(json, &self.retrieval_template, &self.retrieval_mappings)?;
+    todo!("Needs fixed")
+    // let resource = process_template_fields(json, &self.resource_template,
+    // &self.resource_mappings)?; let retrieval =
+    //   process_template_fields(json, &self.retrieval_template, &self.retrieval_mappings)?;
 
-    Ok((resource, retrieval))
+    // Ok((resource, retrieval))
   }
 }
 
