@@ -169,7 +169,6 @@ pub mod format;
 pub mod llm;
 pub mod pdf;
 pub mod record;
-pub mod resource;
 pub mod template;
 
 use crate::{error::*, retriever::*};
