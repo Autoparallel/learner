@@ -1,0 +1,31 @@
+name = "retrieval"
+
+description = "Standard retrieval data template"
+
+type = "retrieval"
+
+[source]
+base_type = "string"
+required  = false
+
+[source_identifier]
+base_type = "string"
+required  = false
+
+[urls]
+base_type = "object"
+fields = [
+    { name = "document", base_type = "string", required = false },
+    { name = "html", base_type = "string", required = false },
+]
+required = false
+
+[last_checked]
+base_type  = "string"
+required   = false
+validation = { datetime = true }
+
+[access_type]
+base_type  = "string"
+required   = false
+validation = { enum_values = ["open", "subscription", "institutional"] }

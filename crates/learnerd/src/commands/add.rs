@@ -24,21 +24,21 @@ pub struct AddArgs {
 pub async fn add<I: UserInteraction>(interaction: &mut I, add_args: AddArgs) -> Result<Paper> {
   let AddArgs { identifier, pdf, no_pdf } = add_args;
 
-  if interaction.learner().retriever.is_empty() {
+  if interaction.learner().retrievers.is_empty() {
     return Err(LearnerdError::Learner(LearnerError::Config(
       "No retriever configured.".to_string(),
     )));
   }
 
   let (source, sanitized_identifier) =
-    interaction.learner().retriever.sanitize_identifier(&identifier)?;
+    interaction.learner().retrievers.sanitize_identifier(&identifier)?;
   let papers = Query::by_source(&source, &sanitized_identifier)
     .execute(&mut interaction.learner().database)
     .await?;
 
   if papers.is_empty() {
     interaction.reply(ResponseContent::Info(&format!("Fetching paper: {}", identifier)))?;
-    let paper = interaction.learner().retriever.get_paper(&identifier).await?;
+    let paper = interaction.learner().retrievers.get_paper(&identifier).await?;
     interaction.reply(ResponseContent::Paper(&paper))?;
 
     let with_pdf = paper.pdf_url.is_some()

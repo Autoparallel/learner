@@ -1,32 +1,41 @@
+name = "iacr"
+
+description = "Retriever template for getting a paper from IACR"
+
+resource_template  = "paper"
+retrieval_template = "retrieval"
+
 base_url          = "https://eprint.iacr.org"
 endpoint_template = "https://eprint.iacr.org/oai?verb=GetRecord&identifier=oai:eprint.iacr.org:{identifier}&metadataPrefix=oai_dc"
-name              = "iacr"
 pattern           = "(?:^|https?://eprint\\.iacr\\.org/)(\\d{4}/\\d+)(?:\\.pdf)?$"
 source            = "iacr"
 
 [response_format]
+clean_content    = true
 strip_namespaces = true
 type             = "xml"
 
-[response_format.field_maps.title]
-path = "OAI-PMH/GetRecord/record/metadata/dc/title"
+[resource_mappings]
+abstract = "OAI-PMH/GetRecord/record/metadata/dc/description"
+title    = "OAI-PMH/GetRecord/record/metadata/dc/title"
 
-[response_format.field_maps.abstract]
-path = "OAI-PMH/GetRecord/record/metadata/dc/description"
+[resource_mappings.authors]
+from = "OAI-PMH/GetRecord/record/metadata/dc/creator"
+map  = { name = "." }
 
-[response_format.field_maps.authors]
-path = "OAI-PMH/GetRecord/record/metadata/dc/creator"
+[resource_mappings.publication_dates]
+map = { created = "OAI-PMH/GetRecord/record/metadata/dc/date" }
 
-[response_format.field_maps.publication_date]
-path = "OAI-PMH/GetRecord/record/metadata/dc/date"
+[retrieval_mappings.urls]
+from = "OAI-PMH/GetRecord/record/metadata/dc/identifier"
+[retrieval_mappings.urls.map]
+document = { paths = [
+    ".",
+], transform = "replace:.*/(\\d{4}/\\d+)$:https://eprint.iacr.org/$1.pdf" }
+html = { paths = [
+    ".",
+], transform = "replace:.*/(\\d{4}/\\d+)$:https://eprint.iacr.org/$1" }
 
-[response_format.field_maps.pdf_url]
-path = "OAI-PMH/GetRecord/record/metadata/dc/identifier"
-
-[response_format.field_maps.pdf_url.transform]
-pattern     = "^(https://eprint\\.iacr\\.org/\\d{4}/\\d+)$"
-replacement = "$1.pdf"
-type        = "Replace"
 
 [headers]
 Accept = "application/xml"

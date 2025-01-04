@@ -57,7 +57,7 @@ pub mod remove;
 
 use rusqlite::{params_from_iter, ToSql};
 
-use self::query::Query;
+use crate::record::Record;
 
 /// Trait for implementing type-safe database operations.
 ///
